@@ -35,11 +35,16 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   List<String> _columns = [];
   String? _sortColumn;
   bool _sortDescending = false;
-  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    // 不在这里调用MediaQuery，延迟到didChangeDependencies
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _initColumns();
   }
 
@@ -49,7 +54,6 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     _columns = widget.preferencesService.getApplicationColumns(defaults);
     _sortColumn = widget.preferencesService.getApplicationSort();
     _sortDescending = widget.preferencesService.getApplicationSortDesc();
-    _isInitialized = true;
   }
 
   void _onColumnsChanged(List<String> columns) {
@@ -91,10 +95,6 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInitialized) {
-      _initColumns();
-    }
-
     final isMobile = MediaQuery.of(context).size.width < 600;
     final items = _getSortedItems();
 
