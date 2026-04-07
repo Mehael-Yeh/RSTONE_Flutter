@@ -74,32 +74,19 @@ class _SearchPageState extends State<SearchPage> {
               padding: const EdgeInsets.only(top: 16, bottom: 8),
               child: Row(
                 children: [
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.orange[400]!, Colors.orange[700]!],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.diamond, color: Colors.white, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          '锐石 RSTONE',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
+                  const SizedBox(width: 48), // Spacer for settings button
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        '锐石',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                  const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.settings, color: Colors.white70),
                     onPressed: () {
