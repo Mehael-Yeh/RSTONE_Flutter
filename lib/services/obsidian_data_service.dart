@@ -1,12 +1,15 @@
+import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/product_item.dart';
 
 /// Obsidian数据服务
 class ObsidianDataService {
-  static const String _sourcePath = '/vol2/1000/Obsidian/锐石';
-  static const String _productsFolder = '产品列表';
-  static const String _applicationsFolder = '产品应用';
+  static const String _productsAssetIndex = 'assets/产品列表.json';
+  static const String _applicationsAssetIndex = 'assets/产品应用.json';
+  static const String _productsAssetPath = 'assets/产品列表';
+  static const String _applicationsAssetPath = 'assets/产品应用';
   
   List<ProductItem> _products = [];
   List<ProductItem> _applications = [];
@@ -16,67 +19,50 @@ class ObsidianDataService {
   List<ProductItem> get applications => _applications;
   bool get isInitialized => _initialized;
 
-  /// 初始化：复制数据到应用私有目录并解析
+  /// 初始化
   Future<void> initialize() async {
     if (_initialized) return;
     
     try {
-      // 获取应用文档目录
+      // 先尝试从私有目录加载
       final appDir = await getApplicationDocumentsDirectory();
       final dataDir = Directory('${appDir.path}/rst_data');
       
-      // 如果数据目录不存在，先复制数据
-      if (!await dataDir.exists()) {
-        await dataDir.create(recursive: true);
-        await _copyData(dataDir);
+      bool hasData = false;
+      
+      // 检查私有目录是否有数据
+      if (await dataDir.exists()) {
+        final productsDir = Directory('${dataDir.path}/产品列表');
+        final appsDir = Directory('${dataDir.path}/产品应用');
+        
+        final productFiles = await productsDir.list().toList();
+        final appFiles = await appsDir.list().toList();
+        
+        if (productFiles.isNotEmpty || appFiles.isNotEmpty) {
+          await _loadFromPrivateDir(dataDir);
+          hasData = true;
+        }
       }
       
-      // 读取并解析MD文件
-      await _loadProducts(dataDir);
-      await _loadApplications(dataDir);
+      // 如果私有目录没有数据，从Asset加载
+      if (!hasData) {
+        await _loadFromAssets(dataDir);
+      }
       
       _initialized = true;
     } catch (e) {
-      // 如果无法访问Obsidian源，直接从源路径读取
-      await _loadFromSource();
+      // 确保至少加载了数据
+      if (_products.isEmpty || _applications.isEmpty) {
+        await _loadFromAssetsOnly();
+      }
       _initialized = true;
     }
   }
 
-  /// 从Obsidian源路径复制数据到应用私有目录
-  Future<void> _copyData(Directory dataDir) async {
-    try {
-      final productsSource = Directory('$_sourcePath/$_productsFolder');
-      final appsSource = Directory('$_sourcePath/$_applicationsFolder');
-      
-      if (await productsSource.exists()) {
-        final productsDest = Directory('${dataDir.path}/$_productsFolder');
-        await productsDest.create(recursive: true);
-        await for (var entity in productsSource.list()) {
-          if (entity is File && entity.path.endsWith('.md')) {
-            await entity.copy('${productsDest.path}/${entity.path.split('/').last}');
-          }
-        }
-      }
-      
-      if (await appsSource.exists()) {
-        final appsDest = Directory('${dataDir.path}/$_applicationsFolder');
-        await appsDest.create(recursive: true);
-        await for (var entity in appsSource.list()) {
-          if (entity is File && entity.path.endsWith('.md')) {
-            await entity.copy('${appsDest.path}/${entity.path.split('/').last}');
-          }
-        }
-      }
-    } catch (e) {
-      // 复制失败，后续会尝试直接从源路径读取
-    }
-  }
-
-  /// 从应用数据目录加载产品列表
-  Future<void> _loadProducts(Directory dataDir) async {
-    final productsDir = Directory('${dataDir.path}/$_productsFolder');
-    
+  /// 从私有目录加载
+  Future<void> _loadFromPrivateDir(Directory dataDir) async {
+    // 加载产品列表
+    final productsDir = Directory('${dataDir.path}/产品列表');
     if (await productsDir.exists()) {
       await for (var entity in productsDir.list()) {
         if (entity is File && entity.path.endsWith('.md')) {
@@ -84,17 +70,14 @@ class ObsidianDataService {
             final content = await entity.readAsString();
             _products.add(ProductItem.fromMdContent(entity.path, content));
           } catch (e) {
-            // 跳过无法读取的文件
+            // 跳过
           }
         }
       }
     }
-  }
-
-  /// 从应用数据目录加载产品应用
-  Future<void> _loadApplications(Directory dataDir) async {
-    final appsDir = Directory('${dataDir.path}/$_applicationsFolder');
     
+    // 加载产品应用
+    final appsDir = Directory('${dataDir.path}/产品应用');
     if (await appsDir.exists()) {
       await for (var entity in appsDir.list()) {
         if (entity is File && entity.path.endsWith('.md')) {
@@ -102,46 +85,101 @@ class ObsidianDataService {
             final content = await entity.readAsString();
             _applications.add(ProductItem.fromMdContent(entity.path, content));
           } catch (e) {
-            // 跳过无法读取的文件
+            // 跳过
           }
         }
       }
     }
   }
 
-  /// 直接从Obsidian源路径加载数据（备用方案）
-  Future<void> _loadFromSource() async {
+  /// 从Asset加载数据并保存到私有目录
+  Future<void> _loadFromAssets(Directory dataDir) async {
     try {
-      final productsSource = Directory('$_sourcePath/$_productsFolder');
-      final appsSource = Directory('$_sourcePath/$_applicationsFolder');
+      await dataDir.create(recursive: true);
       
-      if (await productsSource.exists()) {
-        await for (var entity in productsSource.list()) {
-          if (entity is File && entity.path.endsWith('.md')) {
-            try {
-              final content = await entity.readAsString();
-              _products.add(ProductItem.fromMdContent(entity.path, content));
-            } catch (e) {
-              // 跳过
-            }
+      // 加载产品列表索引
+      try {
+        final indexContent = await rootBundle.loadString(_productsAssetIndex);
+        final List<dynamic> productFiles = jsonDecode(indexContent);
+        
+        for (final fileName in productFiles) {
+          try {
+            final content = await rootBundle.loadString('$_productsAssetPath/$fileName');
+            final file = File('${dataDir.path}/产品列表/$fileName');
+            await file.parent.create(recursive: true);
+            await file.writeAsString(content);
+            _products.add(ProductItem.fromMdContent(file.path, content));
+          } catch (e) {
+            // 文件不存在，跳过
           }
         }
+      } catch (e) {
+        // 索引加载失败
       }
       
-      if (await appsSource.exists()) {
-        await for (var entity in appsSource.list()) {
-          if (entity is File && entity.path.endsWith('.md')) {
-            try {
-              final content = await entity.readAsString();
-              _applications.add(ProductItem.fromMdContent(entity.path, content));
-            } catch (e) {
-              // 跳过
-            }
+      // 加载产品应用索引
+      try {
+        final indexContent = await rootBundle.loadString(_applicationsAssetIndex);
+        final List<dynamic> appFiles = jsonDecode(indexContent);
+        
+        for (final fileName in appFiles) {
+          try {
+            final content = await rootBundle.loadString('$_applicationsAssetPath/$fileName');
+            final file = File('${dataDir.path}/产品应用/$fileName');
+            await file.parent.create(recursive: true);
+            await file.writeAsString(content);
+            _applications.add(ProductItem.fromMdContent(file.path, content));
+          } catch (e) {
+            // 文件不存在，跳过
           }
         }
+      } catch (e) {
+        // 索引加载失败
       }
     } catch (e) {
-      // 加载失败，数据列表为空
+      // 尝试只从Asset加载
+      await _loadFromAssetsOnly();
+    }
+  }
+
+  /// 只从Asset加载（不保存到私有目录）
+  Future<void> _loadFromAssetsOnly() async {
+    try {
+      // 加载产品列表
+      try {
+        final indexContent = await rootBundle.loadString(_productsAssetIndex);
+        final List<dynamic> productFiles = jsonDecode(indexContent);
+        
+        for (final fileName in productFiles) {
+          try {
+            final content = await rootBundle.loadString('$_productsAssetPath/$fileName');
+            _products.add(ProductItem.fromMdContent('$_productsAssetPath/$fileName', content));
+          } catch (e) {
+            // 跳过
+          }
+        }
+      } catch (e) {
+        // 索引加载失败
+      }
+      
+      // 加载产品应用
+      try {
+        final indexContent = await rootBundle.loadString(_applicationsAssetIndex);
+        final List<dynamic> appFiles = jsonDecode(indexContent);
+        
+        for (final fileName in appFiles) {
+          try {
+            final content = await rootBundle.loadString('$_applicationsAssetPath/$fileName');
+            _applications.add(ProductItem.fromMdContent('$_applicationsAssetPath/$fileName', content));
+          } catch (e) {
+            // 跳过
+          }
+        }
+      } catch (e) {
+        // 索引加载失败
+      }
+    } catch (e) {
+      // 忽略
     }
   }
 
@@ -167,7 +205,7 @@ class ObsidianDataService {
     return results;
   }
 
-  /// 清除应用数据（卸载时调用）
+  /// 清除应用数据
   Future<void> clearData() async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
@@ -179,7 +217,7 @@ class ObsidianDataService {
       _applications.clear();
       _initialized = false;
     } catch (e) {
-      // 忽略错误
+      // 忽略
     }
   }
 }
