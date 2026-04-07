@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
 import '../widgets/product_detail_sheet.dart';
+import 'settings_page.dart';
 
 /// 搜索页面（主界面）
 class SearchPage extends StatefulWidget {
@@ -72,8 +73,8 @@ class _SearchPageState extends State<SearchPage> {
             Padding(
               padding: const EdgeInsets.only(top: 16, bottom: 8),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  const Spacer(),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
@@ -97,6 +98,18 @@ class _SearchPageState extends State<SearchPage> {
                         ),
                       ],
                     ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.settings, color: Colors.white70),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SettingsPage(dataService: widget.dataService),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

@@ -14,172 +14,201 @@ class ObsidianDataService {
   List<ProductItem> _products = [];
   List<ProductItem> _applications = [];
   bool _initialized = false;
-
+  
+  /// 日志记录
+  final List<String> _logs = [];
+  
   List<ProductItem> get products => _products;
   List<ProductItem> get applications => _applications;
   bool get isInitialized => _initialized;
+  List<String> get logs => List.unmodifiable(_logs);
+
+  void _addLog(String message) {
+    final timestamp = DateTime.now().toString().substring(11, 19);
+    _logs.insert(0, '[$timestamp] $message');
+    // 只保留最近100条日志
+    if (_logs.length > 100) {
+      _logs.removeLast();
+    }
+  }
 
   /// 初始化
   Future<void> initialize() async {
-    if (_initialized) return;
+    if (_initialized) {
+      _addLog('DataService: Already initialized, skipping');
+      return;
+    }
+    
+    _addLog('DataService: Starting initialization');
     
     try {
-      // 先尝试从私有目录加载
-      final appDir = await getApplicationDocumentsDirectory();
-      final dataDir = Directory('${appDir.path}/rst_data');
+      // 第一步：直接从Asset加载（最可靠）
+      _addLog('DataService: Loading from assets...');
+      await _loadFromAssetsOnly();
+      _addLog('DataService: Asset load complete. Products: ${_products.length}, Applications: ${_applications.length}');
       
-      bool hasData = false;
-      
-      // 检查私有目录是否有数据
-      if (await dataDir.exists()) {
-        final productsDir = Directory('${dataDir.path}/产品列表');
-        final appsDir = Directory('${dataDir.path}/产品应用');
-        
-        final productFiles = await productsDir.list().toList();
-        final appFiles = await appsDir.list().toList();
-        
-        if (productFiles.isNotEmpty || appFiles.isNotEmpty) {
-          await _loadFromPrivateDir(dataDir);
-          hasData = true;
-        }
+      // 第二步：如果Asset加载失败，从私有目录加载
+      if (_products.isEmpty && _applications.isEmpty) {
+        _addLog('DataService: Asset load failed, trying private directory...');
+        final appDir = await getApplicationDocumentsDirectory();
+        final dataDir = Directory('${appDir.path}/rst_data');
+        await _loadFromPrivateDir(dataDir);
+        _addLog('DataService: Private dir load complete. Products: ${_products.length}, Applications: ${_applications.length}');
       }
       
-      // 如果私有目录没有数据，从Asset加载
-      if (!hasData) {
-        await _loadFromAssets(dataDir);
+      // 第三步：如果还是空的，从Asset复制到私有目录
+      if (_products.isEmpty && _applications.isEmpty) {
+        _addLog('DataService: All loads failed, product list is empty!');
+      } else {
+        // 复制到私有目录以便后续使用
+        _addLog('DataService: Copying data to private directory...');
+        final appDir = await getApplicationDocumentsDirectory();
+        final dataDir = Directory('${appDir.path}/rst_data');
+        await _copyAssetsToPrivateDir(dataDir);
       }
       
       _initialized = true;
-    } catch (e) {
-      // 确保至少加载了数据
-      if (_products.isEmpty || _applications.isEmpty) {
-        await _loadFromAssetsOnly();
-      }
-      _initialized = true;
+      _addLog('DataService: Initialization complete. Total: ${_products.length + _applications.length} items');
+    } catch (e, stack) {
+      _addLog('DataService: ERROR during initialization: $e');
+      _addLog('DataService: Stack trace: $stack');
+      _initialized = true; // 标记为已初始化，避免无限重试
     }
   }
 
   /// 从私有目录加载
   Future<void> _loadFromPrivateDir(Directory dataDir) async {
-    // 加载产品列表
-    final productsDir = Directory('${dataDir.path}/产品列表');
-    if (await productsDir.exists()) {
-      await for (var entity in productsDir.list()) {
-        if (entity is File && entity.path.endsWith('.md')) {
-          try {
-            final content = await entity.readAsString();
-            _products.add(ProductItem.fromMdContent(entity.path, content));
-          } catch (e) {
-            // 跳过
-          }
-        }
-      }
-    }
-    
-    // 加载产品应用
-    final appsDir = Directory('${dataDir.path}/产品应用');
-    if (await appsDir.exists()) {
-      await for (var entity in appsDir.list()) {
-        if (entity is File && entity.path.endsWith('.md')) {
-          try {
-            final content = await entity.readAsString();
-            _applications.add(ProductItem.fromMdContent(entity.path, content));
-          } catch (e) {
-            // 跳过
-          }
-        }
-      }
-    }
-  }
-
-  /// 从Asset加载数据并保存到私有目录
-  Future<void> _loadFromAssets(Directory dataDir) async {
     try {
-      await dataDir.create(recursive: true);
-      
-      // 加载产品列表索引
-      try {
-        final indexContent = await rootBundle.loadString(_productsAssetIndex);
-        final List<dynamic> productFiles = jsonDecode(indexContent);
-        
-        for (final fileName in productFiles) {
-          try {
-            final content = await rootBundle.loadString('$_productsAssetPath/$fileName');
-            final file = File('${dataDir.path}/产品列表/$fileName');
-            await file.parent.create(recursive: true);
-            await file.writeAsString(content);
-            _products.add(ProductItem.fromMdContent(file.path, content));
-          } catch (e) {
-            // 文件不存在，跳过
+      // 加载产品列表
+      final productsDir = Directory('${dataDir.path}/产品列表');
+      if (await productsDir.exists()) {
+        final files = await productsDir.list().toList();
+        _addLog('DataService: Found ${files.length} product files in private dir');
+        for (var entity in files) {
+          if (entity is File && entity.path.endsWith('.md')) {
+            try {
+              final content = await entity.readAsString();
+              _products.add(ProductItem.fromMdContent(entity.path, content));
+            } catch (e) {
+              _addLog('DataService: Error reading product file: ${entity.path}');
+            }
           }
         }
-      } catch (e) {
-        // 索引加载失败
       }
       
-      // 加载产品应用索引
-      try {
-        final indexContent = await rootBundle.loadString(_applicationsAssetIndex);
-        final List<dynamic> appFiles = jsonDecode(indexContent);
-        
-        for (final fileName in appFiles) {
-          try {
-            final content = await rootBundle.loadString('$_applicationsAssetPath/$fileName');
-            final file = File('${dataDir.path}/产品应用/$fileName');
-            await file.parent.create(recursive: true);
-            await file.writeAsString(content);
-            _applications.add(ProductItem.fromMdContent(file.path, content));
-          } catch (e) {
-            // 文件不存在，跳过
+      // 加载产品应用
+      final appsDir = Directory('${dataDir.path}/产品应用');
+      if (await appsDir.exists()) {
+        final files = await appsDir.list().toList();
+        _addLog('DataService: Found ${files.length} application files in private dir');
+        for (var entity in files) {
+          if (entity is File && entity.path.endsWith('.md')) {
+            try {
+              final content = await entity.readAsString();
+              _applications.add(ProductItem.fromMdContent(entity.path, content));
+            } catch (e) {
+              _addLog('DataService: Error reading application file: ${entity.path}');
+            }
           }
         }
-      } catch (e) {
-        // 索引加载失败
       }
     } catch (e) {
-      // 尝试只从Asset加载
-      await _loadFromAssetsOnly();
+      _addLog('DataService: Error loading from private dir: $e');
     }
   }
 
   /// 只从Asset加载（不保存到私有目录）
   Future<void> _loadFromAssetsOnly() async {
+    _addLog('DataService: Loading products from assets...');
+    
+    // 加载产品列表索引
     try {
-      // 加载产品列表
+      final indexContent = await rootBundle.loadString(_productsAssetIndex);
+      final List<dynamic> productFiles = jsonDecode(indexContent);
+      _addLog('DataService: Found ${productFiles.length} product files in index');
+      
+      for (final fileName in productFiles) {
+        try {
+          final content = await rootBundle.loadString('$_productsAssetPath/$fileName');
+          _products.add(ProductItem.fromMdContent('$_productsAssetPath/$fileName', content));
+        } catch (e) {
+          _addLog('DataService: Error loading product $fileName: $e');
+        }
+      }
+    } catch (e) {
+      _addLog('DataService: Error loading product index: $e');
+    }
+    
+    // 加载产品应用索引
+    _addLog('DataService: Loading applications from assets...');
+    try {
+      final indexContent = await rootBundle.loadString(_applicationsAssetIndex);
+      final List<dynamic> appFiles = jsonDecode(indexContent);
+      _addLog('DataService: Found ${appFiles.length} application files in index');
+      
+      for (final fileName in appFiles) {
+        try {
+          final content = await rootBundle.loadString('$_applicationsAssetPath/$fileName');
+          _applications.add(ProductItem.fromMdContent('$_applicationsAssetPath/$fileName', content));
+        } catch (e) {
+          _addLog('DataService: Error loading application $fileName: $e');
+        }
+      }
+    } catch (e) {
+      _addLog('DataService: Error loading application index: $e');
+    }
+  }
+
+  /// 从Asset复制数据到私有目录
+  Future<void> _copyAssetsToPrivateDir(Directory dataDir) async {
+    try {
+      await dataDir.create(recursive: true);
+      
+      // 复制产品列表
       try {
         final indexContent = await rootBundle.loadString(_productsAssetIndex);
         final List<dynamic> productFiles = jsonDecode(indexContent);
         
+        final productsDir = Directory('${dataDir.path}/产品列表');
+        await productsDir.create(recursive: true);
+        
         for (final fileName in productFiles) {
           try {
             final content = await rootBundle.loadString('$_productsAssetPath/$fileName');
-            _products.add(ProductItem.fromMdContent('$_productsAssetPath/$fileName', content));
+            final file = File('${productsDir.path}/$fileName');
+            await file.writeAsString(content);
           } catch (e) {
-            // 跳过
+            // 忽略单个文件错误
           }
         }
+        _addLog('DataService: Copied ${productFiles.length} products to private dir');
       } catch (e) {
-        // 索引加载失败
+        _addLog('DataService: Error copying products: $e');
       }
       
-      // 加载产品应用
+      // 复制产品应用
       try {
         final indexContent = await rootBundle.loadString(_applicationsAssetIndex);
         final List<dynamic> appFiles = jsonDecode(indexContent);
         
+        final appsDir = Directory('${dataDir.path}/产品应用');
+        await appsDir.create(recursive: true);
+        
         for (final fileName in appFiles) {
           try {
             final content = await rootBundle.loadString('$_applicationsAssetPath/$fileName');
-            _applications.add(ProductItem.fromMdContent('$_applicationsAssetPath/$fileName', content));
+            final file = File('${appsDir.path}/$fileName');
+            await file.writeAsString(content);
           } catch (e) {
-            // 跳过
+            // 忽略单个文件错误
           }
         }
+        _addLog('DataService: Copied ${appFiles.length} applications to private dir');
       } catch (e) {
-        // 索引加载失败
+        _addLog('DataService: Error copying applications: $e');
       }
     } catch (e) {
-      // 忽略
+      _addLog('DataService: Error in _copyAssetsToPrivateDir: $e');
     }
   }
 
@@ -189,6 +218,8 @@ class ObsidianDataService {
     
     final lowerQuery = query.toLowerCase();
     final results = <ProductItem>[];
+    
+    _addLog('DataService: Searching for "$query"');
     
     for (var product in _products) {
       if (product.searchText.contains(lowerQuery)) {
@@ -202,11 +233,13 @@ class ObsidianDataService {
       }
     }
     
+    _addLog('DataService: Search found ${results.length} results');
     return results;
   }
 
   /// 清除应用数据
   Future<void> clearData() async {
+    _addLog('DataService: Clearing data');
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final dataDir = Directory('${appDir.path}/rst_data');
@@ -217,7 +250,13 @@ class ObsidianDataService {
       _applications.clear();
       _initialized = false;
     } catch (e) {
-      // 忽略
+      _addLog('DataService: Error clearing data: $e');
     }
+  }
+  
+  /// 清除日志
+  void clearLogs() {
+    _logs.clear();
+    _addLog('DataService: Logs cleared');
   }
 }
