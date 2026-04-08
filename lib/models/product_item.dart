@@ -1,4 +1,7 @@
-/// 产品数据模型
+/// 产品/应用数据模型
+/// 
+/// 用于表示产品列表和产品应用两大类数据。
+/// 通过 [fromMdContent] 工厂构造函数从 Markdown 文件内容解析生成。
 class ProductItem {
   final String fileName;       // 文件名（不含路径）
   final String filePath;       // 完整文件路径

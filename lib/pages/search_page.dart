@@ -5,6 +5,8 @@ import '../widgets/product_detail_sheet.dart';
 import 'settings_page.dart';
 
 /// 搜索页面（主界面）
+/// 
+/// 提供产品/应用的关键词搜索功能，支持实时搜索和结果展示。
 class SearchPage extends StatefulWidget {
   final ObsidianDataService dataService;
 
@@ -15,10 +17,15 @@ class SearchPage extends StatefulWidget {
 }
 
 class _SearchPageState extends State<SearchPage> {
+  /// 搜索框文本控制器
   final TextEditingController _searchController = TextEditingController();
+  /// 搜索框焦点控制节点
   final FocusNode _searchFocusNode = FocusNode();
+  /// 搜索结果列表
   List<ProductItem> _results = [];
+  /// 是否正在搜索（搜索框有内容）
   bool _isSearching = false;
+  /// 是否显示结果列表
   bool _showResults = false;
 
   @override
@@ -34,6 +41,7 @@ class _SearchPageState extends State<SearchPage> {
     super.dispose();
   }
 
+  /// 搜索内容变化时触发：更新搜索状态、延迟执行搜索
   void _onSearchChanged() {
     final query = _searchController.text.trim();
     setState(() {
@@ -46,7 +54,7 @@ class _SearchPageState extends State<SearchPage> {
       return;
     }
     
-    // 延迟搜索，避免频繁搜索
+    // 延迟搜索 150ms，避免用户输入过程中频繁触发搜索
     Future.delayed(const Duration(milliseconds: 150), () {
       if (_searchController.text.trim() == query) {
         final results = widget.dataService.search(query);

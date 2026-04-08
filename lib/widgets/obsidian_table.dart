@@ -3,16 +3,31 @@ import 'package:reorderables/reorderables.dart';
 import '../models/product_item.dart';
 import 'product_detail_sheet.dart';
 
-/// Obsidian风格的表格组件，支持列拖拽重排
+/// Obsidian 风格的表格组件，支持列拖拽重排和排序
+/// 
+/// 支持两种视图模式：
+/// - 移动端：卡片式列表展示
+/// - 桌面端：完整表格展示
+/// 
+/// 用户可点击表头进行升序/降序切换，也可编辑列的显示顺序。
 class ObsidianTable extends StatefulWidget {
+  /// 数据项列表
   final List<ProductItem> items;
+  /// 配方列表（用于详情弹窗）
   final List<ProductItem> formulas;
+  /// 默认显示的列
   final List<String> defaultColumns;
+  /// 是否为移动端视图
   final bool isMobile;
+  /// 列顺序变更回调
   final Function(List<String>) onColumnsChanged;
+  /// 排序列变更回调
   final Function(String?) onSortChanged;
+  /// 排序方向变更回调
   final Function(bool) onSortDirectionChanged;
+  /// 当前排序列
   final String? currentSortColumn;
+  /// 是否降序
   final bool sortDescending;
 
   const ObsidianTable({
@@ -33,7 +48,9 @@ class ObsidianTable extends StatefulWidget {
 }
 
 class _ObsidianTableState extends State<ObsidianTable> {
+  /// 当前显示的列顺序
   late List<String> _columns;
+  /// 是否处于列编辑模式
   bool _isEditingColumns = false;
 
   @override
@@ -42,6 +59,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
     _columns = List.from(widget.defaultColumns);
   }
 
+  /// 显示排序选择底部弹窗
   void _showSortMenu() {
     showModalBottomSheet(
       context: context,
@@ -82,7 +100,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                       : null,
                   onTap: () {
                     if (isSelected) {
-                      // 切换排序方向
+                      // 已选中的列再次点击则切换排序方向
                       widget.onSortDirectionChanged(!widget.sortDescending);
                     } else {
                       widget.onSortChanged(col);
@@ -110,12 +128,14 @@ class _ObsidianTableState extends State<ObsidianTable> {
     );
   }
 
+  /// 进入列编辑模式
   void _showColumnEditor() {
     setState(() {
       _isEditingColumns = true;
     });
   }
 
+  /// 保存新的列顺序
   void _saveColumnOrder(List<String> newColumns) {
     setState(() {
       _columns = newColumns;
@@ -124,6 +144,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
     });
   }
 
+  /// 获取排序后的数据列表
   List<ProductItem> _getSortedItems() {
     if (widget.currentSortColumn == null) return widget.items;
     
@@ -146,6 +167,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
   @override
   Widget build(BuildContext context) {
+    // 列编辑模式和表格展示模式二选一
     if (_isEditingColumns) {
       return _buildColumnEditor();
     }

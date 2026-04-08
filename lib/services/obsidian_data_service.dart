@@ -4,19 +4,31 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/product_item.dart';
 
-/// Obsidian数据服务
+/// Obsidian 数据服务
+/// 
+/// 负责从 Flutter Asset 加载产品列表、产品应用、产品配方三类数据。
+/// 数据来源为内置的 assets 目录下的 JSON 索引文件和 Markdown 文件。
+/// 同时提供搜索功能和日志记录。
 class ObsidianDataService {
+  /// 产品列表 Asset 索引文件路径
   static const String _productsAssetIndex = 'assets/产品列表.json';
+  /// 产品应用 Asset 索引文件路径
   static const String _applicationsAssetIndex = 'assets/产品应用.json';
+  /// 产品列表 Asset 目录路径
   static const String _productsAssetPath = 'assets/产品列表';
+  /// 产品应用 Asset 目录路径
   static const String _applicationsAssetPath = 'assets/产品应用';
   
+  /// 产品列表数据
   List<ProductItem> _products = [];
+  /// 产品应用数据
   List<ProductItem> _applications = [];
+  /// 产品配方数据
   List<ProductItem> _formulas = [];
+  /// 是否已完成初始化
   bool _initialized = false;
   
-  /// 日志记录
+  /// 日志记录（最近 100 条）
   final List<String> _logs = [];
   
   List<ProductItem> get products => _products;
@@ -34,7 +46,12 @@ class ObsidianDataService {
     }
   }
 
-  /// 初始化
+  /// 初始化数据加载
+  /// 
+  /// 加载顺序：
+  /// 1. 直接从 Asset 加载（最可靠的内置数据）
+  /// 2. 如果 Asset 为空，从私有目录加载（备用方案）
+  /// 3. 如果数据存在，复制 Asset 到私有目录（供后续使用）
   Future<void> initialize() async {
     if (_initialized) {
       _addLog('DataService: Already initialized, skipping');
@@ -235,7 +252,13 @@ class ObsidianDataService {
     }
   }
 
-  /// 搜索产品和应用（分词 AND 匹配：所有关键词都出现在 searchText 中即匹配）
+  /// 搜索产品和应用
+  /// 
+  /// 分词 AND 匹配：所有关键词都必须出现在 searchText 中才算匹配。
+  /// 搜索范围包括：文件名、标签、工程师、实验牌号、固含、基材、底漆、中漆、面漆。
+  /// 
+  /// [query] 搜索关键词，支持空格分隔多个关键词
+  /// 返回匹配的产品和应用列表
   List<ProductItem> search(String query) {
     if (query.isEmpty) return [];
     
