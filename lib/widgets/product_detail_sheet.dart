@@ -136,66 +136,35 @@ class ProductDetailSheet extends StatelessWidget {
     );
   }
 
-  /// 检测 MD 内容中的表格并渲染
-  Widget _buildMarkdownBody(String content, ScrollController scrollController) {
-    // 正则匹配 markdown 表格
-    final tableRegex = RegExp(
-      r'((?:\|.+\|\n)+\|[-:|\s]+\|\n(?:\|.+\|\n)*)',
-      multiLine: true,
-    );
-
-    if (!tableRegex.hasMatch(content)) {
-      return _markdownView(content, scrollController);
-    }
-
-    final widgets = <Widget>[];
-    int lastEnd = 0;
-
-    for (final match in tableRegex.allMatches(content)) {
-      // 匹配位置之前的文本
-      if (match.start > lastEnd) {
-        widgets.add(_markdownView(content.substring(lastEnd, match.start), scrollController));
-      }
-      // 表格
-      widgets.add(_buildMdTable(match.group(0)!));
-      lastEnd = match.end;
-    }
-
-    // 剩余文本
-    if (lastEnd < content.length) {
-      widgets.add(_markdownView(content.substring(lastEnd), scrollController));
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: widgets,
-    );
-  }
-
-  /// 判断某行是否为 markdown 表格分隔行（如 | --- | --- | ）
-  bool _isSeparatorRow(List<String> cols) {
-    return cols.every((c) => RegExp(r'^[-:|\s]+$').hasMatch(c));
-  }
-
-  /// 渲染单个 markdown 表格
-  Widget _buildMdTable(String tableStr) {
+  /// 渲染配方 markdown 表格（无 frontmatter，内容即表格）
+  Widget _buildMdTable(String rawContent) {
     final rows = <List<String>>[];
-    for (final line in tableStr.split('\n')) {
-      if (line.trim().isEmpty) continue;
-      final cols = line.split('|').where((s) => s.trim().isNotEmpty).map((s) => s.trim()).toList();
-      if (cols.isNotEmpty && !_isSeparatorRow(cols)) {
-        rows.add(cols);
+    for (final line in rawContent.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      // 判断是否为分隔行（全是 -: 和空白）
+      bool isSep = true;
+      for (final cell in trimmed.split('|')) {
+        final t = cell.trim();
+        if (t.isNotEmpty && !RegExp(r'^[-:]+$').hasMatch(t)) {
+          isSep = false;
+          break;
+        }
       }
+      if (isSep) continue;
+      // 解析表格行
+      final cols = trimmed.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      if (cols.isNotEmpty) rows.add(cols);
     }
 
     if (rows.isEmpty) return const SizedBox.shrink();
 
-    // 首行作为表头
+    // 首行为表头
     final header = rows.first;
     final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey.shade700),
@@ -204,18 +173,15 @@ class ProductDetailSheet extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         child: DataTable(
           headingRowColor: WidgetStateProperty.all(Colors.grey.shade800),
-          dataRowColor: WidgetStateProperty.resolveWith((states) {
-            return Colors.transparent;
-          }),
+          dataRowColor: WidgetStateProperty.resolveWith((_) => Colors.transparent),
           columns: header.map((h) => DataColumn(
-            label: Text(h, style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 13)),
+            label: Text(h, style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
           )).toList(),
-          rows: dataRows.asMap().entries.map((entry) {
-            final row = entry.value;
+          rows: dataRows.asMap().entries.map((e) {
             return DataRow(
-              color: WidgetStateProperty.all(entry.key.isOdd ? Colors.grey.shade900 : Colors.transparent),
-              cells: row.map((cell) => DataCell(
-                Text(cell, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+              color: WidgetStateProperty.all(e.key.isOdd ? Colors.grey.shade900 : Colors.transparent),
+              cells: e.value.map((cell) => DataCell(
+                Text(cell, style: const TextStyle(color: Colors.white70, fontSize: 12)),
               )).toList(),
             );
           }).toList(),
@@ -362,7 +328,7 @@ class ProductDetailSheet extends StatelessWidget {
                 ..._buildLinkedFormulas(product),
               // MD 内容（不含 frontmatter）
               Expanded(
-                child: _buildMarkdownBody(bodyContent, scrollController),
+                child: _markdownView(bodyContent, scrollController),
               ),
             ],
           ),
