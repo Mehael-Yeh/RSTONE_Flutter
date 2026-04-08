@@ -1,0 +1,92 @@
+name: Release Alpha APK
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.0"
+          channel: "stable"
+
+      - name: Get latest version
+        id: version
+        run: |
+          # 获取最新 alpha tag 的版本号
+          LATEST=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-alpha$' | head -1)
+          if [ -z "$LATEST" ]; then
+            # 从 pubspec 读取当前版本
+            CURRENT=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+            echo "version=${CURRENT}+1" >> $GITHUB_OUTPUT
+            echo "tag=v${CURRENT}-alpha" >> $GITHUB_OUTPUT
+          else
+            # 去掉 v 前缀，提取 semver 主干
+            BASE=${LATEST#v}
+            BASE=${BASE%-alpha}
+            # 递增 patch 版本
+            major=$(echo $BASE | cut -d. -f1)
+            minor=$(echo $BASE | cut -d. -f2)
+            patch=$(echo $BASE | cut -d. -f3)
+            patch=$((patch + 1))
+            new_ver="${major}.${minor}.${patch}"
+            echo "version=${new_ver}+${patch}" >> $GITHUB_OUTPUT
+            echo "tag=v${new_ver}-alpha" >> $GITHUB_OUTPUT
+          fi
+          echo "当前版本: ${{ steps.version.outputs.version }}"
+          echo "标签: ${{ steps.version.outputs.tag }}"
+
+      - name: Update version in pubspec.yaml
+        run: |
+          sed -i 's/^version:.*/version: ${{ steps.version.outputs.version }}/' pubspec.yaml
+          cat pubspec.yaml | grep "^version:"
+
+      - name: Commit & Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pubspec.yaml
+          git commit -m "chore: version ${{ steps.version.outputs.tag }}"
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin main --tags
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Build Release APK (Android)
+        run: |
+          flutter build apk --release --split-per-abi
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Alpha ${{ steps.version.outputs.tag }}
+          body: |
+            ## Alpha Pre-release
+            自动构建版本: `${{ steps.version.outputs.tag }}`
+            - 提交: `${{ github.sha }}`
+            - 构建时间: `${{ github.event.head_commit.timestamp }}`
+          files: build/app/outputs/flutter-apk/app-release.apk
+          prerelease: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
