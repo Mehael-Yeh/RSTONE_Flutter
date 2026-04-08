@@ -14,24 +14,45 @@ class SearchPage extends StatefulWidget {
   State<SearchPage> createState() => _SearchPageState();
 }
 
-class _SearchPageState extends State<SearchPage> {
+class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   List<ProductItem> _results = [];
   bool _isSearching = false;
   bool _showResults = false;
+  bool _userExplicitlyUnfocused = false; // 用户主动取消焦点后，不再自动获得焦点
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _searchController.addListener(_onSearchChanged);
+    _searchFocusNode.addListener(_onFocusChanged);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
+    _searchFocusNode.removeListener(_onFocusChanged);
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 当应用进入非活跃状态时，清除焦点，防止键盘自动弹出
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      _userExplicitlyUnfocused = true;
+      _searchFocusNode.unfocus();
+    }
+  }
+
+  void _onFocusChanged() {
+    // 当焦点丢失时，如果是由用户操作触发的（而不是键盘隐藏等系统行为），标记之
+    if (!_searchFocusNode.hasFocus) {
+      // 不再在这里标记，留给具体的用户操作来标记
+    }
   }
 
   void _onSearchChanged() {
@@ -85,6 +106,7 @@ class _SearchPageState extends State<SearchPage> {
                   IconButton(
                     icon: const Icon(Icons.settings, color: Colors.white70),
                     onPressed: () {
+                      _userExplicitlyUnfocused = true; // 用户主动导航，标记不再自动获得焦点
                       _searchFocusNode.unfocus();
                       Navigator.push(
                         context,
@@ -151,6 +173,8 @@ class _SearchPageState extends State<SearchPage> {
                         ),
                       ),
                       onTap: () {
+                        // 用户主动点击搜索框，清除标记，允许获得焦点
+                        _userExplicitlyUnfocused = false;
                         if (_searchController.text.isNotEmpty) {
                           setState(() => _showResults = true);
                         }
@@ -227,9 +251,10 @@ class _SearchPageState extends State<SearchPage> {
       color: const Color(0xFF2D2D2D),
       child: InkWell(
         onTap: () {
-        _searchFocusNode.unfocus();
-        ProductDetailSheet.show(context, item, formulas: widget.dataService.formulas);
-      },
+          _userExplicitlyUnfocused = true; // 用户主动点击结果，标记不再自动获得焦点
+          _searchFocusNode.unfocus();
+          ProductDetailSheet.show(context, item, formulas: widget.dataService.formulas);
+        },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),

@@ -190,9 +190,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   /// 渲染配方 markdown 表格（完全自定义渲染，列宽自动适配内容）
-  Widget _buildMdTable(String rawContent) {
+  /// 同时返回非表格内容供外部渲染
+  Widget _buildMdTable(String rawContent, {required Function(String) onNonTableContent}) {
     final rows = _parseTable(rawContent);
-    if (rows.isEmpty) return const SizedBox.shrink();
+    if (rows.isEmpty) {
+      // 没有表格时，把全部内容当非表格内容处理
+      onNonTableContent(rawContent);
+      return const SizedBox.shrink();
+    }
 
     final header = rows.first;
     final colCount = header.length;
@@ -224,8 +229,58 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     const Color headerText = Color(0xFFFF9800);
     const Color cellText = Color(0xFFB0B0B0);
 
+    // 计算表格总宽度
+    final tableWidth = colWidths.reduce((a, b) => a + b);
+
+    // 提取表格部分的起始和结束位置
+    final tableLines = <String>[];
+    bool inTable = false;
+    for (final line in rawContent.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      // 检测是否是表格分隔行
+      bool isSep = true;
+      for (final cell in trimmed.split('|')) {
+        final t = cell.trim();
+        if (t.isNotEmpty && !RegExp(r'^[-:]+$').hasMatch(t)) {
+          isSep = false;
+          break;
+        }
+      }
+      if (isSep) {
+        if (!inTable) {
+          inTable = true;
+          tableLines.add(line);
+        } else {
+          tableLines.add(line);
+        }
+        continue;
+      }
+      if (inTable) {
+        tableLines.add(line);
+      } else {
+        // 表格前的非表格内容
+        final nonTablePart = tableLines.join('\n');
+        if (nonTablePart.isNotEmpty) {
+          onNonTableContent(nonTablePart);
+        }
+        tableLines.clear();
+        tableLines.add(line);
+        inTable = true;
+      }
+    }
+    // 表格后的非表格内容
+    if (tableLines.isNotEmpty && inTable) {
+      final tableContent = tableLines.join('\n');
+      final nonTablePart = _extractNonTableAfterTable(rawContent, tableContent);
+      if (nonTablePart.isNotEmpty) {
+        onNonTableContent(nonTablePart);
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      width: tableWidth,
       decoration: BoxDecoration(
         color: rowBg,
         borderRadius: BorderRadius.circular(8),
@@ -252,6 +307,37 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         ),
       ),
     );
+  }
+
+  /// 从原始内容中提取表格之后的非表格内容
+  String _extractNonTableAfterTable(String rawContent, String tableContent) {
+    final tableIndex = rawContent.indexOf(tableContent);
+    if (tableIndex == -1) return '';
+    final afterTable = rawContent.substring(tableIndex + tableContent.length);
+    // 提取非表格内容（跳过空行）
+    final lines = afterTable.split('\n');
+    final nonTableLines = <String>[];
+    bool foundContent = false;
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) {
+        if (foundContent) nonTableLines.add(line);
+        continue;
+      }
+      // 检查是否是表格分隔行
+      bool isSep = true;
+      for (final cell in trimmed.split('|')) {
+        final t = cell.trim();
+        if (t.isNotEmpty && !RegExp(r'^[-:]+$').hasMatch(t)) {
+          isSep = false;
+          break;
+        }
+      }
+      if (isSep) continue;
+      foundContent = true;
+      nonTableLines.add(line);
+    }
+    return nonTableLines.join('\n').trim();
   }
 
   Widget _buildTableRow(List<String> cells, List<double> colWidths, double height,
@@ -394,9 +480,19 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
   /// 查找并渲染关联的产品配方（文件名以产品牌号开头，如 RS7767-银.md 对应 RS7767）
   Widget _buildLinkedFormulas() {
+    // 使用 experimentalCode 进行匹配（如果存在），否则使用 fileName
+    // 注意：只有 experimentalCode 非空时才进行匹配，避免空字符串匹配所有配方
+    final productCode = widget.product.experimentalCode;
+    
     final matchedFormulas = widget.formulas.where((f) {
-      return f.fileName.startsWith(widget.product.fileName) ||
-          f.fileName.startsWith(widget.product.experimentalCode ?? '');
+      if (productCode != null && productCode.isNotEmpty) {
+        // 如果有 experimentalCode，精确匹配以该代码开头的配方
+        return f.fileName.startsWith(productCode);
+      }
+      // 如果没有 experimentalCode，使用 fileName 匹配
+      // 但要求配方文件名与产品文件名相同或以产品文件名开头
+      return f.fileName == widget.product.fileName ||
+          f.fileName.startsWith(widget.product.fileName + '-');
     }).toList();
 
     if (matchedFormulas.isEmpty) return const SizedBox.shrink();
@@ -454,46 +550,83 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   Widget _buildFormulaCard(String title, String rawContent, List<List<String>> rows) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2D2D2D),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade800),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-            child: Row(
-              children: [
-                const Icon(Icons.science_outlined, color: Colors.cyan, size: 16),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.cyan,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, color: Colors.grey, size: 18),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                  tooltip: '分享表格',
-                  onPressed: () => _shareTableAsImage(context, title, rows),
-                ),
-              ],
-            ),
+    // 非表格内容
+    final List<String> nonTableContents = [];
+
+    // 计算表格总宽度
+    double tableWidth = 200;
+    if (rows.isNotEmpty) {
+      const double minColWidth = 60.0;
+      const double maxColWidth = 300.0;
+      const double cellHPadding = 12.0;
+      final colCount = rows.first.length;
+      List<double> colWidths = List.filled(colCount, minColWidth);
+      for (final row in rows) {
+        for (int i = 0; i < row.length && i < colCount; i++) {
+          final w = _textWidth(row[i], 12) + cellHPadding * 2;
+          colWidths[i] = w.clamp(minColWidth, maxColWidth);
+        }
+      }
+      tableWidth = colWidths.reduce((a, b) => a + b);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 配方卡片
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2D2D2D),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade800),
           ),
-          _buildMdTable(rawContent),
-          const SizedBox(height: 8),
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.science_outlined, color: Colors.cyan, size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.cyan,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.share_outlined, color: Colors.grey, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      tooltip: '分享表格',
+                      onPressed: () => _shareTableAsImage(context, title, rows),
+                    ),
+                  ],
+                ),
+              ),
+              _buildMdTable(rawContent, onNonTableContent: (content) {
+                if (content.trim().isNotEmpty) {
+                  nonTableContents.add(content);
+                }
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+        // 非表格内容：直接写在配方下面，宽度与表格一致
+        for (final content in nonTableContents)
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            width: tableWidth,
+            child: _markdownView(content, ScrollController()),
+          ),
+      ],
     );
   }
 
@@ -510,6 +643,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       initialChildSize: 0.65,
       minChildSize: 0.3,
       maxChildSize: 0.95,
+      snap: true,
+      snapSizes: const [0.3, 0.5, 0.65, 0.8, 0.95],
       builder: (context, scrollController) {
         return Container(
           decoration: const BoxDecoration(
