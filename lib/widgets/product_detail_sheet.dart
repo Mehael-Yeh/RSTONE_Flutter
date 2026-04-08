@@ -478,8 +478,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   Widget _buildFormulaCard(String title, String rawContent, List<List<String>> rows) {
+    // 去掉 frontmatter，只保留 body 部分（blockquote 施工比例在 body 中）
+    final frontmatterEnd = rawContent.indexOf('---', 4);
+    final bodyContent = frontmatterEnd != -1
+        ? rawContent.substring(frontmatterEnd + 3).trim()
+        : rawContent;
+
     // 提取表格外的文字（如 blockquote 施工比例说明）
-    final extraContent = rawContent.split('\n').where((line) {
+    final extraContent = bodyContent.split('\n').where((line) {
       final trimmed = line.trim();
       if (trimmed.isEmpty) return false;
       if (!trimmed.startsWith('|')) return true;
@@ -580,6 +586,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
             ),
             child: ListView(
               controller: scrollController,
+              physics: const ClampingScrollPhysics(),
               padding: EdgeInsets.zero,
               children: [
                 // 拖动条（把手）
