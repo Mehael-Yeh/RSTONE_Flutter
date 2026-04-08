@@ -77,8 +77,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   Future<void> _shareTableAsImage(
     BuildContext context,
     String title,
-    List<List<String>> rows,
-  ) async {
+    List<List<String>> rows, {
+    String? extraContent,
+  }) async {
     if (rows.isEmpty) return;
     try {
       const double rowHeight = 36.0;
@@ -99,7 +100,17 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         }
       }
       final totalWidth = colWidths.reduce((a, b) => a + b) + 4;
-      final totalHeight = headerHeight + dataRows.length * rowHeight + 4;
+      // 计算 blockquote 高度
+      double extraHeight = 0;
+      if (extraContent != null && extraContent.trim().isNotEmpty) {
+        final tp = TextPainter(
+          text: TextSpan(text: extraContent, style: const TextStyle(fontSize: 12, height: 1.5)),
+          textDirection: TextDirection.ltr,
+        );
+        tp.layout(maxWidth: totalWidth - 24);
+        extraHeight = tp.height + 16; // 上下各 8px padding
+      }
+      final totalHeight = headerHeight + dataRows.length * rowHeight + 4 + extraHeight;
 
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
@@ -155,6 +166,24 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           ..strokeWidth = 1,
       );
 
+      // 绘制 blockquote 施工比例文字
+      if (extraContent != null && extraContent.trim().isNotEmpty) {
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: extraContent,
+            style: const TextStyle(
+              color: Color(0xFFB0B0B0),
+              fontSize: 12,
+              height: 1.5,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        );
+        textPainter.layout(maxWidth: totalWidth - 24);
+        final blockY = totalHeight + 8;
+        textPainter.paint(canvas, Offset(12, blockY));
+      }
+
       final picture = recorder.endRecording();
       final img = await picture.toImage(totalWidth.toInt(), totalHeight.toInt());
       final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
@@ -208,7 +237,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   /// 渲染配方 markdown 表格（完全自定义渲染，列宽自动适配内容）
-  Widget _buildMdTable(String rawContent) {
+  /// [rawContent] 应为去掉 frontmatter 后的纯 markdown 内容
+  /// [extraContent] 表格外的文字（如 blockquote 施工比例），会渲染在表格下方，宽度与表格总列宽一致
+  Widget _buildMdTable(String rawContent, {String? extraContent}) {
     final rows = _parseTable(rawContent);
     if (rows.isEmpty) return const SizedBox.shrink();
 
@@ -234,6 +265,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     }
     // 填充空列
     while (colWidths.length < colCount) colWidths.add(minColWidth);
+    final totalTableWidth = colWidths.reduce((a, b) => a + b);
 
     const Color borderColor = Color(0xFF3D3D3D);
     const Color headerBg = Color(0xFF2D2D2D);
@@ -243,31 +275,50 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     const Color cellText = Color(0xFFB0B0B0);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       decoration: BoxDecoration(
         color: rowBg,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey.shade700),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 表头行
-            _buildTableRow(header, colWidths, headerHeight, true, cellHPadding,
-                headerBg, headerText, borderColor),
-            // 数据行
-            for (int ri = 0; ri < dataRows.length; ri++)
-              _buildTableRow(
-                dataRows[ri].length >= colCount
-                    ? dataRows[ri].take(colCount).toList()
-                    : List.generate(colCount, (i) => i < dataRows[ri].length ? dataRows[ri][i] : ''),
-                colWidths, rowHeight, false, cellHPadding,
-                ri.isOdd ? rowAlt : rowBg, cellText, borderColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 表头行
+                _buildTableRow(header, colWidths, headerHeight, true, cellHPadding,
+                    headerBg, headerText, borderColor),
+                // 数据行
+                for (int ri = 0; ri < dataRows.length; ri++)
+                  _buildTableRow(
+                    dataRows[ri].length >= colCount
+                        ? dataRows[ri].take(colCount).toList()
+                        : List.generate(colCount, (i) => i < dataRows[ri].length ? dataRows[ri][i] : ''),
+                    colWidths, rowHeight, false, cellHPadding,
+                    ri.isOdd ? rowAlt : rowBg, cellText, borderColor,
+                  ),
+              ],
+            ),
+          ),
+          // 表格下方的非表格文字（blockquote 施工比例等），宽度与表格总列宽一致
+          if (extraContent != null && extraContent.trim().isNotEmpty)
+            Container(
+              width: totalTableWidth,
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Text(
+                extraContent,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  height: 1.5,
+                ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -478,23 +529,29 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   Widget _buildFormulaCard(String title, String rawContent, List<List<String>> rows) {
-    // 去掉 frontmatter，只保留 body 部分（blockquote 施工比例在 body 中）
+    // 从原始内容中提取表格外的文字（blockquote 施工比例）
+    // blockquote 出现在 frontmatter 之前，需要在去掉 frontmatter 之前提取
+    final extraContentLines = <String>[];
+    for (final line in rawContent.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      // frontmatter 结束，跳出
+      if (trimmed == '---') break;
+      // 非表格行 = blockquote 等额外内容
+      if (!trimmed.startsWith('|')) {
+        // 去掉 blockquote 前缀 > 渲染为纯文字
+        extraContentLines.add(trimmed.startsWith('> ')
+            ? trimmed.substring(2)
+            : trimmed);
+      }
+    }
+    final extraContent = extraContentLines.join('\n');
+
+    // 去掉 frontmatter，只留表格 markdown 内容传给 _buildMdTable
     final frontmatterEnd = rawContent.indexOf('---', 4);
-    final bodyContent = frontmatterEnd != -1
+    final tableContent = frontmatterEnd != -1
         ? rawContent.substring(frontmatterEnd + 3).trim()
         : rawContent;
-
-    // 提取表格外的文字（如 blockquote 施工比例说明）
-    final extraContent = bodyContent.split('\n').where((line) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty) return false;
-      if (!trimmed.startsWith('|')) return true;
-      for (final cell in trimmed.split('|')) {
-        final t = cell.trim();
-        if (t.isNotEmpty && !RegExp(r'^[-:]+$').hasMatch(t)) return false;
-      }
-      return true;
-    }).join('\n');
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -527,29 +584,12 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                   tooltip: '分享表格',
-                  onPressed: () => _shareTableAsImage(context, title, rows),
+                  onPressed: () => _shareTableAsImage(context, title, rows, extraContent: extraContent),
                 ),
               ],
             ),
           ),
-          _buildMdTable(rawContent),
-          // 配方表格下方的非表格文字（如施工比例等 blockquote）
-          if (extraContent.trim().isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Markdown(
-                data: extraContent,
-                styleSheet: MarkdownStyleSheet(
-                  blockquote: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
-                  blockquoteDecoration: BoxDecoration(
-                    border: const Border(
-                      left: BorderSide(color: Colors.orange, width: 3),
-                    ),
-                  ),
-                  blockquotePadding: const EdgeInsets.only(left: 12),
-                ),
-              ),
-            ),
+          _buildMdTable(tableContent, extraContent: extraContent),
           const SizedBox(height: 8),
         ],
       ),
