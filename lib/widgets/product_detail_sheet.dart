@@ -45,7 +45,11 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         }
       }
       if (isSep) continue;
-      final cols = trimmed.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      // 保留所有单元格（包括尾部空单元格），用 null 占位以保持列对齐
+      final cols = trimmed.split('|').map((s) => s.trim()).toList();
+      // 去掉首尾空字符串（首尾 | 产生的空列）
+      while (cols.isNotEmpty && cols.first.isEmpty) cols.removeAt(0);
+      while (cols.isNotEmpty && cols.last.isEmpty) cols.removeLast();
       if (cols.isNotEmpty) rows.add(cols);
     }
     return rows;
@@ -176,8 +180,16 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     tp.paint(canvas, Offset(x + 8, y + (h - tp.height) / 2));
   }
 
-  /// 渲染配方 markdown 表格（无 frontmatter，内容即表格）
-  /// 渲染配方表格（用于屏幕显示）
+  double _textWidth(String text, double fontSize) {
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: TextStyle(fontSize: fontSize)),
+      textDirection: TextDirection.ltr,
+    );
+    tp.layout();
+    return tp.width;
+  }
+
+  /// 渲染配方 markdown 表格（完全自定义渲染，列宽自动适配内容）
   Widget _buildMdTable(String rawContent) {
     final rows = _parseTable(rawContent);
     if (rows.isEmpty) return const SizedBox.shrink();
@@ -186,32 +198,94 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final colCount = header.length;
     final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
 
+    // 计算每列最小宽度（根据内容）
+    const double minColWidth = 60.0;
+    const double maxColWidth = 300.0;
+    const double cellHPadding = 12.0;
+    const double rowHeight = 36.0;
+    const double headerHeight = 38.0;
+
+    List<double> colWidths = List.filled(colCount, minColWidth);
+    void measureCol(int col, String text) {
+      final w = _textWidth(text, 12) + cellHPadding * 2;
+      if (w > colWidths[col]) colWidths[col] = w.clamp(minColWidth, maxColWidth);
+    }
+    for (int i = 0; i < colCount; i++) measureCol(i, header[i]);
+    for (final row in dataRows) {
+      for (int i = 0; i < row.length; i++) measureCol(i, row[i]);
+    }
+    // 填充空列
+    while (colWidths.length < colCount) colWidths.add(minColWidth);
+
+    const Color borderColor = Color(0xFF3D3D3D);
+    const Color headerBg = Color(0xFF2D2D2D);
+    const Color rowAlt = Color(0xFF252525);
+    const Color rowBg = Color(0xFF1E1E1E);
+    const Color headerText = Color(0xFFFF9800);
+    const Color cellText = Color(0xFFB0B0B0);
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: rowBg,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey.shade700),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(Colors.grey.shade800),
-          dataRowColor: WidgetStateProperty.resolveWith((_) => Colors.transparent),
-          columns: header.map((h) => DataColumn(
-            label: Text(h, style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
-          )).toList(),
-          rows: dataRows.asMap().entries.map((e) {
-            final paddedRow = List<String>.from(e.value);
-            while (paddedRow.length < colCount) paddedRow.add('');
-            return DataRow(
-              color: WidgetStateProperty.all(e.key.isOdd ? Colors.grey.shade900 : Colors.transparent),
-              cells: paddedRow.take(colCount).map((cell) => DataCell(
-                Text(cell, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              )).toList(),
-            );
-          }).toList(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 表头行
+            _buildTableRow(header, colWidths, headerHeight, true, cellHPadding,
+                headerBg, headerText, borderColor),
+            // 数据行
+            for (int ri = 0; ri < dataRows.length; ri++)
+              _buildTableRow(
+                dataRows[ri].length >= colCount
+                    ? dataRows[ri].take(colCount).toList()
+                    : List.generate(colCount, (i) => i < dataRows[ri].length ? dataRows[ri][i] : ''),
+                colWidths, rowHeight, false, cellHPadding,
+                ri.isOdd ? rowAlt : rowBg, cellText, borderColor,
+              ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTableRow(List<String> cells, List<double> colWidths, double height,
+      bool isHeader, double hPadding, Color bg, Color textColor, Color borderColor) {
+    double totalWidth = colWidths.reduce((a, b) => a + b);
+    return Container(
+      width: totalWidth,
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
+      ),
+      child: Row(
+        children: [
+          for (int i = 0; i < cells.length; i++)
+            Container(
+              width: colWidths[i],
+              height: height,
+              alignment: Alignment.centerLeft,
+              padding: EdgeInsets.symmetric(horizontal: hPadding),
+              decoration: BoxDecoration(
+                border: i > 0 ? Border(left: BorderSide(color: borderColor, width: 0.5)) : null,
+              ),
+              child: Text(
+                cells[i],
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 12,
+                  fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -433,7 +507,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     }
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.7,
+      initialChildSize: 0.65,
       minChildSize: 0.3,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
@@ -529,7 +603,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               if (widget.product.folder == '产品列表')
                 _buildLinkedFormulas(),
               // MD 内容（不含 frontmatter）
-              Expanded(
+              Flexible(
                 child: _markdownView(bodyContent, scrollController),
               ),
             ],
