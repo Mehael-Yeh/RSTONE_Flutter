@@ -172,14 +172,20 @@ class ProductDetailSheet extends StatelessWidget {
     );
   }
 
+  /// 判断某行是否为 markdown 表格分隔行（如 | --- | --- | ）
+  bool _isSeparatorRow(List<String> cols) {
+    return cols.every((c) => RegExp(r'^[-:|\s]+$').hasMatch(c));
+  }
+
   /// 渲染单个 markdown 表格
   Widget _buildMdTable(String tableStr) {
     final rows = <List<String>>[];
     for (final line in tableStr.split('\n')) {
       if (line.trim().isEmpty) continue;
-      // 去掉首尾 |，分割各列
       final cols = line.split('|').where((s) => s.trim().isNotEmpty).map((s) => s.trim()).toList();
-      if (cols.isNotEmpty) rows.add(cols);
+      if (cols.isNotEmpty && !_isSeparatorRow(cols)) {
+        rows.add(cols);
+      }
     }
 
     if (rows.isEmpty) return const SizedBox.shrink();
