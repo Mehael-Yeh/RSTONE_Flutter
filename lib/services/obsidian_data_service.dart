@@ -212,23 +212,34 @@ class ObsidianDataService {
     }
   }
 
-  /// 搜索产品和应用
+  /// 搜索产品和应用（分词 AND 匹配：所有关键词都出现在 searchText 中即匹配）
   List<ProductItem> search(String query) {
     if (query.isEmpty) return [];
     
-    final lowerQuery = query.toLowerCase();
+    final keywords = query
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((k) => k.isNotEmpty)
+        .toList();
+    
+    if (keywords.isEmpty) return [];
+    
     final results = <ProductItem>[];
     
-    _addLog('DataService: Searching for "$query"');
+    _addLog('DataService: Searching for keywords: $keywords');
+    
+    bool matchesAllKeywords(String searchText) {
+      return keywords.every((keyword) => searchText.contains(keyword));
+    }
     
     for (var product in _products) {
-      if (product.searchText.contains(lowerQuery)) {
+      if (matchesAllKeywords(product.searchText)) {
         results.add(product);
       }
     }
     
     for (var app in _applications) {
-      if (app.searchText.contains(lowerQuery)) {
+      if (matchesAllKeywords(app.searchText)) {
         results.add(app);
       }
     }
