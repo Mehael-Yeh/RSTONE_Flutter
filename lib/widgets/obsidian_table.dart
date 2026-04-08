@@ -6,6 +6,7 @@ import 'product_detail_sheet.dart';
 /// Obsidian风格的表格组件，支持列拖拽重排
 class ObsidianTable extends StatefulWidget {
   final List<ProductItem> items;
+  final List<ProductItem> formulas;
   final List<String> defaultColumns;
   final bool isMobile;
   final Function(List<String>) onColumnsChanged;
@@ -17,6 +18,7 @@ class ObsidianTable extends StatefulWidget {
   const ObsidianTable({
     super.key,
     required this.items,
+    required this.formulas,
     required this.defaultColumns,
     required this.isMobile,
     required this.onColumnsChanged,
@@ -233,7 +235,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             color: const Color(0xFF2D2D2D),
             child: InkWell(
-              onTap: () => ProductDetailSheet.show(context, item),
+              onTap: () => ProductDetailSheet.show(context, item, formulas: widget.formulas),
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -351,7 +353,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
               final fields = item.getTableFields();
               
               return InkWell(
-                onTap: () => ProductDetailSheet.show(context, item),
+                onTap: () => ProductDetailSheet.show(context, item, formulas: widget.formulas),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                   decoration: BoxDecoration(

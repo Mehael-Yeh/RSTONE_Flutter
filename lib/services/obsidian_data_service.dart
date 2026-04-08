@@ -13,6 +13,7 @@ class ObsidianDataService {
   
   List<ProductItem> _products = [];
   List<ProductItem> _applications = [];
+  List<ProductItem> _formulas = [];
   bool _initialized = false;
   
   /// 日志记录
@@ -20,6 +21,7 @@ class ObsidianDataService {
   
   List<ProductItem> get products => _products;
   List<ProductItem> get applications => _applications;
+  List<ProductItem> get formulas => _formulas;
   bool get isInitialized => _initialized;
   List<String> get logs => List.unmodifiable(_logs);
 
@@ -156,6 +158,27 @@ class ObsidianDataService {
       }
     } catch (e) {
       _addLog('DataService: Error loading application index: $e');
+    }
+    
+    // 加载产品配方（配方文件夹直接列出所有md文件，无需索引）
+    _addLog('DataService: Loading formulas from assets...');
+    try {
+      final formulaAssetPath = 'assets/产品配方';
+      // 配方文件无 frontmatter，直接用文件名作为配方名称，body 即为 markdown 表格
+      final formulaContent = await rootBundle.loadString('assets/产品配方.json');
+      final List<dynamic> formulaFiles = jsonDecode(formulaContent);
+      _addLog('DataService: Found ${formulaFiles.length} formula files');
+      
+      for (final fileName in formulaFiles) {
+        try {
+          final content = await rootBundle.loadString('$formulaAssetPath/$fileName');
+          _formulas.add(ProductItem.fromMdContent('$formulaAssetPath/$fileName', content));
+        } catch (e) {
+          _addLog('DataService: Error loading formula $fileName: $e');
+        }
+      }
+    } catch (e) {
+      _addLog('DataService: Error loading formulas: $e');
     }
   }
 
