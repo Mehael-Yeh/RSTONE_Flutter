@@ -5,16 +5,64 @@ import '../models/product_item.dart';
 /// 产品详情底部弹窗
 class ProductDetailSheet extends StatelessWidget {
   final ProductItem product;
+  final List<ProductItem> formulas;
 
-  const ProductDetailSheet({super.key, required this.product});
+  const ProductDetailSheet({super.key, required this.product, this.formulas = const []});
 
-  static void show(BuildContext context, ProductItem product) {
+  static void show(BuildContext context, ProductItem product, {List<ProductItem> formulas = const []}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => ProductDetailSheet(product: product),
+      builder: (context) => ProductDetailSheet(product: product, formulas: formulas),
     );
+  }
+
+  /// 查找并渲染关联的产品配方（文件名以产品牌号开头，如 RS7767-银.md 对应 RS7767）
+  List<Widget> _buildLinkedFormulas(ProductItem product) {
+    final matchedFormulas = formulas.where((f) {
+      return f.fileName.startsWith(product.fileName) ||
+          f.fileName.startsWith(product.experimentalCode ?? '');
+    }).toList();
+
+    if (matchedFormulas.isEmpty) return [];
+
+    return matchedFormulas.map((formula) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2D2D2D),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade800),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.science_outlined, color: Colors.cyan, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '配方：${formula.fileName.replaceAll('.md', '')}',
+                      style: const TextStyle(
+                        color: Colors.cyan,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _buildMdTable(formula.rawContent),
+            const SizedBox(height: 8),
+          ],
+        ),
+      );
+    }).toList();
   }
 
   /// 从 frontmatter 提取配方相关字段，生成结构化表格
@@ -303,6 +351,9 @@ class ProductDetailSheet extends StatelessWidget {
                 ),
               // 配方表格（仅产品应用有配方字段）
               if (product.folder == '产品应用') _buildFormulaTable(),
+              // 产品配方 section：文件名以当前产品牌号开头时显示
+              if (product.folder == '产品列表')
+                ..._buildLinkedFormulas(product),
               // MD 内容（不含 frontmatter）
               Expanded(
                 child: _buildMarkdownBody(bodyContent, scrollController),

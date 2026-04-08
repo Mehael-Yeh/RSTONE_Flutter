@@ -144,6 +144,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
             )
           : ObsidianTable(
               items: items,
+              formulas: widget.dataService.formulas,
               defaultColumns: _columns,
               isMobile: isMobile,
               onColumnsChanged: _onColumnsChanged,

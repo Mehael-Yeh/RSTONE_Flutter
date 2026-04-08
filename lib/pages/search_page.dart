@@ -228,7 +228,7 @@ class _SearchPageState extends State<SearchPage> {
       child: InkWell(
         onTap: () {
         _searchFocusNode.unfocus();
-        ProductDetailSheet.show(context, item);
+        ProductDetailSheet.show(context, item, formulas: widget.dataService.formulas);
       },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
