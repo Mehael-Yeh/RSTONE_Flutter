@@ -80,6 +80,33 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
+      - name: Fetch latest data from Rstone
+        run: |
+          # Clone Rstone repo to temporary directory
+          git clone --depth 1 https://github.com/Mehael-Yeh/Rstone.git ../rstone_data
+
+          # Copy .md files to assets directories
+          cp ../rstone_data/产品列表/*.md assets/产品列表/
+          cp ../rstone_data/产品应用/*.md assets/产品应用/
+          cp ../rstone_data/产品配方/*.md assets/产品配方/
+
+          # Generate JSON index files (array of .md filenames, one per line format)
+          python3 -c "
+          import os, json
+
+          for folder, jsonfile in [
+              ('产品列表', 'assets/产品列表.json'),
+              ('产品应用', 'assets/产品应用.json'),
+              ('产品配方', 'assets/产品配方.json'),
+          ]:
+              files = sorted([f for f in os.listdir(f'assets/{folder}') if f.endswith('.md')])
+              with open(jsonfile, 'w') as f:
+                  json.dump(files, f, ensure_ascii=False, indent=2)
+              print(f'{folder}: {len(files)} files')
+          "
+
+          echo "Done. Assets updated from Rstone."
+
       - name: Build Release APK (Android)
         run: |
           flutter build apk --release --split-per-abi
