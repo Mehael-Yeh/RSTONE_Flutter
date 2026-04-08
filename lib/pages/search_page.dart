@@ -16,7 +16,7 @@ class SearchPage extends StatefulWidget {
   State<SearchPage> createState() => _SearchPageState();
 }
 
-class _SearchPageState extends State<SearchPage> {
+class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
   /// 搜索框文本控制器
   final TextEditingController _searchController = TextEditingController();
   /// 搜索框焦点控制节点
@@ -31,14 +31,25 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 应用切到后台或失活时，清除搜索框焦点，防止键盘在后台继续显示
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      _searchFocusNode.unfocus();
+    }
   }
 
   /// 搜索内容变化时触发：更新搜索状态、延迟执行搜索
