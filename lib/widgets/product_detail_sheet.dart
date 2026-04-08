@@ -8,7 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/product_item.dart';
 
 /// 产品详情底部弹窗
-class ProductDetailSheet extends StatelessWidget {
+class ProductDetailSheet extends StatefulWidget {
   final ProductItem product;
   final List<ProductItem> formulas;
 
@@ -23,19 +23,119 @@ class ProductDetailSheet extends StatelessWidget {
     );
   }
 
-  /// 分享表格为图片
-  Future<void> _shareTableAsImage(BuildContext context, String title, GlobalKey tableKey) async {
+  @override
+  State<ProductDetailSheet> createState() => _ProductDetailSheetState();
+}
+
+class _ProductDetailSheetState extends State<ProductDetailSheet> {
+  int _selectedFormulaIndex = 0;
+
+  /// 解析 markdown 表格数据
+  List<List<String>> _parseTable(String rawContent) {
+    final rows = <List<String>>[];
+    for (final line in rawContent.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      bool isSep = true;
+      for (final cell in trimmed.split('|')) {
+        final t = cell.trim();
+        if (t.isNotEmpty && !RegExp(r'^[-:]+$').hasMatch(t)) {
+          isSep = false;
+          break;
+        }
+      }
+      if (isSep) continue;
+      final cols = trimmed.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      if (cols.isNotEmpty) rows.add(cols);
+    }
+    return rows;
+  }
+
+  /// 用 Canvas 完整渲染表格为 PNG（不依赖截图，保证所有行都渲染）
+  Future<void> _shareTableAsImage(
+    BuildContext context,
+    String title,
+    List<List<String>> rows,
+  ) async {
+    if (rows.isEmpty) return;
     try {
-      final boundary = tableKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('无法截取表格'), backgroundColor: Colors.orange),
+      const double rowHeight = 36.0;
+      const double headerHeight = 40.0;
+      const double cellPaddingH = 16.0;
+      const double colMinWidth = 80.0;
+
+      final header = rows.first;
+      final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
+      final colCount = header.length;
+
+      // 计算每列宽度（根据内容）
+      List<double> colWidths = List.filled(colCount, colMinWidth);
+      for (final row in rows) {
+        for (int i = 0; i < row.length && i < colCount; i++) {
+          final len = row[i].length * 10.0 + cellPaddingH * 2;
+          if (len > colWidths[i]) colWidths[i] = len.clamp(colMinWidth, 300.0);
+        }
+      }
+      final totalWidth = colWidths.reduce((a, b) => a + b) + 4;
+      final totalHeight = headerHeight + dataRows.length * rowHeight + 4;
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+
+      // 背景
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, totalWidth, totalHeight),
+        Paint()..color = const Color(0xFF1E1E1E),
+      );
+
+      // 表头背景
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, totalWidth, headerHeight),
+        Paint()..color = const Color(0xFF2D2D2D),
+      );
+
+      // 绘制表头
+      double x = 0;
+      for (int i = 0; i < colCount; i++) {
+        canvas.drawRect(
+          Rect.fromLTWH(x, 0, colWidths[i], headerHeight),
+          Paint()..color = Colors.grey.shade800,
         );
-        return;
+        _drawCell(canvas, header[i], x, 0, colWidths[i], headerHeight,
+            const Color(0xFFFF9800), true);
+        x += colWidths[i];
       }
 
-      final image = await boundary.toImage(pixelRatio: 3.0);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      // 绘制数据行
+      for (int r = 0; r < dataRows.length; r++) {
+        final row = dataRows[r];
+        final y = headerHeight + r * rowHeight;
+        if (r.isOdd) {
+          canvas.drawRect(
+            Rect.fromLTWH(0, y, totalWidth, rowHeight),
+            Paint()..color = const Color(0xFF2A2A2A),
+          );
+        }
+        x = 0;
+        for (int i = 0; i < colCount; i++) {
+          _drawCell(canvas, i < row.length ? row[i] : '',
+              x, y, colWidths[i], rowHeight, const Color(0xFFB0B0B0), false);
+          x += colWidths[i];
+        }
+      }
+
+      // 边框
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, totalWidth, totalHeight),
+        Paint()
+          ..color = Colors.grey.shade700
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+
+      final picture = recorder.endRecording();
+      final img = await picture.toImage(totalWidth.toInt(), totalHeight.toInt());
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
 
       final pngBytes = byteData.buffer.asUint8List();
@@ -57,60 +157,60 @@ class ProductDetailSheet extends StatelessWidget {
     }
   }
 
-  /// 渲染配方 markdown 表格（无 frontmatter，内容即表格）
-  Widget _buildMdTable(String rawContent, {GlobalKey? tableKey}) {
-    final rows = <List<String>>[];
-    for (final line in rawContent.split('\n')) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty) continue;
-      bool isSep = true;
-      for (final cell in trimmed.split('|')) {
-        final t = cell.trim();
-        if (t.isNotEmpty && !RegExp(r'^[-:]+$').hasMatch(t)) {
-          isSep = false;
-          break;
-        }
-      }
-      if (isSep) continue;
-      final cols = trimmed.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-      if (cols.isNotEmpty) rows.add(cols);
-    }
+  void _drawCell(Canvas canvas, String text, double x, double y,
+      double w, double h, Color color, bool bold) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      maxLines: 1,
+      ellipsis: '…',
+      textDirection: TextDirection.ltr,
+    );
+    tp.layout(maxWidth: w - 8);
+    tp.paint(canvas, Offset(x + 8, y + (h - tp.height) / 2));
+  }
 
+  /// 渲染配方 markdown 表格（无 frontmatter，内容即表格）
+  /// 渲染配方表格（用于屏幕显示）
+  Widget _buildMdTable(String rawContent) {
+    final rows = _parseTable(rawContent);
     if (rows.isEmpty) return const SizedBox.shrink();
 
     final header = rows.first;
     final colCount = header.length;
     final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
 
-    return RepaintBoundary(
-      key: tableKey,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey.shade700),
-        ),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(Colors.grey.shade800),
-            dataRowColor: WidgetStateProperty.resolveWith((_) => Colors.transparent),
-            columns: header.map((h) => DataColumn(
-              label: Text(h, style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
-            )).toList(),
-            rows: dataRows.asMap().entries.map((e) {
-              // Pad row to match header column count
-              final paddedRow = List<String>.from(e.value);
-              while (paddedRow.length < colCount) paddedRow.add('');
-              return DataRow(
-                color: WidgetStateProperty.all(e.key.isOdd ? Colors.grey.shade900 : Colors.transparent),
-                cells: paddedRow.take(colCount).map((cell) => DataCell(
-                  Text(cell, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                )).toList(),
-              );
-            }).toList(),
-          ),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade700),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: WidgetStateProperty.all(Colors.grey.shade800),
+          dataRowColor: WidgetStateProperty.resolveWith((_) => Colors.transparent),
+          columns: header.map((h) => DataColumn(
+            label: Text(h, style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+          )).toList(),
+          rows: dataRows.asMap().entries.map((e) {
+            final paddedRow = List<String>.from(e.value);
+            while (paddedRow.length < colCount) paddedRow.add('');
+            return DataRow(
+              color: WidgetStateProperty.all(e.key.isOdd ? Colors.grey.shade900 : Colors.transparent),
+              cells: paddedRow.take(colCount).map((cell) => DataCell(
+                Text(cell, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              )).toList(),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -157,10 +257,10 @@ class ProductDetailSheet extends StatelessWidget {
       }
     }
 
-    add('底漆', product.primer);
-    add('中漆', product.midCoat);
-    add('面漆', product.topCoat);
-    add('基材', product.baseMaterial);
+    add('底漆', widget.product.primer);
+    add('中漆', widget.product.midCoat);
+    add('面漆', widget.product.topCoat);
+    add('基材', widget.product.baseMaterial);
 
     if (fields.isEmpty) return const SizedBox.shrink();
 
@@ -219,66 +319,114 @@ class ProductDetailSheet extends StatelessWidget {
   }
 
   /// 查找并渲染关联的产品配方（文件名以产品牌号开头，如 RS7767-银.md 对应 RS7767）
-  List<Widget> _buildLinkedFormulas(BuildContext context, ProductItem product) {
-    final matchedFormulas = formulas.where((f) {
-      return f.fileName.startsWith(product.fileName) ||
-          f.fileName.startsWith(product.experimentalCode ?? '');
+  Widget _buildLinkedFormulas() {
+    final matchedFormulas = widget.formulas.where((f) {
+      return f.fileName.startsWith(widget.product.fileName) ||
+          f.fileName.startsWith(widget.product.experimentalCode ?? '');
     }).toList();
 
-    if (matchedFormulas.isEmpty) return [];
+    if (matchedFormulas.isEmpty) return const SizedBox.shrink();
 
-    return matchedFormulas.map((formula) {
+    // 单配方：直接展示
+    if (matchedFormulas.length == 1) {
+      final formula = matchedFormulas.first;
       final title = '配方：${formula.fileName.replaceAll('.md', '')}';
-      final tableKey = GlobalKey();
+      final rows = _parseTable(formula.rawContent);
+      return _buildFormulaCard(title, formula.rawContent, rows);
+    }
 
-      return Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2D2D2D),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade800),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.science_outlined, color: Colors.cyan, size: 16),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.cyan,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.share_outlined, color: Colors.grey, size: 18),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                    tooltip: '分享表格',
-                    onPressed: () => _shareTableAsImage(context, title, tableKey),
-                  ),
-                ],
-              ),
-            ),
-            _buildMdTable(formula.rawContent, tableKey: tableKey),
-            const SizedBox(height: 8),
-          ],
+    // 多配方：下拉选择器
+    final items = matchedFormulas.map((f) {
+      return DropdownMenuItem(
+        value: matchedFormulas.indexOf(f),
+        child: Text(
+          f.fileName.replaceAll('.md', ''),
+          style: const TextStyle(color: Colors.white, fontSize: 13),
         ),
       );
     }).toList();
+
+    final selectedFormula = matchedFormulas[_selectedFormulaIndex.clamp(0, matchedFormulas.length - 1)];
+    final title = '配方：${selectedFormula.fileName.replaceAll('.md', '')}';
+    final rows = _parseTable(selectedFormula.rawContent);
+
+    return Column(
+      children: [
+        // 下拉选择器
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2D2D2D),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade700),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _selectedFormulaIndex.clamp(0, matchedFormulas.length - 1),
+              isExpanded: true,
+              dropdownColor: const Color(0xFF2D2D2D),
+              icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
+              items: items,
+              onChanged: (val) {
+                if (val != null) setState(() => _selectedFormulaIndex = val);
+              },
+            ),
+          ),
+        ),
+        _buildFormulaCard(title, selectedFormula.rawContent, rows),
+      ],
+    );
+  }
+
+  Widget _buildFormulaCard(String title, String rawContent, List<List<String>> rows) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2D2D2D),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade800),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.science_outlined, color: Colors.cyan, size: 16),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.cyan,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.share_outlined, color: Colors.grey, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  tooltip: '分享表格',
+                  onPressed: () => _shareTableAsImage(context, title, rows),
+                ),
+              ],
+            ),
+          ),
+          _buildMdTable(rawContent),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     // 去掉 frontmatter 部分，只留 body
-    String bodyContent = product.rawContent;
+    String bodyContent = widget.product.rawContent;
     final frontmatterEnd = bodyContent.indexOf('---', 4);
     if (frontmatterEnd != -1) {
       bodyContent = bodyContent.substring(frontmatterEnd + 3).trim();
@@ -314,15 +462,15 @@ class ProductDetailSheet extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: product.folder == '产品列表'
+                        color: widget.product.folder == '产品列表'
                             ? Colors.blue.withOpacity(0.2)
                             : Colors.green.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        product.folder,
+                        widget.product.folder,
                         style: TextStyle(
-                          color: product.folder == '产品列表'
+                          color: widget.product.folder == '产品列表'
                               ? Colors.blue[300]
                               : Colors.green[300],
                           fontSize: 12,
@@ -333,7 +481,7 @@ class ProductDetailSheet extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        product.displayName,
+                        widget.product.displayName,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -351,13 +499,13 @@ class ProductDetailSheet extends StatelessWidget {
               ),
               const Divider(color: Colors.grey, height: 1),
               // 标签
-              if (product.tags.isNotEmpty)
+              if (widget.product.tags.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: product.tags.map((tag) {
+                    children: widget.product.tags.map((tag) {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
@@ -376,10 +524,10 @@ class ProductDetailSheet extends StatelessWidget {
                   ),
                 ),
               // 配方表格（仅产品应用有配方字段）
-              if (product.folder == '产品应用') _buildFormulaTable(),
+              if (widget.product.folder == '产品应用') _buildFormulaTable(),
               // 产品配方 section：文件名以当前产品牌号开头时显示
-              if (product.folder == '产品列表')
-                ..._buildLinkedFormulas(context, product),
+              if (widget.product.folder == '产品列表')
+                _buildLinkedFormulas(),
               // MD 内容（不含 frontmatter）
               Expanded(
                 child: _markdownView(bodyContent, scrollController),
