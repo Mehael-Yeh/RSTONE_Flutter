@@ -1,5 +1,10 @@
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter/rendering.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/product_item.dart';
 
 /// 产品详情底部弹窗
@@ -18,51 +23,128 @@ class ProductDetailSheet extends StatelessWidget {
     );
   }
 
-  /// 查找并渲染关联的产品配方（文件名以产品牌号开头，如 RS7767-银.md 对应 RS7767）
-  List<Widget> _buildLinkedFormulas(ProductItem product) {
-    final matchedFormulas = formulas.where((f) {
-      return f.fileName.startsWith(product.fileName) ||
-          f.fileName.startsWith(product.experimentalCode ?? '');
-    }).toList();
+  /// 分享表格为图片
+  Future<void> _shareTableAsImage(BuildContext context, String title, GlobalKey tableKey) async {
+    try {
+      final boundary = tableKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('无法截取表格'), backgroundColor: Colors.orange),
+        );
+        return;
+      }
 
-    if (matchedFormulas.isEmpty) return [];
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
 
-    return matchedFormulas.map((formula) {
-      return Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2D2D2D),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade800),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.science_outlined, color: Colors.cyan, size: 16),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '配方：${formula.fileName.replaceAll('.md', '')}',
-                      style: const TextStyle(
-                        color: Colors.cyan,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            _buildMdTable(formula.rawContent),
-            const SizedBox(height: 8),
-          ],
-        ),
+      final pngBytes = byteData.buffer.asUint8List();
+      final tempDir = await getTemporaryDirectory();
+      final fileName = '${title.replaceAll('配方：', '').replaceAll(' ', '_')}.png';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(pngBytes);
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        subject: '$title - 锐石 RSTONE',
       );
-    }).toList();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('分享失败: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  /// 渲染配方 markdown 表格（无 frontmatter，内容即表格）
+  Widget _buildMdTable(String rawContent, {GlobalKey? tableKey}) {
+    final rows = <List<String>>[];
+    for (final line in rawContent.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      bool isSep = true;
+      for (final cell in trimmed.split('|')) {
+        final t = cell.trim();
+        if (t.isNotEmpty && !RegExp(r'^[-:]+$').hasMatch(t)) {
+          isSep = false;
+          break;
+        }
+      }
+      if (isSep) continue;
+      final cols = trimmed.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      if (cols.isNotEmpty) rows.add(cols);
+    }
+
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    final header = rows.first;
+    final colCount = header.length;
+    final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
+
+    return RepaintBoundary(
+      key: tableKey,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade700),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(Colors.grey.shade800),
+            dataRowColor: WidgetStateProperty.resolveWith((_) => Colors.transparent),
+            columns: header.map((h) => DataColumn(
+              label: Text(h, style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+            )).toList(),
+            rows: dataRows.asMap().entries.map((e) {
+              // Pad row to match header column count
+              final paddedRow = List<String>.from(e.value);
+              while (paddedRow.length < colCount) paddedRow.add('');
+              return DataRow(
+                color: WidgetStateProperty.all(e.key.isOdd ? Colors.grey.shade900 : Colors.transparent),
+                cells: paddedRow.take(colCount).map((cell) => DataCell(
+                  Text(cell, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                )).toList(),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _markdownView(String content, ScrollController scrollController) {
+    if (content.trim().isEmpty) return const SizedBox.shrink();
+    return Markdown(
+      controller: scrollController,
+      data: content,
+      styleSheet: MarkdownStyleSheet(
+        p: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.6),
+        h1: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+        h2: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+        h3: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+        listBullet: const TextStyle(color: Colors.white70),
+        code: TextStyle(color: Colors.cyan[300], backgroundColor: Colors.grey[900]),
+        codeblockDecoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        blockquoteDecoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: Colors.blue[300]!, width: 3),
+          ),
+        ),
+        horizontalRuleDecoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: Colors.grey[700]!, width: 1),
+          ),
+        ),
+      ),
+      selectable: true,
+    );
   }
 
   /// 从 frontmatter 提取配方相关字段，生成结构化表格
@@ -136,89 +218,61 @@ class ProductDetailSheet extends StatelessWidget {
     );
   }
 
-  /// 渲染配方 markdown 表格（无 frontmatter，内容即表格）
-  Widget _buildMdTable(String rawContent) {
-    final rows = <List<String>>[];
-    for (final line in rawContent.split('\n')) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty) continue;
-      // 判断是否为分隔行（全是 -: 和空白）
-      bool isSep = true;
-      for (final cell in trimmed.split('|')) {
-        final t = cell.trim();
-        if (t.isNotEmpty && !RegExp(r'^[-:]+$').hasMatch(t)) {
-          isSep = false;
-          break;
-        }
-      }
-      if (isSep) continue;
-      // 解析表格行
-      final cols = trimmed.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-      if (cols.isNotEmpty) rows.add(cols);
-    }
+  /// 查找并渲染关联的产品配方（文件名以产品牌号开头，如 RS7767-银.md 对应 RS7767）
+  List<Widget> _buildLinkedFormulas(BuildContext context, ProductItem product) {
+    final matchedFormulas = formulas.where((f) {
+      return f.fileName.startsWith(product.fileName) ||
+          f.fileName.startsWith(product.experimentalCode ?? '');
+    }).toList();
 
-    if (rows.isEmpty) return const SizedBox.shrink();
+    if (matchedFormulas.isEmpty) return [];
 
-    // 首行为表头
-    final header = rows.first;
-    final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
+    return matchedFormulas.map((formula) {
+      final title = '配方：${formula.fileName.replaceAll('.md', '')}';
+      final tableKey = GlobalKey();
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade700),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(Colors.grey.shade800),
-          dataRowColor: WidgetStateProperty.resolveWith((_) => Colors.transparent),
-          columns: header.map((h) => DataColumn(
-            label: Text(h, style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
-          )).toList(),
-          rows: dataRows.asMap().entries.map((e) {
-            return DataRow(
-              color: WidgetStateProperty.all(e.key.isOdd ? Colors.grey.shade900 : Colors.transparent),
-              cells: e.value.map((cell) => DataCell(
-                Text(cell, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              )).toList(),
-            );
-          }).toList(),
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2D2D2D),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade800),
         ),
-      ),
-    );
-  }
-
-  Widget _markdownView(String content, ScrollController scrollController) {
-    if (content.trim().isEmpty) return const SizedBox.shrink();
-    return Markdown(
-      controller: scrollController,
-      data: content,
-      styleSheet: MarkdownStyleSheet(
-        p: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.6),
-        h1: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-        h2: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-        h3: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-        listBullet: const TextStyle(color: Colors.white70),
-        code: TextStyle(color: Colors.cyan[300], backgroundColor: Colors.grey[900]),
-        codeblockDecoration: BoxDecoration(
-          color: Colors.grey[900],
-          borderRadius: BorderRadius.circular(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.science_outlined, color: Colors.cyan, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.cyan,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.share_outlined, color: Colors.grey, size: 18),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    tooltip: '分享表格',
+                    onPressed: () => _shareTableAsImage(context, title, tableKey),
+                  ),
+                ],
+              ),
+            ),
+            _buildMdTable(formula.rawContent, tableKey: tableKey),
+            const SizedBox(height: 8),
+          ],
         ),
-        blockquoteDecoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(color: Colors.blue[300]!, width: 3),
-          ),
-        ),
-        horizontalRuleDecoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: Colors.grey[700]!, width: 1),
-          ),
-        ),
-      ),
-      selectable: true,
-    );
+      );
+    }).toList();
   }
 
   @override
@@ -325,7 +379,7 @@ class ProductDetailSheet extends StatelessWidget {
               if (product.folder == '产品应用') _buildFormulaTable(),
               // 产品配方 section：文件名以当前产品牌号开头时显示
               if (product.folder == '产品列表')
-                ..._buildLinkedFormulas(product),
+                ..._buildLinkedFormulas(context, product),
               // MD 内容（不含 frontmatter）
               Expanded(
                 child: _markdownView(bodyContent, scrollController),
