@@ -40,11 +40,20 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   int _selectedFormulaIndex = 0;
 
   /// 解析 markdown 表格数据
-  List<List<String>> _parseTable(String rawContent) {
+  /// [rawContent] 传入的完整 markdown 内容（可能包含多张表格和非表格文字）
+  /// 返回解析后的表格行列表；同时通过 [nonTableContent] 输出不在表格内的文字（如 blockquote 等）
+  List<List<String>> _parseTable(String rawContent, [List<String>? nonTableContent]) {
     final rows = <List<String>>[];
     for (final line in rawContent.split('\n')) {
       final trimmed = line.trim();
       if (trimmed.isEmpty) continue;
+      // 非表格行（如 blockquote、行首无 | 的内容）
+      if (!trimmed.startsWith('|')) {
+        if (nonTableContent != null && trimmed.isNotEmpty) {
+          nonTableContent.add(trimmed);
+        }
+        continue;
+      }
       bool isSep = true;
       for (final cell in trimmed.split('|')) {
         final t = cell.trim();
@@ -463,6 +472,18 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   Widget _buildFormulaCard(String title, String rawContent, List<List<String>> rows) {
+    // 提取表格外的文字（如 blockquote 施工比例说明）
+    final extraContent = rawContent.split('\n').where((line) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) return false;
+      if (!trimmed.startsWith('|')) return true;
+      for (final cell in trimmed.split('|')) {
+        final t = cell.trim();
+        if (t.isNotEmpty && !RegExp(r'^[-:]+$').hasMatch(t)) return false;
+      }
+      return true;
+    }).join('\n');
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
@@ -500,6 +521,23 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
             ),
           ),
           _buildMdTable(rawContent),
+          // 配方表格下方的非表格文字（如施工比例等 blockquote）
+          if (extraContent.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Markdown(
+                data: extraContent,
+                styleSheet: MarkdownStyleSheet(
+                  blockquote: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
+                  blockquoteDecoration: BoxDecoration(
+                    border: const Border(
+                      left: BorderSide(color: Colors.orange, width: 3),
+                    ),
+                  ),
+                  blockquotePadding: const EdgeInsets.only(left: 12),
+                ),
+              ),
+            ),
           const SizedBox(height: 8),
         ],
       ),
@@ -515,24 +553,33 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       bodyContent = bodyContent.substring(frontmatterEnd + 3).trim();
     }
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.65,
-      minChildSize: 0.3,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF1E1E1E),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: Column(
-            children: [
-              // 拖动条
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
+    return NotificationListener<DraggableScrollableNotification>(
+      onNotification: (notification) {
+        // 当 sheet 被拖动到接近底部时（extent 接近 minExtent），关闭弹窗
+        if (notification.extent < notification.minExtent * 0.6) {
+          Navigator.pop(context);
+          return true;
+        }
+        return false;
+      },
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.65,
+        minChildSize: 0.1,
+        maxChildSize: 1.0,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Column(
+              children: [
+                // 拖动条（把手）- 向上拖可展开到全屏，向下拖可关闭
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
                   color: Colors.grey[600],
                   borderRadius: BorderRadius.circular(2),
                 ),
@@ -619,6 +666,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           ),
         );
       },
-    );
+    ),
+  );
   }
 }
