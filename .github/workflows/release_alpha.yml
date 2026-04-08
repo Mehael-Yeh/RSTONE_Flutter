@@ -85,7 +85,8 @@ jobs:
           # Clone Rstone repo to temporary directory
           git clone --depth 1 https://github.com/Mehael-Yeh/Rstone.git ../rstone_data
 
-          # Copy .md files to assets directories
+          # Recreate assets directories and copy .md files
+          mkdir -p assets/产品列表 assets/产品应用 assets/产品配方
           cp ../rstone_data/产品列表/*.md assets/产品列表/
           cp ../rstone_data/产品应用/*.md assets/产品应用/
           cp ../rstone_data/产品配方/*.md assets/产品配方/
