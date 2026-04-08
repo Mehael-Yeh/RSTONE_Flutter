@@ -73,7 +73,7 @@ jobs:
           storePassword=${{ secrets.KEYSTORE_STORE_PASSWORD }}
           keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}
           keyAlias=${{ secrets.KEYSTORE_KEY_ALIAS }}
-          storeFile=app/rst_flutter.jks
+          storeFile=rst_flutter.jks
           KEYEOF
           cat android/key.properties
 
@@ -83,6 +83,17 @@ jobs:
       - name: Build Release APK (Android)
         run: |
           flutter build apk --release --split-per-abi
+          # 重命名为 RSTONE-{version}-{abi}-release.apk
+          cd build/app/outputs/flutter-apk
+          for apk in app-*-release.apk; do
+            case "$apk" in
+              app-armeabi-v7a-release.apk)  ABI=armeabi-v7a ;;
+              app-arm64-v8a-release.apk)    ABI=arm64-v8a ;;
+              app-x86_64-release.apk)         ABI=x86_64 ;;
+            esac
+            mv "$apk" "RSTONE-${{ steps.version.outputs.tag }}-${ABI}-release.apk"
+          done
+          ls -la
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
@@ -94,7 +105,10 @@ jobs:
             自动构建版本: `${{ steps.version.outputs.tag }}`
             - 提交: `${{ github.sha }}`
             - 构建时间: `${{ github.event.head_commit.timestamp }}`
-          files: build/app/outputs/flutter-apk/app-release.apk
+          files: |
+            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-x86_64-release.apk
           prerelease: true
           generate_release_notes: true
         env:
