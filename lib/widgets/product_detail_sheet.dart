@@ -8,12 +8,20 @@ import 'package:share_plus/share_plus.dart';
 import '../models/product_item.dart';
 
 /// 产品详情底部弹窗
+/// 
+/// 从屏幕底部滑出的半屏弹窗，用于展示产品/应用的完整信息。
+/// 支持：
+/// - Markdown 内容渲染
+/// - 产品配方表格展示（Canvas 绘制，支持分享）
+/// - 配方信息结构化展示
+/// - 拖拽调整弹窗高度（向上展开、向下收起）
 class ProductDetailSheet extends StatefulWidget {
   final ProductItem product;
   final List<ProductItem> formulas;
 
   const ProductDetailSheet({super.key, required this.product, this.formulas = const []});
 
+  /// 显示产品详情弹窗的便捷方法
   static void show(BuildContext context, ProductItem product, {List<ProductItem> formulas = const []}) {
     showModalBottomSheet(
       context: context,
@@ -28,6 +36,7 @@ class ProductDetailSheet extends StatefulWidget {
 }
 
 class _ProductDetailSheetState extends State<ProductDetailSheet> {
+  /// 多配方时下拉选择的索引
   int _selectedFormulaIndex = 0;
 
   /// 解析 markdown 表格数据

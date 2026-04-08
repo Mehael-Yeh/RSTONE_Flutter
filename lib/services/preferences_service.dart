@@ -2,14 +2,28 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 用户偏好设置服务
+/// 
+/// 负责持久化用户的个性化设置，包括：
+/// - 产品列表/产品应用的列显示顺序
+/// - 排序列和排序方向
+/// 
+/// 使用 shared_preferences 进行本地存储，卸载应用后数据清除。
 class PreferencesService {
+  // ===== Storage Keys =====
+  /// 产品列表列顺序存储键
   static const String _productListColumnsKey = 'product_list_columns';
+  /// 产品列表排序列存储键
   static const String _productListSortKey = 'product_list_sort';
-  static const String _applicationColumnsKey = 'application_columns';
-  static const String _applicationSortKey = 'application_sort';
+  /// 产品列表排序方向存储键
   static const String _productListSortDescKey = 'product_list_sort_desc';
+  /// 产品应用列顺序存储键
+  static const String _applicationColumnsKey = 'application_columns';
+  /// 产品应用排序列存储键
+  static const String _applicationSortKey = 'application_sort';
+  /// 产品应用排序方向存储键
   static const String _applicationSortDescKey = 'application_sort_desc';
 
+  /// SharedPreferences 实例
   SharedPreferences? _prefs;
 
   Future<void> initialize() async {
