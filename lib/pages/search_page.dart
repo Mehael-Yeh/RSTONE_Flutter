@@ -25,11 +25,6 @@ class _SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    _searchFocusNode.addListener(() {
-      if (_searchFocusNode.hasFocus && _searchController.text.isNotEmpty) {
-        setState(() => _showResults = true);
-      }
-    });
   }
 
   @override
@@ -90,6 +85,7 @@ class _SearchPageState extends State<SearchPage> {
                   IconButton(
                     icon: const Icon(Icons.settings, color: Colors.white70),
                     onPressed: () {
+                      _searchFocusNode.unfocus();
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -230,7 +226,10 @@ class _SearchPageState extends State<SearchPage> {
       margin: const EdgeInsets.only(bottom: 8),
       color: const Color(0xFF2D2D2D),
       child: InkWell(
-        onTap: () => ProductDetailSheet.show(context, item),
+        onTap: () {
+        _searchFocusNode.unfocus();
+        ProductDetailSheet.show(context, item);
+      },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
