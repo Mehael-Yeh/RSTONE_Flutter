@@ -413,8 +413,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   /// 查找并渲染关联的产品配方（文件名以产品牌号开头，如 RS7767-银.md 对应 RS7767）
   Widget _buildLinkedFormulas() {
     final matchedFormulas = widget.formulas.where((f) {
-      return f.fileName.startsWith(widget.product.fileName) ||
-          f.fileName.startsWith(widget.product.experimentalCode ?? '');
+      // 精确匹配：配方文件名以产品牌号+"-"开头（如 RS7767-银.md 匹配产品 RS7767）
+      // experimentalCode 可能指向另一个系列的产品牌号，仅在非空且有明确匹配时才使用
+      final hasExperimentalCodeMatch =
+          widget.product.experimentalCode != null &&
+          widget.product.experimentalCode!.isNotEmpty &&
+          f.fileName.startsWith(widget.product.experimentalCode!);
+      return f.fileName.startsWith(widget.product.fileName + '-') ||
+          hasExperimentalCodeMatch;
     }).toList();
 
     if (matchedFormulas.isEmpty) return const SizedBox.shrink();
@@ -568,105 +574,110 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         maxChildSize: 1.0,
         builder: (context, scrollController) {
           return Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            decoration: const BoxDecoration(
+              color: Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
-            child: Column(
+            child: ListView(
+              controller: scrollController,
+              padding: EdgeInsets.zero,
               children: [
-                // 拖动条（把手）- 向上拖可展开到全屏，向下拖可关闭
-                Container(
-                  margin: const EdgeInsets.symmetric(vertical: 12),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                  color: Colors.grey[600],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              // 标题栏
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: widget.product.folder == '产品列表'
-                            ? Colors.blue.withOpacity(0.2)
-                            : Colors.green.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        widget.product.folder,
-                        style: TextStyle(
-                          color: widget.product.folder == '产品列表'
-                              ? Colors.blue[300]
-                              : Colors.green[300],
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                // 拖动条（把手）
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 12),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[600],
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        widget.product.displayName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(color: Colors.grey, height: 1),
-              // 标签
-              if (widget.product.tags.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: widget.product.tags.map((tag) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          tag,
-                          style: const TextStyle(
-                            color: Colors.orange,
-                            fontSize: 12,
-                          ),
-                        ),
-                      );
-                    }).toList(),
                   ),
                 ),
-              // 配方表格（仅产品应用有配方字段）
-              if (widget.product.folder == '产品应用') _buildFormulaTable(),
-              // 产品配方 section：文件名以当前产品牌号开头时显示
-              if (widget.product.folder == '产品列表')
-                _buildLinkedFormulas(),
-              // MD 内容（不含 frontmatter）
-              Flexible(
-                child: _markdownView(bodyContent, scrollController),
-              ),
-            ],
-          ),
-        );
-      },
-    ),
-  );
+                // 标题栏
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: widget.product.folder == '产品列表'
+                              ? Colors.blue.withOpacity(0.2)
+                              : Colors.green.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          widget.product.folder,
+                          style: TextStyle(
+                            color: widget.product.folder == '产品列表'
+                                ? Colors.blue[300]
+                                : Colors.green[300],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          widget.product.displayName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(color: Colors.grey, height: 1),
+                // 标签
+                if (widget.product.tags.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: widget.product.tags.map((tag) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            tag,
+                            style: const TextStyle(
+                              color: Colors.orange,
+                              fontSize: 12,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                // 配方表格（仅产品应用有配方字段）
+                if (widget.product.folder == '产品应用') _buildFormulaTable(),
+                // 产品配方 section：文件名以当前产品牌号+"-"开头时显示
+                if (widget.product.folder == '产品列表')
+                  _buildLinkedFormulas(),
+                // MD 内容（不含 frontmatter）
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                  child: _markdownView(bodyContent, scrollController),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }
