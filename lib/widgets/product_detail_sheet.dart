@@ -74,17 +74,20 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   /// 用 Canvas 完整渲染表格为 PNG（不依赖截图，保证所有行都渲染）
+  /// [extraContent] blockquote 等表格外的文字，会渲染在表格下方
   Future<void> _shareTableAsImage(
     BuildContext context,
     String title,
-    List<List<String>> rows,
-  ) async {
+    List<List<String>> rows, {
+    String? extraContent,
+  }) async {
     if (rows.isEmpty) return;
     try {
       const double rowHeight = 36.0;
       const double headerHeight = 40.0;
       const double cellPaddingH = 16.0;
       const double colMinWidth = 80.0;
+      const double scale = 2.0; // 2x 分辨率提升清晰度
 
       final header = rows.first;
       final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
@@ -99,10 +102,21 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         }
       }
       final totalWidth = colWidths.reduce((a, b) => a + b) + 4;
-      final totalHeight = headerHeight + dataRows.length * rowHeight + 4;
+      // 计算 blockquote 高度（2x 缩放）
+      double extraHeight = 0;
+      if (extraContent != null && extraContent.trim().isNotEmpty) {
+        final tp = TextPainter(
+          text: TextSpan(text: extraContent, style: const TextStyle(fontSize: 12, height: 1.5)),
+          textDirection: TextDirection.ltr,
+        );
+        tp.layout(maxWidth: (totalWidth - 24) * scale);
+        extraHeight = (tp.height + 16) * scale; // 上下各 8px padding
+      }
+      final totalHeight = headerHeight + dataRows.length * rowHeight + 4 + extraHeight;
 
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
+      canvas.scale(scale, scale); // 2x 缩放提升清晰度
 
       // 背景
       canvas.drawRect(
@@ -154,6 +168,24 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1,
       );
+
+      // 绘制 blockquote 施工比例文字
+      if (extraContent != null && extraContent.trim().isNotEmpty) {
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: extraContent,
+            style: const TextStyle(
+              color: Color(0xFFB0B0B0),
+              fontSize: 12,
+              height: 1.5,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        );
+        textPainter.layout(maxWidth: totalWidth - 24);
+        final blockY = totalHeight + 8;
+        textPainter.paint(canvas, Offset(12, blockY));
+      }
 
       final picture = recorder.endRecording();
       final img = await picture.toImage(totalWidth.toInt(), totalHeight.toInt());
@@ -208,8 +240,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   /// 渲染配方 markdown 表格（完全自定义渲染，列宽自动适配内容）
-  Widget _buildMdTable(String rawContent) {
-    final rows = _parseTable(rawContent);
+  /// [tableContent] 应为去掉 frontmatter 后的纯 markdown 表格内容
+  /// [extraContent] 表格外的文字（如 blockquote 施工比例），渲染在表格下方，宽度与表格总列宽一致
+  Widget _buildMdTable(String tableContent, {String? extraContent}) {
+    final rows = _parseTable(tableContent);
     if (rows.isEmpty) return const SizedBox.shrink();
 
     final header = rows.first;
@@ -234,6 +268,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     }
     // 填充空列
     while (colWidths.length < colCount) colWidths.add(minColWidth);
+    final totalTableWidth = colWidths.reduce((a, b) => a + b);
 
     const Color borderColor = Color(0xFF3D3D3D);
     const Color headerBg = Color(0xFF2D2D2D);
@@ -243,31 +278,50 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     const Color cellText = Color(0xFFB0B0B0);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       decoration: BoxDecoration(
         color: rowBg,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey.shade700),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 表头行
-            _buildTableRow(header, colWidths, headerHeight, true, cellHPadding,
-                headerBg, headerText, borderColor),
-            // 数据行
-            for (int ri = 0; ri < dataRows.length; ri++)
-              _buildTableRow(
-                dataRows[ri].length >= colCount
-                    ? dataRows[ri].take(colCount).toList()
-                    : List.generate(colCount, (i) => i < dataRows[ri].length ? dataRows[ri][i] : ''),
-                colWidths, rowHeight, false, cellHPadding,
-                ri.isOdd ? rowAlt : rowBg, cellText, borderColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 表头行
+                _buildTableRow(header, colWidths, headerHeight, true, cellHPadding,
+                    headerBg, headerText, borderColor),
+                // 数据行
+                for (int ri = 0; ri < dataRows.length; ri++)
+                  _buildTableRow(
+                    dataRows[ri].length >= colCount
+                        ? dataRows[ri].take(colCount).toList()
+                        : List.generate(colCount, (i) => i < dataRows[ri].length ? dataRows[ri][i] : ''),
+                    colWidths, rowHeight, false, cellHPadding,
+                    ri.isOdd ? rowAlt : rowBg, cellText, borderColor,
+                  ),
+              ],
+            ),
+          ),
+          // 表格下方的 blockquote 等额外文字，宽度与表格总列宽一致
+          if (extraContent != null && extraContent.trim().isNotEmpty)
+            Container(
+              width: totalTableWidth,
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Text(
+                extraContent,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  height: 1.5,
+                ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -478,23 +532,60 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   Widget _buildFormulaCard(String title, String rawContent, List<List<String>> rows) {
-    // 去掉 frontmatter，只保留 body 部分（blockquote 施工比例在 body 中）
-    final frontmatterEnd = rawContent.indexOf('---', 4);
-    final bodyContent = frontmatterEnd != -1
-        ? rawContent.substring(frontmatterEnd + 3).trim()
-        : rawContent;
+    // 以表格位置为基准提取内容：
+    // - 表格前的内容 → 渲染在表格上方
+    // - 表格后的内容 → 渲染在表格下方
+    // - frontmatter（--- 之间的字段）和 wiki 链接（[[...]]）不显示
+    // - 去掉 markdown 格式符号（如 > 、| 、--- 等）
+    final preTableLines = <String>[];
+    final postTableLines = <String>[];
+    bool foundTable = false;
+    bool inFrontmatter = false;
+    bool frontmatterEnded = false;
 
-    // 提取表格外的文字（如 blockquote 施工比例说明）
-    final extraContent = bodyContent.split('\n').where((line) {
+    for (final line in rawContent.split('\n')) {
       final trimmed = line.trim();
-      if (trimmed.isEmpty) return false;
-      if (!trimmed.startsWith('|')) return true;
-      for (final cell in trimmed.split('|')) {
-        final t = cell.trim();
-        if (t.isNotEmpty && !RegExp(r'^[-:]+$').hasMatch(t)) return false;
+
+      // 跟踪 frontmatter 边界
+      if (trimmed == '---') {
+        if (!inFrontmatter) {
+          inFrontmatter = true;
+        } else {
+          frontmatterEnded = true;
+          inFrontmatter = false;
+        }
+        continue;
       }
-      return true;
-    }).join('\n');
+
+      // frontmatter 内容不显示
+      if (inFrontmatter) continue;
+
+      // wiki 链接不显示
+      if (frontmatterEnded && trimmed.startsWith('[[')) continue;
+
+      // 遇到表格行，切换到 postTable 模式
+      if (trimmed.startsWith('|')) {
+        foundTable = true;
+        continue;
+      }
+
+      // 跳过空行和分隔行（---）
+      if (trimmed.isEmpty) continue;
+
+      // 收集非表格行：去掉 > 前缀（blockquote）、| 前后空格
+      final clean = trimmed.startsWith('> ')
+          ? trimmed.substring(2).trim()
+          : trimmed;
+
+      if (foundTable) {
+        postTableLines.add(clean);
+      } else {
+        preTableLines.add(clean);
+      }
+    }
+
+    final preContent = preTableLines.join('\n');
+    final postContent = postTableLines.join('\n');
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -527,26 +618,40 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                   tooltip: '分享表格',
-                  onPressed: () => _shareTableAsImage(context, title, rows),
+                  onPressed: () => _shareTableAsImage(
+                    context, title, rows,
+                    extraContent: preContent.isNotEmpty
+                        ? '$preContent${postContent.isNotEmpty ? '\n$postContent' : ''}'
+                        : postContent,
+                  ),
                 ),
               ],
             ),
           ),
+          // 表格前的额外内容（如有）
+          if (preContent.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              child: Text(
+                preContent,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  height: 1.5,
+                ),
+              ),
+            ),
           _buildMdTable(rawContent),
-          // 配方表格下方的非表格文字（如施工比例等 blockquote）
-          if (extraContent.trim().isNotEmpty)
+          // 表格后的额外内容（如施工比例，如有）
+          if (postContent.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Markdown(
-                data: extraContent,
-                styleSheet: MarkdownStyleSheet(
-                  blockquote: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
-                  blockquoteDecoration: BoxDecoration(
-                    border: const Border(
-                      left: BorderSide(color: Colors.orange, width: 3),
-                    ),
-                  ),
-                  blockquotePadding: const EdgeInsets.only(left: 12),
+              child: Text(
+                postContent,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  height: 1.5,
                 ),
               ),
             ),
@@ -571,6 +676,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         if (notification.extent < notification.minExtent * 0.6) {
           Navigator.pop(context);
           return true;
+        }
+        // 当 sheet 拖动超出 maxChildSize 时，阻止默认弹性拉伸
+        if (notification.extent > notification.maxChildSize) {
+          return true; // preventDefault by returning true without calling super
         }
         return false;
       },
