@@ -107,6 +107,16 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         }
       }
       final totalWidth = colWidths.reduce((a, b) => a + b) + 4;
+      // 计算标题高度
+      double titleHeight = 0;
+      if (title.isNotEmpty) {
+        final tp = TextPainter(
+          text: TextSpan(text: title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF9800))),
+          textDirection: TextDirection.ltr,
+        );
+        tp.layout(maxWidth: (totalWidth - 24) * scale);
+        titleHeight = (tp.height + 16) * scale; // 上下各 8px padding
+      }
       // 计算 blockquote 文字高度（2x 缩放）
       double extraHeight = 0;
       if (extraContent != null && extraContent.trim().isNotEmpty) {
@@ -118,7 +128,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         extraHeight = (tp.height + 16) * scale; // 上下各 8px padding
       }
       final tableHeight = headerHeight + dataRows.length * rowHeight + 4;
-      final totalHeight = tableHeight + extraHeight;
+      final totalHeight = titleHeight + tableHeight + extraHeight;
 
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
@@ -130,28 +140,38 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         Paint()..color = const Color(0xFF1E1E1E),
       );
 
-      // 表头背景
+      // 绘制标题（wiki 链接已转换为普通文字）
+      if (title.isNotEmpty) {
+        final titlePainter = TextPainter(
+          text: TextSpan(text: title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF9800))),
+          textDirection: TextDirection.ltr,
+        );
+        titlePainter.layout(maxWidth: totalWidth - 24);
+        titlePainter.paint(canvas, Offset(12, 8));
+      }
+
+      // 表头背景（表格从 titleHeight 开始）
       canvas.drawRect(
-        Rect.fromLTWH(0, 0, totalWidth, headerHeight),
+        Rect.fromLTWH(0, titleHeight, totalWidth, headerHeight),
         Paint()..color = const Color(0xFF2D2D2D),
       );
 
-      // 绘制表头
+      // 绘制表头（表格从 titleHeight 开始）
       double x = 0;
       for (int i = 0; i < colCount; i++) {
         canvas.drawRect(
-          Rect.fromLTWH(x, 0, colWidths[i], headerHeight),
+          Rect.fromLTWH(x, titleHeight, colWidths[i], headerHeight),
           Paint()..color = Colors.grey.shade800,
         );
-        _drawCell(canvas, header[i], x, 0, colWidths[i], headerHeight,
+        _drawCell(canvas, header[i], x, titleHeight, colWidths[i], headerHeight,
             const Color(0xFFFF9800), true);
         x += colWidths[i];
       }
 
-      // 绘制数据行
+      // 绘制数据行（表格从 titleHeight 开始）
       for (int r = 0; r < dataRows.length; r++) {
         final row = dataRows[r];
-        final y = headerHeight + r * rowHeight;
+        final y = titleHeight + headerHeight + r * rowHeight;
         if (r.isOdd) {
           canvas.drawRect(
             Rect.fromLTWH(0, y, totalWidth, rowHeight),
@@ -189,7 +209,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           textDirection: TextDirection.ltr,
         );
         textPainter.layout(maxWidth: totalWidth - 24);
-        final blockY = tableHeight + 8; // 表格高度之后 + padding
+        final blockY = titleHeight + tableHeight + 8; // 标题+表格高度之后 + padding
         textPainter.paint(canvas, Offset(12, blockY));
       }
 
@@ -228,8 +248,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           fontWeight: bold ? FontWeight.bold : FontWeight.normal,
         ),
       ),
-      maxLines: 1,
-      ellipsis: '…',
       textDirection: TextDirection.ltr,
     );
     tp.layout(maxWidth: w - 8);
@@ -370,9 +388,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
   Widget _markdownView(String content, ScrollController scrollController) {
     if (content.trim().isEmpty) return const SizedBox.shrink();
+    // 把 Obsidian wiki 链接 [[XXX]] 转换为普通文字 XXX
+    final converted = content.replaceAllMapped(
+      RegExp(r'\[\[([^\]]+)\]\]'),
+      (m) => m.group(1) ?? m.group(0) ?? '',
+    );
     return Markdown(
       controller: scrollController,
-      data: content,
+      data: converted,
       styleSheet: MarkdownStyleSheet(
         p: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.6),
         h1: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
@@ -578,10 +601,11 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       // 跳过空行和分隔行（---）
       if (trimmed.isEmpty) continue;
 
-      // 收集非表格行：去掉 > 前缀（blockquote）、| 前后空格
-      final clean = trimmed.startsWith('> ')
+      // 收集非表格行：去掉 > 前缀（blockquote），同时把 [[wiki链接]] 转换为普通文字
+      var clean = trimmed.startsWith('> ')
           ? trimmed.substring(2).trim()
           : trimmed;
+      clean = clean.replaceAllMapped(RegExp(r'\[\[([^\]]+)\]\]'), (m) => m.group(1) ?? clean);
 
       if (foundTable) {
         postTableLines.add(clean);
