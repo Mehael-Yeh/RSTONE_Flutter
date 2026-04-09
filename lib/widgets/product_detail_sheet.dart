@@ -544,8 +544,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               isExpanded: true,
               dropdownColor: const Color(0xFF2D2D2D),
               icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
-              items: items,
-              onChanged: (val) {
+                    context, title,
+                    _parseTable(bodyContent),
                 if (val != null) setState(() => _selectedFormulaIndex = val);
               },
             ),
