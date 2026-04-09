@@ -558,7 +558,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     );
   }
 
-  Widget _buildFormulaCard(String title, String rawContent, List<List<String>> rows) {
+  Widget _buildFormulaCard(String title, String rawContent) {
     // 以表格位置为基准提取内容：
     // - 表格前的内容 → 渲染在表格上方
     // - 表格后的内容 → 渲染在表格下方
@@ -615,6 +615,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final preContent = preTableLines.join('\n');
     final postContent = postTableLines.join('\n');
 
+    // 去掉 frontmatter，只保留 body（表格和表格外内容）
+    String tableBody = rawContent;
+    final fmEnd = tableBody.indexOf('---', 4);
+    if (fmEnd != -1) tableBody = tableBody.substring(fmEnd + 3).trim();
+    // 用 frontmatter 去除后的 body 解析表格行，供分享图片使用
+    final tableBodyRows = _parseTable(tableBody);
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
@@ -648,7 +655,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   tooltip: '分享表格',
                   onPressed: () => _shareTableAsImage(
                     context, title,
-                    _parseTable(bodyContent),
+                    tableBodyRows,
                     extraContent: preContent.isNotEmpty
                         ? '$preContent${postContent.isNotEmpty ? '\n$postContent' : ''}'
                         : postContent,
@@ -670,10 +677,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                 ),
               ),
             ),
-          // 传入去 frontmatter 的纯 markdown 表格内容，_parseTable 只解析 body 中的表格
-          String tableBody = rawContent;
-          final fmEnd = tableBody.indexOf('---', 4);
-          if (fmEnd != -1) tableBody = tableBody.substring(fmEnd + 3).trim();
+          // 传入去 frontmatter 的纯 markdown 表格内容
           _buildMdTable(tableBody),
           // 表格后的额外内容（如施工比例，如有）
           if (postContent.isNotEmpty)
