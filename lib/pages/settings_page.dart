@@ -1,12 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../services/obsidian_data_service.dart';
 
 /// 设置页面
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   final ObsidianDataService dataService;
 
   const SettingsPage({super.key, required this.dataService});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  String _appVersion = '...';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final pkg = await PackageInfo.fromPlatform();
+    if (mounted) setState(() => _appVersion = 'v${pkg.version}');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -205,7 +224,7 @@ class SettingsPage extends StatelessWidget {
               _buildInfoTile(
                 icon: Icons.info_outline,
                 title: '版本',
-                value: 'v0.0.4-alpha',
+                value: _appVersion,
               ),
               _buildInfoTile(
                 icon: Icons.diamond,
