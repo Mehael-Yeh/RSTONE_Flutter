@@ -107,25 +107,25 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         }
       }
       final totalWidth = colWidths.reduce((a, b) => a + b) + 4;
-      // 计算标题高度
+      // 计算标题高度（缩放后已是逻辑像素，直接用）
       double titleHeight = 0;
       if (title.isNotEmpty) {
         final tp = TextPainter(
           text: TextSpan(text: title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF9800))),
           textDirection: TextDirection.ltr,
         );
-        tp.layout(maxWidth: (totalWidth - 24) * scale);
-        titleHeight = (tp.height + 16) * scale; // 上下各 8px padding
+        tp.layout(maxWidth: totalWidth - 24);
+        titleHeight = tp.height + 16; // 上下各 8px padding
       }
-      // 计算 blockquote 文字高度（2x 缩放）
+      // 计算 blockquote 文字高度
       double extraHeight = 0;
       if (extraContent != null && extraContent.trim().isNotEmpty) {
         final tp = TextPainter(
           text: TextSpan(text: extraContent, style: const TextStyle(fontSize: 12, height: 1.5)),
           textDirection: TextDirection.ltr,
         );
-        tp.layout(maxWidth: (totalWidth - 24) * scale);
-        extraHeight = (tp.height + 16) * scale; // 上下各 8px padding
+        tp.layout(maxWidth: totalWidth - 24);
+        extraHeight = tp.height + 16; // 上下各 8px padding
       }
       final tableHeight = headerHeight + dataRows.length * rowHeight + 4;
       final totalHeight = titleHeight + tableHeight + extraHeight;
@@ -377,8 +377,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   fontSize: 12,
                   fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
         ],
