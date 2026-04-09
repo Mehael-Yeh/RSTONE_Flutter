@@ -678,8 +678,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           return true;
         }
         // 当 sheet 拖动超出 maxChildSize 时，阻止默认弹性拉伸
-        if (notification.extent > notification.maxChildSize) {
-          return true; // preventDefault by returning true without calling super
+        // DraggableScrollableNotification 没有 maxChildSize 属性，直接用 DraggableScrollableSheet 的实际值 1.0
+        if (notification.extent > 1.0) {
+          return true; // 阻止通知向上冒泡
         }
         return false;
       },

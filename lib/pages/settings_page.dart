@@ -52,17 +52,17 @@ class _SettingsPageState extends State<SettingsPage> {
               _buildInfoTile(
                 icon: Icons.inventory_2,
                 title: '产品数量',
-                value: '${dataService.products.length}',
+                value: '${widget.dataService.products.length}',
               ),
               _buildInfoTile(
                 icon: Icons.apps,
                 title: '应用数量',
-                value: '${dataService.applications.length}',
+                value: '${widget.dataService.applications.length}',
               ),
               _buildInfoTile(
                 icon: Icons.check_circle,
                 title: '初始化状态',
-                value: dataService.isInitialized ? '已完成' : '未完成',
+                value: widget.dataService.isInitialized ? '已完成' : '未完成',
               ),
             ],
           ),
@@ -78,7 +78,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   style: TextStyle(color: Colors.white),
                 ),
                 subtitle: Text(
-                  '${dataService.logs.length} 条日志',
+                  '${widget.dataService.logs.length} 条日志',
                   style: TextStyle(color: Colors.grey[500]),
                 ),
                 trailing: const Icon(Icons.chevron_right, color: Colors.grey),
@@ -86,7 +86,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => LogViewerPage(dataService: dataService),
+                      builder: (context) => LogViewerPage(dataService: widget.dataService),
                     ),
                   );
                 },
@@ -103,7 +103,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                 onTap: () {
-                  final logs = dataService.logs.join('\n');
+                  final logs = widget.dataService.logs.join('\n');
                   Clipboard.setData(ClipboardData(text: logs));
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -144,7 +144,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                         ElevatedButton(
                           onPressed: () {
-                            dataService.clearLogs();
+                            widget.dataService.clearLogs();
                             Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -200,14 +200,14 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   );
                   
-                  await dataService.clearData();
-                  await dataService.initialize();
+                  await widget.dataService.clearData();
+                  await widget.dataService.initialize();
                   
                   if (context.mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('重新加载完成！产品: ${dataService.products.length}, 应用: ${dataService.applications.length}'),
+                        content: Text('重新加载完成！产品: ${widget.dataService.products.length}, 应用: ${widget.dataService.applications.length}'),
                         backgroundColor: Colors.green,
                       ),
                     );
