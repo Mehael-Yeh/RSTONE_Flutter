@@ -511,7 +511,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       final formula = matchedFormulas.first;
       final title = '配方：${formula.fileName.replaceAll('.md', '')}';
       final rows = _parseTable(formula.rawContent);
-      return _buildFormulaCard(title, formula.rawContent, rows);
+      return _buildFormulaCard(title, formula.rawContent);
     }
 
     // 多配方：下拉选择器
@@ -553,7 +553,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
             ),
           ),
         ),
-        _buildFormulaCard(title, selectedFormula.rawContent, rows),
+        _buildFormulaCard(title, selectedFormula.rawContent),
       ],
     );
   }
@@ -692,7 +692,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   @override
   Widget build(BuildContext context) {
     // 去掉 frontmatter 部分，只留 body
-    String bodyContent = widget.product.rawContent;
+    String bodyContent = rawContent;
     final frontmatterEnd = bodyContent.indexOf('---', 4);
     if (frontmatterEnd != -1) {
       bodyContent = bodyContent.substring(frontmatterEnd + 3).trim();
