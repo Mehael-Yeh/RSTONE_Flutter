@@ -559,11 +559,19 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   Widget _buildFormulaCard(String title, String rawContent, List<List<String>> rows) {
+    // 去掉 frontmatter（--- 之间的内容），只保留 body 部分
+    final frontmatterEnd = rawContent.indexOf('---', 4);
+    final tableContent = frontmatterEnd != -1
+        ? rawContent.substring(frontmatterEnd + 3).trim()
+        : rawContent;
+
     // 以表格位置为基准提取内容：
-    // - 表格前的内容 → 渲染在表格上方
-    // - 表格后的内容 → 渲染在表格下方
-    // - frontmatter（--- 之间的字段）和 wiki 链接（[[...]]）不显示
-    // - 去掉 markdown 格式符号（如 > 、| 、--- 等）
+    // - frontmatter（--- 之间的字段）→ 不显示
+    // - 表格 → 用 _buildMdTable 渲染
+    // - 表格前的内容（blockquote 等）→ 渲染在表格上方
+    // - 表格后的内容（blockquote 等）→ 渲染在表格下方
+    // - wiki 链接（[[...]]）→ 转换为普通文字
+    // - 去掉 markdown 格式符号（如 > 、--- 等）
     final preTableLines = <String>[];
     final postTableLines = <String>[];
     bool foundTable = false;
@@ -584,11 +592,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         continue;
       }
 
-      // frontmatter 内容不显示
+      // frontmatter 内容（实验牌号、工程师等）→ 不显示
       if (inFrontmatter) continue;
-
-      // wiki 链接不显示
-      if (frontmatterEnded && trimmed.startsWith('[[')) continue;
 
       // 遇到表格行，切换到 postTable 模式
       if (trimmed.startsWith('|')) {
@@ -596,7 +601,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         continue;
       }
 
-      // 跳过空行和分隔行（---）
+      // 跳过空行
       if (trimmed.isEmpty) continue;
 
       // 收集非表格行：去掉 > 前缀（blockquote），同时把 [[wiki链接]] 转换为普通文字
@@ -614,6 +619,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
     final preContent = preTableLines.join('\n');
     final postContent = postTableLines.join('\n');
+    final shareExtraContent = preContent.isNotEmpty
+        ? '$preContent${postContent.isNotEmpty ? '\n$postContent' : ''}'
+        : postContent;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -646,11 +654,11 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                   tooltip: '分享表格',
+                  // tableContent 确保 _parseTable 不把 frontmatter 当表格行处理
                   onPressed: () => _shareTableAsImage(
-                    context, title, rows,
-                    extraContent: preContent.isNotEmpty
-                        ? '$preContent${postContent.isNotEmpty ? '\n$postContent' : ''}'
-                        : postContent,
+                    context, title,
+                    _parseTable(tableContent),
+                    extraContent: shareExtraContent,
                   ),
                 ),
               ],
@@ -669,7 +677,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                 ),
               ),
             ),
-          _buildMdTable(rawContent),
+          // 传入 tableContent（去 frontmatter），确保 _parseTable 解析正确
+          _buildMdTable(tableContent),
           // 表格后的额外内容（如施工比例，如有）
           if (postContent.isNotEmpty)
             Padding(
@@ -704,11 +713,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         if (notification.extent < notification.minExtent * 0.6) {
           Navigator.pop(context);
           return true;
-        }
-        // 当 sheet 拖动超出 maxChildSize 时，阻止默认弹性拉伸
-        // DraggableScrollableNotification 没有 maxChildSize 属性，直接用 DraggableScrollableSheet 的实际值 1.0
-        if (notification.extent > 1.0) {
-          return true; // 阻止通知向上冒泡
         }
         return false;
       },
