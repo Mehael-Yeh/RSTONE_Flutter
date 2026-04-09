@@ -64,7 +64,12 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       }
       if (isSep) continue;
       // 保留所有单元格（包括尾部空单元格），用 null 占位以保持列对齐
-      final cols = trimmed.split('|').map((s) => s.trim()).toList();
+      // 同时把 Obsidian wiki 链接 [[XXX]] 转换为 XXX
+      final cols = trimmed.split('|').map((s) {
+        var cell = s.trim();
+        cell = cell.replaceAllMapped(RegExp(r'\[\[([^\]]+)\]\]'), (m) => m.group(1) ?? cell);
+        return cell;
+      }).toList();
       // 去掉首尾空字符串（首尾 | 产生的空列）
       while (cols.isNotEmpty && cols.first.isEmpty) cols.removeAt(0);
       while (cols.isNotEmpty && cols.last.isEmpty) cols.removeLast();
@@ -102,7 +107,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         }
       }
       final totalWidth = colWidths.reduce((a, b) => a + b) + 4;
-      // 计算 blockquote 高度（2x 缩放）
+      // 计算 blockquote 文字高度（2x 缩放）
       double extraHeight = 0;
       if (extraContent != null && extraContent.trim().isNotEmpty) {
         final tp = TextPainter(
@@ -112,7 +117,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         tp.layout(maxWidth: (totalWidth - 24) * scale);
         extraHeight = (tp.height + 16) * scale; // 上下各 8px padding
       }
-      final totalHeight = headerHeight + dataRows.length * rowHeight + 4 + extraHeight;
+      final tableHeight = headerHeight + dataRows.length * rowHeight + 4;
+      final totalHeight = tableHeight + extraHeight;
 
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
@@ -183,7 +189,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           textDirection: TextDirection.ltr,
         );
         textPainter.layout(maxWidth: totalWidth - 24);
-        final blockY = totalHeight + 8;
+        final blockY = tableHeight + 8; // 表格高度之后 + padding
         textPainter.paint(canvas, Offset(12, blockY));
       }
 
