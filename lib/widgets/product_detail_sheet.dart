@@ -544,8 +544,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               isExpanded: true,
               dropdownColor: const Color(0xFF2D2D2D),
               icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
-              hint: Text(matchedFormulas.isNotEmpty ? matchedFormulas[_selectedFormulaIndex.clamp(0, matchedFormulas.length - 1)].title : '选择公式', overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey)),
-              items: List.generate(matchedFormulas.length, (i) => DropdownMenuItem<int>(value: i, child: Text(matchedFormulas[i].title, overflow: TextOverflow.ellipsis))),
+              hint: Text(matchedFormulas.isNotEmpty ? matchedFormulas[_selectedFormulaIndex.clamp(0, matchedFormulas.length - 1)].displayName : '选择公式', overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey)),
+              items: List.generate(matchedFormulas.length, (i) => DropdownMenuItem<int>(value: i, child: Text(matchedFormulas[i].displayName, overflow: TextOverflow.ellipsis))),
               onChanged: (val) {
                 if (val != null) setState(() => _selectedFormulaIndex = val);
               },
