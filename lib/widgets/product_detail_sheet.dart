@@ -647,7 +647,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                   tooltip: '分享表格',
                   onPressed: () => _shareTableAsImage(
-                    context, title, rows,
+                    context, title,
+                    _parseTable(bodyContent),
                     extraContent: preContent.isNotEmpty
                         ? '$preContent${postContent.isNotEmpty ? '\n$postContent' : ''}'
                         : postContent,
@@ -669,7 +670,11 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                 ),
               ),
             ),
-          _buildMdTable(rawContent),
+          // 传入去 frontmatter 的纯 markdown 表格内容，_parseTable 只解析 body 中的表格
+          String tableBody = rawContent;
+          final fmEnd = tableBody.indexOf('---', 4);
+          if (fmEnd != -1) tableBody = tableBody.substring(fmEnd + 3).trim();
+          _buildMdTable(tableBody),
           // 表格后的额外内容（如施工比例，如有）
           if (postContent.isNotEmpty)
             Padding(
