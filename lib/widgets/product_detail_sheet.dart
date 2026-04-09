@@ -558,7 +558,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     );
   }
 
-  Widget _buildFormulaCard(String title, String rawContent, List<List<String>> rows) {
+  Widget _buildFormulaCard(String title, String rawContent) {
     // 以表格位置为基准提取内容：
     // - 表格前的内容 → 渲染在表格上方
     // - 表格后的内容 → 渲染在表格下方
@@ -669,7 +669,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                 ),
               ),
             ),
-          _buildMdTable(rawContent),
+          _buildMdTable(bodyContent),
           // 表格后的额外内容（如施工比例，如有）
           if (postContent.isNotEmpty)
             Padding(
@@ -823,6 +823,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           );
         },
       ),
-    );
-  }
+    ), // NotificationListener
+  );
 }
