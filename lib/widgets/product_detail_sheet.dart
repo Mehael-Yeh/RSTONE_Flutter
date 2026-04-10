@@ -510,7 +510,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     if (matchedFormulas.length == 1) {
       final formula = matchedFormulas.first;
       final title = '配方：${formula.fileName.replaceAll('.md', '')}';
-      final rows = _parseTable(formula.rawContent);
       return _buildFormulaCard(title, formula.rawContent);
     }
 
@@ -527,7 +526,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
     final selectedFormula = matchedFormulas[_selectedFormulaIndex.clamp(0, matchedFormulas.length - 1)];
     final title = '配方：${selectedFormula.fileName.replaceAll('.md', '')}';
-    final rows = _parseTable(selectedFormula.rawContent);
 
     return Column(
       children: [
@@ -615,6 +613,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final preContent = preTableLines.join('\n');
     final postContent = postTableLines.join('\n');
 
+    // 去掉 frontmatter，只保留 body（表格和表格外内容）
+    String bodyContent = rawContent;
+    final fmEnd = bodyContent.indexOf('---', 4);
+    if (fmEnd != -1) bodyContent = bodyContent.substring(fmEnd + 3).trim();
+    // 用 frontmatter 去除后的 body 解析表格行，供分享图片使用
+    final tableBodyRows = _parseTable(bodyContent);
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
@@ -647,7 +652,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                   tooltip: '分享表格',
                   onPressed: () => _shareTableAsImage(
-                    context, title, rows,
+                    context, title, tableBodyRows,
                     extraContent: preContent.isNotEmpty
                         ? '$preContent${postContent.isNotEmpty ? '\n$postContent' : ''}'
                         : postContent,
@@ -692,7 +697,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   @override
   Widget build(BuildContext context) {
     // 去掉 frontmatter 部分，只留 body
-    String bodyContent = rawContent;
+    String bodyContent = widget.product.rawContent;
     final frontmatterEnd = bodyContent.indexOf('---', 4);
     if (frontmatterEnd != -1) {
       bodyContent = bodyContent.substring(frontmatterEnd + 3).trim();
