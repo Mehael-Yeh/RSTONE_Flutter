@@ -828,6 +828,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           );
         },
       ),
-    ), // NotificationListener
-  );
+    );
+  }
 }
