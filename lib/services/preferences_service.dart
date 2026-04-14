@@ -22,6 +22,8 @@ class PreferencesService {
   static const String _applicationSortKey = 'application_sort';
   /// 产品应用排序方向存储键
   static const String _applicationSortDescKey = 'application_sort_desc';
+  /// 主题模式存储键（system/light/dark）
+  static const String _themeModeKey = 'theme_mode';
 
   /// SharedPreferences 实例
   SharedPreferences? _prefs;
@@ -110,5 +112,15 @@ class PreferencesService {
   /// 保存产品应用排序方向
   Future<void> saveApplicationSortDesc(bool descending) async {
     await _prefs?.setBool(_applicationSortDescKey, descending);
+  }
+
+  /// 获取主题模式，默认跟随系统。
+  String getThemeMode() {
+    return _prefs?.getString(_themeModeKey) ?? 'system';
+  }
+
+  /// 保存主题模式（system/light/dark）。
+  Future<void> saveThemeMode(String mode) async {
+    await _prefs?.setString(_themeModeKey, mode);
   }
 }
