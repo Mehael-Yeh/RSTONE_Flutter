@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
+import '../services/preferences_service.dart';
 import '../widgets/product_detail_sheet.dart';
 import 'settings_page.dart';
 
 class SearchPage extends StatefulWidget {
   final ObsidianDataService dataService;
+  final PreferencesService preferencesService;
+  final ValueChanged<ThemeMode> onThemeModeChanged;
 
-  const SearchPage({super.key, required this.dataService});
+  const SearchPage({
+    super.key,
+    required this.dataService,
+    required this.preferencesService,
+    required this.onThemeModeChanged,
+  });
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -99,7 +107,14 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => SettingsPage(dataService: widget.dataService),
+                          builder: (context) => SettingsPage(
+                            dataService: widget.dataService,
+                            preferencesService: widget.preferencesService,
+                            themeMode: _themeModeFromString(
+                              widget.preferencesService.getThemeMode(),
+                            ),
+                            onThemeModeChanged: widget.onThemeModeChanged,
+                          ),
                         ),
                       );
                     },
@@ -278,5 +293,16 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  ThemeMode _themeModeFromString(String mode) {
+    switch (mode) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
   }
 }

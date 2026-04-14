@@ -74,6 +74,10 @@ class _ObsidianTableState extends State<ObsidianTable> {
     return sorted;
   }
 
+  bool _isWaterBased(ProductItem item) {
+    return item.tags.any((t) => t.contains('水性'));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isEditingColumns) {
@@ -171,6 +175,19 @@ class _ObsidianTableState extends State<ObsidianTable> {
                   children: [
                     Row(
                       children: [
+                        Container(
+                          width: 4,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: item.folder == '产品列表'
+                                ? (_isWaterBased(item)
+                                    ? Colors.blue.shade400
+                                    : Colors.orange.shade400)
+                                : cs.primary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             fields[_columns.first] ?? item.displayName,

@@ -40,6 +40,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   int _selectedFormulaIndex = 0;
   String? _selectedApplicationFormulaName;
 
+  bool _isWaterBasedProduct() {
+    return widget.product.tags.any((tag) => tag.contains('水性'));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -551,6 +555,83 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     );
   }
 
+  /// 产品元数据表（放在配方之前，且与配方分区展示）
+  Widget _buildProductMetaTable() {
+    if (widget.product.folder != '产品列表') return const SizedBox.shrink();
+
+    final entries = <MapEntry<String, String>>[
+      if (widget.product.experimentalCode?.isNotEmpty == true)
+        MapEntry('实验牌号', widget.product.experimentalCode!),
+      if (widget.product.engineer?.isNotEmpty == true)
+        MapEntry('工程师', widget.product.engineer!),
+      if (widget.product.solidContent?.isNotEmpty == true)
+        MapEntry('固含', widget.product.solidContent!),
+      if (widget.product.hydroxylValue?.isNotEmpty == true)
+        MapEntry('羟值', widget.product.hydroxylValue!),
+      if (widget.product.waterContactAngle?.isNotEmpty == true)
+        MapEntry('水接触角', widget.product.waterContactAngle!),
+      if (widget.product.technologySource?.isNotEmpty == true)
+        MapEntry('技术源', widget.product.technologySource!),
+      if (widget.product.benchmark?.isNotEmpty == true)
+        MapEntry('对标', widget.product.benchmark!),
+      if (widget.product.viscosity?.isNotEmpty == true)
+        MapEntry('粘度', widget.product.viscosity!),
+    ];
+
+    if (entries.isEmpty) return const SizedBox.shrink();
+    final typeColor = _isWaterBasedProduct() ? Colors.blue : Colors.orange;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                Icon(Icons.table_view, size: 16, color: typeColor.shade300),
+                const SizedBox(width: 6),
+                Text(
+                  '产品信息',
+                  style: TextStyle(
+                    color: typeColor.shade300,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Table(
+            columnWidths: const {0: FixedColumnWidth(90), 1: FlexColumnWidth(1)},
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+            children: entries.map((e) {
+              return TableRow(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text(e.key, style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text(e.value, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
   List<ProductItem> _getApplicationLinkedFormulas() {
     if (widget.product.folder != '产品应用') return const [];
     final keys = <String>{
@@ -828,7 +909,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: widget.product.folder == '产品列表'
-                              ? Colors.blue.withOpacity(0.2)
+                              ? (_isWaterBasedProduct()
+                                      ? Colors.blue
+                                      : Colors.orange)
+                                  .withOpacity(0.2)
                               : Colors.green.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -836,7 +920,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                           widget.product.folder,
                           style: TextStyle(
                             color: widget.product.folder == '产品列表'
-                                ? Colors.blue[300]
+                                ? (_isWaterBasedProduct()
+                                    ? Colors.blue[300]
+                                    : Colors.orange[300])
                                 : Colors.green[300],
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -890,6 +976,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   ),
                 // 配方表格（仅产品应用有配方字段）
                 if (widget.product.folder == '产品应用') _buildFormulaTable(),
+                // 产品详情字段表格（位于配方区块之前）
+                if (widget.product.folder == '产品列表') _buildProductMetaTable(),
                 // 产品配方 section：文件名以当前产品牌号+"-"开头时显示
                 if (widget.product.folder == '产品列表')
                   _buildLinkedFormulas(),

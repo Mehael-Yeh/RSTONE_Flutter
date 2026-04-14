@@ -45,6 +45,91 @@ class RstoneApp extends StatelessWidget {
   });
 
   @override
+  State<RstoneApp> createState() => _RstoneAppState();
+}
+
+class _RstoneAppState extends State<RstoneApp> {
+  late ThemeMode _themeMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _themeMode = _themeModeFromString(widget.preferencesService.getThemeMode());
+  }
+
+  ThemeMode _themeModeFromString(String mode) {
+    switch (mode) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  String _themeModeToString(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'light';
+      case ThemeMode.dark:
+        return 'dark';
+      case ThemeMode.system:
+        return 'system';
+    }
+  }
+
+  Future<void> _updateThemeMode(ThemeMode mode) async {
+    setState(() => _themeMode = mode);
+    await widget.preferencesService.saveThemeMode(_themeModeToString(mode));
+  }
+
+  ThemeData _buildTheme(Brightness brightness) {
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFFFF8A00),
+      brightness: brightness,
+    );
+    return ThemeData(
+      // 启用 Material Design 3 组件行为与样式。
+      useMaterial3: true,
+      brightness: brightness,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: colorScheme.surface,
+      appBarTheme: AppBarTheme(
+        centerTitle: true,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+      ),
+      // Flutter 3.24 使用 CardTheme（而非 CardThemeData）。
+      cardTheme: CardTheme(
+        elevation: 0,
+        color: colorScheme.surfaceContainer,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        // 底部导航使用低层级容器色，保证与内容区域层级分离。
+        backgroundColor: colorScheme.surfaceContainerLow,
+        indicatorColor: colorScheme.secondaryContainer,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          );
+        }),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: colorScheme.inverseSurface,
+        contentTextStyle: TextStyle(color: colorScheme.onInverseSurface),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     // 使用橙色种子生成 MD3 深色语义色板，统一全局视觉语言。
     final colorScheme = ColorScheme.fromSeed(
@@ -94,8 +179,9 @@ class RstoneApp extends StatelessWidget {
         ),
       ),
       home: MainScreen(
-        dataService: dataService,
-        preferencesService: preferencesService,
+        dataService: widget.dataService,
+        preferencesService: widget.preferencesService,
+        onThemeModeChanged: _updateThemeMode,
       ),
     );
   }
@@ -104,11 +190,13 @@ class RstoneApp extends StatelessWidget {
 class MainScreen extends StatefulWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
+  final ValueChanged<ThemeMode> onThemeModeChanged;
 
   const MainScreen({
     super.key,
     required this.dataService,
     required this.preferencesService,
+    required this.onThemeModeChanged,
   });
 
   @override
