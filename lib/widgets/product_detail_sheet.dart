@@ -38,6 +38,16 @@ class ProductDetailSheet extends StatefulWidget {
 class _ProductDetailSheetState extends State<ProductDetailSheet> {
   /// 多配方时下拉选择的索引
   int _selectedFormulaIndex = 0;
+  String? _selectedApplicationFormulaName;
+
+  @override
+  void initState() {
+    super.initState();
+    final linked = _getApplicationLinkedFormulas();
+    if (linked.isNotEmpty) {
+      _selectedApplicationFormulaName = linked.first.fileName.replaceAll('.md', '');
+    }
+  }
 
   String _extractMarkdownBody(String rawContent) {
     final normalized = rawContent.replaceAll('\r\n', '\n');
@@ -446,6 +456,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   /// 从 frontmatter 提取配方相关字段，生成结构化表格
   Widget _buildFormulaTable() {
     final fields = <MapEntry<String, String>>[];
+    final linkedByName = {
+      for (final f in _getApplicationLinkedFormulas()) f.fileName.replaceAll('.md', ''): f,
+    };
 
     void add(String label, String? value) {
       if (value != null && value.isNotEmpty) {
@@ -473,7 +486,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Text(
-              '配方信息',
+              '应用信息',
               style: TextStyle(
                 color: Colors.orange,
                 fontSize: 13,
@@ -499,19 +512,53 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Text(
-                      e.value,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13),
-                    ),
+                    child: linkedByName.containsKey(e.value)
+                        ? InkWell(
+                            onTap: () => setState(() => _selectedApplicationFormulaName = e.value),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Text(
+                              e.value,
+                              style: TextStyle(
+                                color: _selectedApplicationFormulaName == e.value
+                                    ? Colors.cyan[300]
+                                    : Colors.lightBlue[300],
+                                fontSize: 13,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            e.value,
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
                   ),
                 ],
               );
             }).toList(),
           ),
-          const SizedBox(height: 4),
+          if (_selectedApplicationFormulaName != null &&
+              linkedByName[_selectedApplicationFormulaName!] != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
+              child: _buildFormulaCard(
+                '配方：$_selectedApplicationFormulaName',
+                linkedByName[_selectedApplicationFormulaName!]!.rawContent,
+              ),
+            ),
+          const SizedBox(height: 8),
         ],
       ),
     );
+  }
+
+  List<ProductItem> _getApplicationLinkedFormulas() {
+    if (widget.product.folder != '产品应用') return const [];
+    final keys = <String>{
+      if (widget.product.primer != null && widget.product.primer!.isNotEmpty) widget.product.primer!,
+      if (widget.product.midCoat != null && widget.product.midCoat!.isNotEmpty) widget.product.midCoat!,
+      if (widget.product.topCoat != null && widget.product.topCoat!.isNotEmpty) widget.product.topCoat!,
+    };
+    return widget.formulas.where((f) => keys.contains(f.fileName.replaceAll('.md', ''))).toList();
   }
 
   /// 查找并渲染关联的产品配方（文件名以产品牌号开头，如 RS7767-银.md 对应 RS7767）
