@@ -57,5 +57,27 @@ tags:
 
       expect(item.tags, ['水性', 'PU', '底漆', '耐汽油', '中漆']);
     });
+
+    test('parses wiki-style links in application fields as plain text', () {
+      const content = '''
+---
+tags:
+  - PC
+  - ABS
+底漆: "[[RS8214-黑]]"
+中漆: "[[RD1160-黑]]"
+面漆: "[[RD1010-4-亮]]"
+基材:
+---
+''';
+
+      final item = ProductItem.fromMdContent('assets/产品应用/PC-ABS.md', content);
+
+      expect(item.tags, ['PC', 'ABS']);
+      expect(item.primer, 'RS8214-黑');
+      expect(item.midCoat, 'RD1160-黑');
+      expect(item.topCoat, 'RD1010-4-亮');
+      expect(item.baseMaterial, '');
+    });
   });
 }
