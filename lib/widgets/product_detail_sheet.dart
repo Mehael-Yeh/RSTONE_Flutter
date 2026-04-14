@@ -228,7 +228,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       }
 
       final picture = recorder.endRecording();
-      final img = await picture.toImage(totalWidth.toInt(), totalHeight.toInt());
+      final img = await picture.toImage(
+        (totalWidth * scale).ceil(),
+        (totalHeight * scale).ceil(),
+      );
       final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
 
