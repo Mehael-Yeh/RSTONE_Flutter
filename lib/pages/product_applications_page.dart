@@ -35,6 +35,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   List<String> _columns = [];
   String? _sortColumn;
   bool _sortDescending = false;
+  static const String _nameSortColumn = '名称';
 
   @override
   void initState() {
@@ -102,13 +103,23 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
       appBar: AppBar(
         title: const Text('产品应用'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              widget.dataService.initialize().then((_) {
-                setState(() {});
-              });
+          PopupMenuButton<bool>(
+            tooltip: '排序',
+            icon: const Icon(Icons.sort_by_alpha),
+            onSelected: (descending) {
+              _onSortChanged(_nameSortColumn);
+              _onSortDirectionChanged(descending);
             },
+            itemBuilder: (context) => const [
+              PopupMenuItem<bool>(
+                value: false,
+                child: Text('A-Z'),
+              ),
+              PopupMenuItem<bool>(
+                value: true,
+                child: Text('Z-A'),
+              ),
+            ],
           ),
         ],
       ),
