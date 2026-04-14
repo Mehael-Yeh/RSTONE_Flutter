@@ -85,26 +85,40 @@ jobs:
           # Clone Rstone repo to temporary directory
           git clone --depth 1 https://github.com/Mehael-Yeh/Rstone.git ../rstone_data
 
-          # Recreate assets directories and copy .md files
+          # Recreate assets directories and copy .md files safely
+          rm -rf assets/产品列表 assets/产品应用 assets/产品配方
           mkdir -p assets/产品列表 assets/产品应用 assets/产品配方
-          cp ../rstone_data/产品列表/*.md assets/产品列表/
-          cp ../rstone_data/产品应用/*.md assets/产品应用/
-          cp ../rstone_data/产品配方/*.md assets/产品配方/
 
-          # Generate JSON index files (array of .md filenames, one per line format)
-          python3 -c "
-          import os, json
+          python3 - << 'PYEOF'
+          import json
+          import shutil
+          from pathlib import Path
 
-          for folder, jsonfile in [
-              ('产品列表', 'assets/产品列表.json'),
-              ('产品应用', 'assets/产品应用.json'),
-              ('产品配方', 'assets/产品配方.json'),
-          ]:
-              files = sorted([f for f in os.listdir(f'assets/{folder}') if f.endswith('.md')])
-              with open(jsonfile, 'w') as f:
-                  json.dump(files, f, ensure_ascii=False, indent=2)
-              print(f'{folder}: {len(files)} files')
-          "
+          source_root = Path('../rstone_data')
+          target_root = Path('assets')
+
+          mapping = [
+              ('产品列表', '产品列表.json'),
+              ('产品应用', '产品应用.json'),
+              ('产品配方', '产品配方.json'),
+          ]
+
+          for folder, json_name in mapping:
+              src_dir = source_root / folder
+              dst_dir = target_root / folder
+              md_files = sorted(src_dir.glob('*.md')) if src_dir.exists() else []
+
+              if not src_dir.exists():
+                  print(f'WARNING: source folder missing: {src_dir}')
+
+              for src_file in md_files:
+                  shutil.copy2(src_file, dst_dir / src_file.name)
+
+              with (target_root / json_name).open('w', encoding='utf-8') as f:
+                  json.dump([f.name for f in md_files], f, ensure_ascii=False, indent=2)
+
+              print(f'{folder}: copied {len(md_files)} files')
+          PYEOF
 
           echo "Done. Assets updated from Rstone."
 
