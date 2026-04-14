@@ -9,7 +9,7 @@ class SettingsPage extends StatefulWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
   final ThemeMode themeMode;
-  final ValueChanged<ThemeMode> onThemeModeChanged;
+  final Future<void> Function(ThemeMode) onThemeModeChanged;
 
   const SettingsPage({
     super.key,
