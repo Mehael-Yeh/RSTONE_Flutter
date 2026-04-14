@@ -9,12 +9,14 @@ class SearchPage extends StatefulWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
   final Future<void> Function(ThemeMode) onThemeModeChanged;
+  final ThemeMode themeMode;
 
   const SearchPage({
     super.key,
     required this.dataService,
     required this.preferencesService,
     required this.onThemeModeChanged,
+    required this.themeMode,
   });
 
   @override
@@ -110,9 +112,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                           builder: (context) => SettingsPage(
                             dataService: widget.dataService,
                             preferencesService: widget.preferencesService,
-                            themeMode: _themeModeFromString(
-                              widget.preferencesService.getThemeMode(),
-                            ),
+                            themeMode: widget.themeMode,
                             onThemeModeChanged: widget.onThemeModeChanged,
                           ),
                         ),
@@ -295,14 +295,4 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     );
   }
 
-  ThemeMode _themeModeFromString(String mode) {
-    switch (mode) {
-      case 'light':
-        return ThemeMode.light;
-      case 'dark':
-        return ThemeMode.dark;
-      default:
-        return ThemeMode.system;
-    }
-  }
 }
