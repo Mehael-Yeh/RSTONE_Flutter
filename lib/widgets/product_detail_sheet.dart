@@ -579,6 +579,21 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     );
   }
 
+  bool _hasLinkedFormulasForCurrentProduct() {
+    if (widget.product.folder != '产品列表') return false;
+    return widget.formulas.any((f) {
+      final formulaName = f.fileName.replaceAll('.md', '');
+      return formulaName.startsWith('${widget.product.fileName}-');
+    });
+  }
+
+  String _removeStandaloneWikiLines(String content) {
+    return content
+        .split('\n')
+        .where((line) => !RegExp(r'^\s*\[\[[^\]]+\]\]\s*$').hasMatch(line))
+        .join('\n');
+  }
+
   Widget _buildFormulaCard(String title, String rawContent) {
     // 以表格位置为基准提取内容：
     // - 表格前的内容 → 渲染在表格上方
@@ -712,6 +727,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   Widget build(BuildContext context) {
     // 去掉 frontmatter 部分，只留 body
     final bodyContent = _extractMarkdownBody(widget.product.rawContent);
+    final markdownContent = _hasLinkedFormulasForCurrentProduct()
+        ? _removeStandaloneWikiLines(bodyContent)
+        : bodyContent;
 
     return NotificationListener<DraggableScrollableNotification>(
       onNotification: (notification) {
@@ -831,7 +849,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                 // MD 内容（不含 frontmatter）
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                  child: _markdownView(bodyContent),
+                  child: _markdownView(markdownContent),
                 ),
               ],
             ),
