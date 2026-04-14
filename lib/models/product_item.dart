@@ -48,7 +48,13 @@ class ProductItem {
   /// 从MD文件内容解析
   factory ProductItem.fromMdContent(String filePath, String content) {
     final fileName = filePath.split('/').last.replaceAll('.md', '');
-    final folder = filePath.contains('产品列表') ? '产品列表' : '产品应用';
+    final folder = filePath.contains('产品列表')
+        ? '产品列表'
+        : filePath.contains('产品应用')
+            ? '产品应用'
+            : filePath.contains('产品配方')
+                ? '产品配方'
+                : '未知';
     
     Map<String, dynamic> frontmatter = {};
     List<String> tags = [];
@@ -194,7 +200,7 @@ class ProductItem {
         if (benchmark != null) '对标': benchmark!,
         if (viscosity != null) '粘度': viscosity!,
       };
-    } else {
+    } else if (folder == '产品应用') {
       return {
         '名称': fileName,
         if (baseMaterial != null) '基材': baseMaterial!,
@@ -202,6 +208,10 @@ class ProductItem {
         if (midCoat != null) '中漆': midCoat!,
         if (topCoat != null) '面漆': topCoat!,
         '标签': tags.join(', '),
+      };
+    } else {
+      return {
+        '名称': fileName,
       };
     }
   }
