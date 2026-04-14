@@ -39,9 +39,9 @@ class _SettingsPageState extends State<SettingsPage> {
     if (mounted) setState(() => _appVersion = 'v${pkg.version}');
   }
 
-  void _onThemeChanged(ThemeMode mode) {
+  Future<void> _onThemeChanged(ThemeMode mode) async {
     setState(() => _selectedThemeMode = mode);
-    widget.onThemeModeChanged(mode);
+    await widget.onThemeModeChanged(mode);
   }
 
   @override

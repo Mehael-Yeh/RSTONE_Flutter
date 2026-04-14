@@ -101,6 +101,16 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('产品应用'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              widget.dataService.initialize().then((_) {
+                setState(() {});
+              });
+            },
+          ),
+        ],
       ),
       body: widget.dataService.applications.isEmpty
           ? Center(

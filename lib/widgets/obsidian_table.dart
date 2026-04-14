@@ -198,16 +198,6 @@ class _ObsidianTableState extends State<ObsidianTable> {
                             ),
                           ),
                         ),
-                        if (item.folder == '产品列表')
-                          Chip(
-                            visualDensity: VisualDensity.compact,
-                            label: Text(_isWaterBased(item) ? '水性' : '油性'),
-                            backgroundColor: (_isWaterBased(item)
-                                    ? Colors.blue
-                                    : Colors.orange)
-                                .withOpacity(0.18),
-                            side: BorderSide.none,
-                          ),
                         Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
                       ],
                     ),
@@ -317,31 +307,12 @@ class _ObsidianTableState extends State<ObsidianTable> {
                     children: _columns.map((col) {
                       final val = fields[col] ?? '';
                       return Expanded(
-                        child: Row(
-                          children: [
-                            if (col == _columns.first && item.folder == '产品列表') ...[
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: _isWaterBased(item)
-                                      ? Colors.blue.shade400
-                                      : Colors.orange.shade400,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                            ],
-                            Expanded(
-                              child: Text(
-                                val,
-                                style: TextStyle(
-                                  color: val.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          val,
+                          style: TextStyle(
+                            color: val.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       );
                     }).toList(),
