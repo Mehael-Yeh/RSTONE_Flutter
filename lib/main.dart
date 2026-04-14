@@ -34,7 +34,7 @@ void main() async {
 }
 
 /// 根组件 - 应用级 MD3 主题配置
-class RstoneApp extends StatefulWidget {
+class RstoneApp extends StatelessWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
 
@@ -131,12 +131,53 @@ class _RstoneAppState extends State<RstoneApp> {
 
   @override
   Widget build(BuildContext context) {
+    // 使用橙色种子生成 MD3 深色语义色板，统一全局视觉语言。
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFFFF8A00),
+      brightness: Brightness.dark,
+    );
+
     return MaterialApp(
       title: '锐石 RSTONE',
       debugShowCheckedModeBanner: false,
-      theme: _buildTheme(Brightness.light),
-      darkTheme: _buildTheme(Brightness.dark),
-      themeMode: _themeMode,
+      theme: ThemeData(
+        // 启用 Material Design 3 组件行为与样式。
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        colorScheme: colorScheme,
+        scaffoldBackgroundColor: colorScheme.surface,
+        appBarTheme: AppBarTheme(
+          centerTitle: true,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          backgroundColor: colorScheme.surface,
+          foregroundColor: colorScheme.onSurface,
+        ),
+        // Flutter 3.24 使用 CardTheme（而非 CardThemeData）。
+        cardTheme: CardTheme(
+          elevation: 0,
+          color: colorScheme.surfaceContainer,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          // 底部导航使用低层级容器色，保证与内容区域层级分离。
+          backgroundColor: colorScheme.surfaceContainerLow,
+          indicatorColor: colorScheme.secondaryContainer,
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return TextStyle(
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            );
+          }),
+        ),
+        snackBarTheme: SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: colorScheme.inverseSurface,
+          contentTextStyle: TextStyle(color: colorScheme.onInverseSurface),
+        ),
+      ),
       home: MainScreen(
         dataService: widget.dataService,
         preferencesService: widget.preferencesService,
@@ -172,11 +213,7 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _pages = [
-      SearchPage(
-        dataService: widget.dataService,
-        preferencesService: widget.preferencesService,
-        onThemeModeChanged: widget.onThemeModeChanged,
-      ),
+      SearchPage(dataService: widget.dataService),
       ProductListPage(
         dataService: widget.dataService,
         preferencesService: widget.preferencesService,

@@ -105,6 +105,16 @@ class _ProductListPageState extends State<ProductListPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('产品列表'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              widget.dataService.initialize().then((_) {
+                setState(() {});
+              });
+            },
+          ),
+        ],
       ),
       body: widget.dataService.products.isEmpty
           ? Center(
