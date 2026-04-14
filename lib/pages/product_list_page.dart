@@ -103,24 +103,8 @@ class _ProductListPageState extends State<ProductListPage> {
     final items = _getSortedItems();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2D2D2D),
-        title: const Text(
-          '产品列表',
-          style: TextStyle(color: Colors.white),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              widget.dataService.initialize().then((_) {
-                setState(() {});
-              });
-            },
-          ),
-        ],
+        title: const Text('产品列表'),
       ),
       body: widget.dataService.products.isEmpty
           ? Center(
