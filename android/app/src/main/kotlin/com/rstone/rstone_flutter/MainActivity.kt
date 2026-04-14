@@ -1,4 +1,4 @@
-package com.rst.rst_flutter
+package com.rstone.rstone_flutter
 
 import io.flutter.embedding.android.FlutterActivity
 
