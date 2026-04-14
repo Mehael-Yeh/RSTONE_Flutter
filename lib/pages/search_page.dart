@@ -8,7 +8,7 @@ import 'settings_page.dart';
 class SearchPage extends StatefulWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
-  final ValueChanged<ThemeMode> onThemeModeChanged;
+  final Future<void> Function(ThemeMode) onThemeModeChanged;
 
   const SearchPage({
     super.key,

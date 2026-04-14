@@ -34,7 +34,7 @@ void main() async {
 }
 
 /// 根组件 - 应用级 MD3 主题配置
-class RstoneApp extends StatelessWidget {
+class RstoneApp extends StatefulWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
 
@@ -190,7 +190,7 @@ class _RstoneAppState extends State<RstoneApp> {
 class MainScreen extends StatefulWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
-  final ValueChanged<ThemeMode> onThemeModeChanged;
+  final Future<void> Function(ThemeMode) onThemeModeChanged;
 
   const MainScreen({
     super.key,
@@ -213,7 +213,11 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _pages = [
-      SearchPage(dataService: widget.dataService),
+      SearchPage(
+        dataService: widget.dataService,
+        preferencesService: widget.preferencesService,
+        onThemeModeChanged: widget.onThemeModeChanged,
+      ),
       ProductListPage(
         dataService: widget.dataService,
         preferencesService: widget.preferencesService,
