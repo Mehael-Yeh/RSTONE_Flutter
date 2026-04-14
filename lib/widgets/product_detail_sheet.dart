@@ -279,8 +279,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         this.preContent, this.postContent);
   }
 
-  /// 解析配方内容，测量列宽，返回 TableMetrics
-  /// 解析逻辑与 _buildMdTable 完全一致，确保分享绘制与界面渲染的列宽相同
+  /// 解析配方内容，测量列宽，返回 TableMetrics /// 解析逻辑与 _buildMdTable 完全一致，确保分享绘制与界面渲染的列宽相同
   _TableMetrics? _measureTable(String rawContent) {
     final preLines = <String>[];
     final postLines = <String>[];
