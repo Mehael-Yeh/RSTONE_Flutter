@@ -131,57 +131,17 @@ class _RstoneAppState extends State<RstoneApp> {
 
   @override
   Widget build(BuildContext context) {
-    // 使用橙色种子生成 MD3 深色语义色板，统一全局视觉语言。
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFFFF8A00),
-      brightness: Brightness.dark,
-    );
-
     return MaterialApp(
       title: '锐石 RSTONE',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        // 启用 Material Design 3 组件行为与样式。
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: colorScheme,
-        scaffoldBackgroundColor: colorScheme.surface,
-        appBarTheme: AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          backgroundColor: colorScheme.surface,
-          foregroundColor: colorScheme.onSurface,
-        ),
-        // Flutter 3.24 使用 CardTheme（而非 CardThemeData）。
-        cardTheme: CardTheme(
-          elevation: 0,
-          color: colorScheme.surfaceContainer,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        navigationBarTheme: NavigationBarThemeData(
-          // 底部导航使用低层级容器色，保证与内容区域层级分离。
-          backgroundColor: colorScheme.surfaceContainerLow,
-          indicatorColor: colorScheme.secondaryContainer,
-          labelTextStyle: WidgetStateProperty.resolveWith((states) {
-            final selected = states.contains(WidgetState.selected);
-            return TextStyle(
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-            );
-          }),
-        ),
-        snackBarTheme: SnackBarThemeData(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: colorScheme.inverseSurface,
-          contentTextStyle: TextStyle(color: colorScheme.onInverseSurface),
-        ),
-      ),
+      theme: _buildTheme(Brightness.light),
+      darkTheme: _buildTheme(Brightness.dark),
+      themeMode: _themeMode,
       home: MainScreen(
         dataService: widget.dataService,
         preferencesService: widget.preferencesService,
         onThemeModeChanged: _updateThemeMode,
+        themeMode: _themeMode,
       ),
     );
   }
@@ -191,12 +151,14 @@ class MainScreen extends StatefulWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
   final Future<void> Function(ThemeMode) onThemeModeChanged;
+  final ThemeMode themeMode;
 
   const MainScreen({
     super.key,
     required this.dataService,
     required this.preferencesService,
     required this.onThemeModeChanged,
+    required this.themeMode,
   });
 
   @override
@@ -206,28 +168,6 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   /// 当前底部导航索引。
   int _currentIndex = 0;
-  /// 使用 IndexedStack 保持三个主页面的状态。
-  late final List<Widget> _pages;
-
-  @override
-  void initState() {
-    super.initState();
-    _pages = [
-      SearchPage(
-        dataService: widget.dataService,
-        preferencesService: widget.preferencesService,
-        onThemeModeChanged: widget.onThemeModeChanged,
-      ),
-      ProductListPage(
-        dataService: widget.dataService,
-        preferencesService: widget.preferencesService,
-      ),
-      ProductApplicationsPage(
-        dataService: widget.dataService,
-        preferencesService: widget.preferencesService,
-      ),
-    ];
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -235,7 +175,22 @@ class _MainScreenState extends State<MainScreen> {
       // 切换 tab 时保留页面滚动位置和内部状态。
       body: IndexedStack(
         index: _currentIndex,
-        children: _pages,
+        children: [
+          SearchPage(
+            dataService: widget.dataService,
+            preferencesService: widget.preferencesService,
+            onThemeModeChanged: widget.onThemeModeChanged,
+            themeMode: widget.themeMode,
+          ),
+          ProductListPage(
+            dataService: widget.dataService,
+            preferencesService: widget.preferencesService,
+          ),
+          ProductApplicationsPage(
+            dataService: widget.dataService,
+            preferencesService: widget.preferencesService,
+          ),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         // MD3 导航栏：采用目的地（destination）模型。
