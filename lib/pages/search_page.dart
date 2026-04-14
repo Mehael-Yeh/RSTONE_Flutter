@@ -260,8 +260,10 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                           visualDensity: VisualDensity.compact,
                           label: Text(isProductList ? '产品' : '应用'),
                           labelStyle: Theme.of(context).textTheme.labelSmall,
-                          backgroundColor: tagColor.withOpacity(0.15),
-                          side: BorderSide.none,
+                          backgroundColor: tagColor.withOpacity(0.14),
+                          side: BorderSide(
+                            color: tagColor.withOpacity(0.35),
+                          ),
                         ),
                       ],
                     ),
@@ -277,9 +279,11 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                             labelStyle: Theme.of(context)
                                 .textTheme
                                 .labelSmall
-                                ?.copyWith(color: cs.primary),
-                            backgroundColor: cs.primaryContainer.withOpacity(0.35),
-                            side: BorderSide.none,
+                                ?.copyWith(color: cs.onSecondaryContainer),
+                            backgroundColor: cs.secondaryContainer,
+                            side: BorderSide(
+                              color: cs.outlineVariant,
+                            ),
                           );
                         }).toList(),
                       ),
