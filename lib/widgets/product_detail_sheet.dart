@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -38,12 +37,6 @@ class ProductDetailSheet extends StatefulWidget {
 class _ProductDetailSheetState extends State<ProductDetailSheet> {
   /// 多配方时下拉选择的索引
   int _selectedFormulaIndex = 0;
-
-  /// 配方卡截图用的 RepaintBoundary key
-  final GlobalKey _formulaCardKey = GlobalKey();
-
-  /// 当前是否正在捕获配方卡（为 true 时不使用水平滚动，展开到完整宽度）
-  bool _isCapturing = false;
 
   /// 解析 markdown 表格数据
   /// [rawContent] 传入的完整 markdown 内容（可能包含多张表格和非表格文字）
@@ -84,17 +77,133 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     return rows;
   }
 
-  /// 用 RepaintBoundary 捕获配方卡片的实际渲染内容（所见即所得）
-  Future<void> _shareCardAsImage(String title) async {
+  /// 用 PictureRecorder 绘制完整配方卡片（不受屏幕裁剪限制）
+  Future<void> _shareCardAsImage(String title, String rawContent) async {
     try {
-      final boundary = _formulaCardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) return;
+      // 解析配方内容
+      final metrics = _measureTable(rawContent);
+      if (metrics == null || metrics.rows.isEmpty) return;
 
-      // 等待一帧确保渲染完成
-      await Future.delayed(const Duration(milliseconds: 200));
+      final header = metrics.rows.first;
+      final dataRows = metrics.rows.length > 1 ? metrics.rows.sublist(1) : <List<String>>[];
+      final colWidths = metrics.colWidths;
+      final totalW = colWidths.reduce((a, b) => a + b);
+      const double scale = 2.0;
+      const double rowH = 36.0;
+      const double headerH = 38.0;
+      const double cellHP = 12.0;
+      const double cardPadding = 16.0;
+      const double headerBarH = 44.0;
+      const double preH = 30.0;
+      const double postH = 40.0;
 
-      final image = await boundary.toImage(pixelRatio: 2.0);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      // 计算各部分高度
+      double titleH = headerBarH;
+      double preContentH = metrics.preContent.isNotEmpty ? preH : 0;
+      double tableH = headerH + dataRows.length * rowH;
+      double postContentH = metrics.postContent.isNotEmpty ? postH : 0;
+      double totalH = titleH + preContentH + tableH + postContentH + cardPadding * 2;
+
+      final recorder = ui.PictureRecorder();
+      final c = Canvas(recorder);
+      c.scale(scale, scale);
+
+      // 背景
+      c.drawRect(Rect.fromLTWH(0, 0, totalW + cardPadding * 2, totalH),
+          Paint()..color = const Color(0xFF2D2D2D));
+
+      // 卡片边框
+      c.drawRRect(
+          RRect.fromRectAndRadius(
+              Rect.fromLTWH(0, 0, totalW + cardPadding * 2, totalH),
+              const Radius.circular(12)),
+          Paint()
+            ..color = Colors.grey.shade800
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1);
+
+      // === 标题栏 ===
+      double y = cardPadding;
+      c.drawRect(Rect.fromLTWH(0, y, totalW + cardPadding * 2, titleH),
+          Paint()..color = const Color(0xFF2D2D2D));
+      _drawText(c, title, 13, const Color(0xFF00BCD4),
+          Rect.fromLTWH(cardPadding + 20, y + 12, totalW, 20), bold: true);
+      // 标题栏左侧图标装饰
+      c.drawCircle(Offset(cardPadding + 8, y + titleH / 2), 4,
+          Paint()..color = const Color(0xFF00BCD4));
+      // 分享按钮装饰
+      c.drawRect(Rect.fromLTWH(totalW + cardPadding - 40, y + 10, 24, 24),
+          Paint()..color = Colors.grey.shade700);
+
+      y += titleH;
+
+      // === preContent ===
+      if (preContentH > 0) {
+        _drawText(c, metrics.preContent, 12, Colors.white70,
+            Rect.fromLTWH(cardPadding, y, totalW, preContentH),
+            height: 1.5);
+        y += preContentH;
+      }
+
+      // === 表格 ===
+      // 表头
+      double tx = cardPadding;
+      c.drawRect(Rect.fromLTWH(tx, y, totalW, headerH),
+          Paint()..color = const Color(0xFF2D2D2D));
+      for (int i = 0; i < colWidths.length; i++) {
+        c.drawRect(Rect.fromLTWH(tx, y, colWidths[i], headerH),
+            Paint()..color = Colors.grey.shade800);
+        _drawCell(c, header[i], tx, y, colWidths[i], headerH,
+            const Color(0xFFFF9800), cellHP, bold: true);
+        tx += colWidths[i];
+      }
+      c.drawRect(Rect.fromLTWH(tx, y, totalW, headerH),
+          Paint()
+            ..color = Colors.grey.shade700
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 0.5);
+      y += headerH;
+
+      // 数据行
+      for (int ri = 0; ri < dataRows.length; ri++) {
+        final row = dataRows[ri];
+        if (ri.isOdd) {
+          c.drawRect(Rect.fromLTWH(cardPadding, y, totalW, rowH),
+              Paint()..color = const Color(0xFF252525));
+        }
+        tx = cardPadding;
+        for (int i = 0; i < colWidths.length; i++) {
+          _drawCell(c, i < row.length ? row[i] : '', tx, y,
+              colWidths[i], rowH, const Color(0xFFB0B0B0), cellHP);
+          tx += colWidths[i];
+        }
+        // 底边框
+        c.drawLine(Offset(cardPadding, y + rowH),
+            Offset(cardPadding + totalW, y + rowH),
+            Paint()..color = const Color(0xFF3D3D3D)..strokeWidth = 0.5);
+        y += rowH;
+      }
+
+      // 整个表格边框
+      c.drawRect(Rect.fromLTWH(cardPadding, y - tableH, totalW, tableH),
+          Paint()
+            ..color = Colors.grey.shade700
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1);
+
+      // === postContent ===
+      if (postContentH > 0) {
+        y += 8;
+        _drawText(c, metrics.postContent, 12, Colors.white70,
+            Rect.fromLTWH(cardPadding, y, totalW, postContentH),
+            height: 1.5);
+      }
+
+      final picture = recorder.endRecording();
+      final img = await picture.toImage(
+          ((totalW + cardPadding * 2) * scale).toInt(),
+          (totalH * scale).toInt());
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
 
       final pngBytes = byteData.buffer.asUint8List();
@@ -116,6 +225,38 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     }
   }
 
+  /// 绘制单元格文字
+  void _drawCell(Canvas c, String text, double x, double y,
+      double w, double h, Color color, double padding,
+      {bool bold = false}) {
+    if (text.isEmpty) return;
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(color: color, fontSize: 12, fontWeight: bold ? FontWeight.bold : FontWeight.normal),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    tp.layout(maxWidth: w - padding * 2);
+    tp.paint(c, Offset(x + padding, y + (h - tp.height) / 2));
+  }
+
+  /// 绘制多行文字
+  void _drawText(Canvas c, String text, double fontSize, Color color,
+      Rect rect, {bool bold = false, double height = 1.0}) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(color: color, fontSize: fontSize,
+            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            height: height),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    tp.layout(maxWidth: rect.width);
+    tp.paint(c, Offset(rect.left, rect.top));
+  }
+
   double _textWidth(String text, double fontSize) {
     final tp = TextPainter(
       text: TextSpan(text: text, style: TextStyle(fontSize: fontSize)),
@@ -123,6 +264,80 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     );
     tp.layout();
     return tp.width;
+  }
+
+  /// 配方表格测量数据结构
+  class _TableMetrics {
+    final List<List<String>> rows;      // 所有行（含表头）
+    final List<double> colWidths;        // 每列宽度
+    final double totalWidth;            // 表格总宽
+    final String preContent;            // 表格前内容
+    final String postContent;           // 表格后内容（如施工比例）
+    _TableMetrics(this.rows, this.colWidths, this.totalWidth,
+        this.preContent, this.postContent);
+  }
+
+  /// 解析配方内容，测量列宽，返回 TableMetrics
+  /// 解析逻辑与 _buildMdTable 完全一致，确保分享绘制与界面渲染的列宽相同
+  _TableMetrics? _measureTable(String rawContent) {
+    final preLines = <String>[];
+    final postLines = <String>[];
+    bool foundTable = false;
+    bool inFrontmatter = false;
+    bool frontmatterEnded = false;
+
+    for (final line in rawContent.split('
+')) {
+      final trimmed = line.trim();
+      if (trimmed == '---') {
+        if (!inFrontmatter) { inFrontmatter = true; }
+        else { frontmatterEnded = true; inFrontmatter = false; }
+        continue;
+      }
+      if (inFrontmatter) continue;
+      if (frontmatterEnded && trimmed.startsWith('[[')) continue;
+      if (trimmed.startsWith('|')) { foundTable = true; continue; }
+      if (trimmed.isEmpty) continue;
+      var clean = trimmed.startsWith('> ')
+          ? trimmed.substring(2).trim()
+          : trimmed;
+      clean = clean.replaceAllMapped(RegExp(r'\[\[([^\]]+)\]\]'),
+          (m) => m.group(1) ?? clean);
+      if (foundTable) { postLines.add(clean); }
+      else { preLines.add(clean); }
+    }
+
+    final preContent = preLines.join('
+');
+    final postContent = postLines.join('
+');
+
+    // 去掉 frontmatter
+    String body = rawContent;
+    final fmEnd = body.indexOf('---', 4);
+    if (fmEnd != -1) body = body.substring(fmEnd + 3).trim();
+
+    final rows = _parseTable(body);
+    if (rows.isEmpty) return null;
+
+    final header = rows.first;
+    final colCount = header.length;
+    final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
+
+    const double minW = 60.0, maxW = 300.0, cellHP = 12.0;
+    List<double> colWidths = List.filled(colCount, minW);
+    void measureCol(int col, String text) {
+      final w = _textWidth(text, 12) + cellHP * 2;
+      if (w > colWidths[col]) colWidths[col] = w.clamp(minW, maxW);
+    }
+    for (int i = 0; i < colCount; i++) measureCol(i, header[i]);
+    for (final row in dataRows) {
+      for (int i = 0; i < row.length; i++) measureCol(i, row[i]);
+    }
+    while (colWidths.length < colCount) colWidths.add(minW);
+    final totalWidth = colWidths.reduce((a, b) => a + b);
+
+    return _TableMetrics(rows, colWidths, totalWidth, preContent, postContent);
   }
 
   /// 渲染配方 markdown 表格（完全自定义渲染，列宽自动适配内容）
@@ -480,11 +695,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final fmEnd = bodyContent.indexOf('---', 4);
     if (fmEnd != -1) bodyContent = bodyContent.substring(fmEnd + 3).trim();
 
-    return RepaintBoundary(
-      key: _formulaCardKey,
-      child: Container(
+    return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      clipBehavior: _isCapturing ? Clip.none : Clip.hardEdge,
       decoration: BoxDecoration(
         color: const Color(0xFF2D2D2D),
         borderRadius: BorderRadius.circular(12),
@@ -514,11 +726,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                   tooltip: '分享表格',
-                  onPressed: () async {
-                    setState(() => _isCapturing = true);
-                    await _shareCardAsImage(title);
-                    if (mounted) setState(() => _isCapturing = false);
-                  },
+                  onPressed: () => _shareCardAsImage(title, rawContent),
                 ),
               ],
             ),
@@ -553,7 +761,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           const SizedBox(height: 8),
         ],
       ),
-    ),
     );
   }
 
