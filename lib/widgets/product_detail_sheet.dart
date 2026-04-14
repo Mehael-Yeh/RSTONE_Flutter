@@ -49,6 +49,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       if (trimmed.isEmpty) continue;
       // 非表格行（如 blockquote、行首无 | 的内容）
       if (!trimmed.startsWith('|')) {
+        if (trimmed == '---') continue; // 跳过 frontmatter 分隔符
         if (nonTableContent != null && trimmed.isNotEmpty) {
           nonTableContent.add(trimmed);
         }
@@ -304,6 +305,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           : trimmed;
       clean = clean.replaceAllMapped(RegExp(r'\[\[([^\]]+)\]\]'),
           (m) => m.group(1) ?? clean);
+      if (trimmed == '---') { postLines.clear(); continue; } // closing --- 不是内容
       if (foundTable) { postLines.add(clean); }
       else { preLines.add(clean); }
     }
