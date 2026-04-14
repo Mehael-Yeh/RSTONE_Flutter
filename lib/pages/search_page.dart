@@ -14,10 +14,15 @@ class SearchPage extends StatefulWidget {
 }
 
 class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
+  /// 搜索输入控制器。
   final TextEditingController _searchController = TextEditingController();
+  /// 搜索框焦点控制（用于生命周期时主动收起键盘）。
   final FocusNode _searchFocusNode = FocusNode();
+  /// 当前搜索结果集合。
   List<ProductItem> _results = [];
+  /// 搜索框中是否存在关键词。
   bool _isSearching = false;
+  /// 是否展示结果区域（仅在有输入时展示）。
   bool _showResults = false;
 
   @override
@@ -44,16 +49,19 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
 
   void _onSearchChanged() {
     final query = _searchController.text.trim();
+    // 输入非空时切换到“搜索态”。
     setState(() {
       _isSearching = query.isNotEmpty;
       _showResults = query.isNotEmpty;
     });
 
     if (query.isEmpty) {
+      // 清空输入后立即清空结果，避免显示旧数据。
       setState(() => _results = []);
       return;
     }
 
+    // 轻量防抖，降低频繁输入时的检索开销。
     Future.delayed(const Duration(milliseconds: 150), () {
       if (_searchController.text.trim() == query) {
         final results = widget.dataService.search(query);
@@ -66,6 +74,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // 统一使用语义色，避免硬编码颜色导致主题割裂。
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -121,6 +130,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                       ]
                     : null,
                 elevation: WidgetStateProperty.all(0),
+                // 使用容器高层级色强化输入控件与背景的层级关系。
                 backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHigh),
                 side: WidgetStatePropertyAll(
                   BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
@@ -159,6 +169,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     final cs = Theme.of(context).colorScheme;
 
     return Center(
+      // 初始引导态：提示可搜索字段。
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -177,6 +188,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     final cs = Theme.of(context).colorScheme;
 
     return Center(
+      // 搜索无结果态：给出明确反馈，减少误操作困惑。
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -206,6 +218,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
           child: Row(
             children: [
               Container(
+                // 左侧竖条作为信息类型视觉锚点（产品/应用）。
                 width: 4,
                 height: 56,
                 decoration: BoxDecoration(

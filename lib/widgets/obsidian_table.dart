@@ -33,7 +33,9 @@ class ObsidianTable extends StatefulWidget {
 }
 
 class _ObsidianTableState extends State<ObsidianTable> {
+  /// 当前可见列顺序（可拖拽重排）。
   late List<String> _columns;
+  /// 是否进入列编辑模式。
   bool _isEditingColumns = false;
 
   @override
@@ -48,6 +50,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
   void _saveColumnOrder(List<String> newColumns) {
     setState(() {
+      // 同步本地状态并通过回调持久化到偏好设置。
       _columns = newColumns;
       _isEditingColumns = false;
       widget.onColumnsChanged(newColumns);
@@ -55,6 +58,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
   }
 
   List<ProductItem> _getSortedItems() {
+    // 无排序列时直接返回原始数据，避免额外拷贝。
     if (widget.currentSortColumn == null) return widget.items;
 
     final sortCol = widget.currentSortColumn!;
@@ -106,6 +110,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
           ),
         ),
         Expanded(
+          // ReorderableWrap 支持拖拽后自动换行，适合移动端窄屏。
           child: ReorderableWrap(
             spacing: 8,
             runSpacing: 8,
@@ -147,6 +152,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
     final sortedItems = _getSortedItems();
 
     if (widget.isMobile) {
+      // 移动端使用卡片化信息密度，提升触控可读性。
       return ListView.builder(
         itemCount: sortedItems.length,
         itemBuilder: (context, index) {
@@ -211,6 +217,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
     return Column(
       children: [
+        // 桌面端表头：支持点击列名切换排序方向。
         Container(
           color: cs.surfaceContainer,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -264,6 +271,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
         ),
         Divider(height: 1, color: cs.outlineVariant),
         Expanded(
+          // 表格主体使用斑马纹分层，增强长列表扫描效率。
           child: ListView.builder(
             itemCount: sortedItems.length,
             itemBuilder: (context, index) {
