@@ -19,6 +19,12 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -28,38 +34,34 @@ jobs:
       - name: Get latest version
         id: version
         run: |
-          LATEST=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-alpha$' | head -1)
+          set -euo pipefail
+          LATEST=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-alpha$' | head -1 || true)
           if [ -z "$LATEST" ]; then
             CURRENT=$(grep '^version:' pubspec.yaml | awk '{print $2}')
-            echo "version=${CURRENT}+1" >> $GITHUB_OUTPUT
-            echo "tag=v${CURRENT}-alpha" >> $GITHUB_OUTPUT
+            CURRENT=${CURRENT%%+*}
+            echo "version=${CURRENT}+1" >> "$GITHUB_OUTPUT"
+            echo "tag=v${CURRENT}-alpha" >> "$GITHUB_OUTPUT"
           else
             BASE=${LATEST#v}
             BASE=${BASE%-alpha}
-            major=$(echo $BASE | cut -d. -f1)
-            minor=$(echo $BASE | cut -d. -f2)
-            patch=$(echo $BASE | cut -d. -f3)
+            major=$(echo "$BASE" | cut -d. -f1)
+            minor=$(echo "$BASE" | cut -d. -f2)
+            patch=$(echo "$BASE" | cut -d. -f3)
             patch=$((patch + 1))
             new_ver="${major}.${minor}.${patch}"
-            echo "version=${new_ver}+${patch}" >> $GITHUB_OUTPUT
-            echo "tag=v${new_ver}-alpha" >> $GITHUB_OUTPUT
+            echo "version=${new_ver}+${patch}" >> "$GITHUB_OUTPUT"
+            echo "tag=v${new_ver}-alpha" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Print version metadata
+        run: |
           echo "版本: ${{ steps.version.outputs.version }}"
           echo "标签: ${{ steps.version.outputs.tag }}"
 
       - name: Update version in pubspec.yaml
         run: |
           sed -i 's/^version:.*/version: ${{ steps.version.outputs.version }}/' pubspec.yaml
-          cat pubspec.yaml | grep "^version:"
-
-      - name: Commit & Tag
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-          git add pubspec.yaml
-          git commit -m "chore: version ${{ steps.version.outputs.tag }}"
-          git tag ${{ steps.version.outputs.tag }}
-          git push origin main --tags
+          grep "^version:" pubspec.yaml
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -124,18 +126,37 @@ jobs:
 
       - name: Build Release APK (Android)
         run: |
+          set -euo pipefail
           flutter build apk --release --split-per-abi
           # 重命名为 RSTONE-{version}-{abi}-release.apk
           cd build/app/outputs/flutter-apk
           for apk in app-*-release.apk; do
             case "$apk" in
-              app-armeabi-v7a-release.apk)  ABI=armeabi-v7a ;;
-              app-arm64-v8a-release.apk)    ABI=arm64-v8a ;;
-              app-x86_64-release.apk)         ABI=x86_64 ;;
+              app-armeabi-v7a-release.apk) ABI=armeabi-v7a ;;
+              app-arm64-v8a-release.apk)   ABI=arm64-v8a ;;
+              app-x86_64-release.apk)      ABI=x86_64 ;;
+              *)
+                echo "Unknown APK naming: $apk"
+                exit 1
+                ;;
             esac
             mv "$apk" "RSTONE-${{ steps.version.outputs.tag }}-${ABI}-release.apk"
           done
           ls -la
+
+      - name: Commit & Tag
+        run: |
+          set -euo pipefail
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git add pubspec.yaml
+          if git diff --cached --quiet; then
+            echo "No version changes detected; skip commit and tag."
+            exit 0
+          fi
+          git commit -m "chore: version ${{ steps.version.outputs.tag }}"
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin main --tags
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
