@@ -52,35 +52,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     return normalized.substring(endIndex + 5).trim();
   }
 
-  Future<void> _shareFullFormulaContent(BuildContext context, String title, String rawContent) async {
-    final converted = rawContent.replaceAllMapped(
-      RegExp(r'\[\[([^\]]+)\]\]'),
-      (m) => m.group(1) ?? m.group(0) ?? '',
-    ).trim();
-
-    if (converted.isEmpty) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('没有可分享的配方内容')),
-        );
-      }
-      return;
-    }
-
-    try {
-      await Share.share(
-        converted,
-        subject: '$title - 锐石 RSTONE',
-      );
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('分享失败: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
   /// 解析 markdown 表格数据
   /// [rawContent] 传入的完整 markdown 内容（可能包含多张表格和非表格文字）
   /// 返回解析后的表格行列表；同时通过 [nonTableContent] 输出不在表格内的文字（如 blockquote 等）
@@ -122,7 +93,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   /// 用 Canvas 完整渲染表格为 PNG（不依赖截图，保证所有行都渲染）
-  /// [extraContent] blockquote 等表格外的文字，会渲染在表格下方
+  /// [extraContent] 表格外的完整文字（表格前/后的补充信息），会渲染在表格下方
   Future<void> _shareTableAsImage(
     BuildContext context,
     String title,
@@ -160,7 +131,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         tp.layout(maxWidth: totalWidth - 24);
         titleHeight = tp.height + 16; // 上下各 8px padding
       }
-      // 计算 blockquote 文字高度
+      // 计算表格外附加文字高度
       double extraHeight = 0;
       if (extraContent != null && extraContent.trim().isNotEmpty) {
         final tp = TextPainter(
@@ -238,7 +209,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           ..strokeWidth = 1,
       );
 
-      // 绘制 blockquote 施工比例文字
+      // 绘制表格外附加文字
       if (extraContent != null && extraContent.trim().isNotEmpty) {
         final textPainter = TextPainter(
           text: TextSpan(
@@ -662,6 +633,11 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
     // 去掉 frontmatter，只保留 body（表格和表格外内容）
     final bodyContent = _extractMarkdownBody(rawContent);
+    final tableBodyRows = _parseTable(bodyContent);
+    final fullExtraContent = [
+      if (preContent.isNotEmpty) preContent,
+      if (postContent.isNotEmpty) postContent,
+    ].join('\n');
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -693,8 +669,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   icon: const Icon(Icons.share_outlined, color: Colors.grey, size: 18),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                  tooltip: '分享配方全文',
-                  onPressed: () => _shareFullFormulaContent(context, title, rawContent),
+                  tooltip: '分享配方图片',
+                  onPressed: () => _shareTableAsImage(
+                    context,
+                    title,
+                    tableBodyRows,
+                    extraContent: fullExtraContent.isNotEmpty ? fullExtraContent : null,
+                  ),
                 ),
               ],
             ),
