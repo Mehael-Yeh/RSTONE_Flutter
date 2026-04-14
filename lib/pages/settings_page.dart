@@ -154,17 +154,6 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 12),
           _buildSectionCard(
-            title: '数据管理',
-            child: ListTile(
-              leading: const Icon(Icons.refresh),
-              title: const Text('重新加载数据'),
-              subtitle: const Text('从内置资源重新加载产品数据'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _reloadData,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildSectionCard(
             title: '关于',
             child: Column(
               children: [
@@ -239,34 +228,6 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  Future<void> _reloadData() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Text('正在重新加载...'),
-          ],
-        ),
-      ),
-    );
-
-    await widget.dataService.clearData();
-    await widget.dataService.initialize();
-
-    if (mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('重新加载完成！产品: ${widget.dataService.products.length}, 应用: ${widget.dataService.applications.length}'),
-        ),
-      );
-      setState(() {});
-    }
-  }
 }
 
 class LogViewerPage extends StatefulWidget {
