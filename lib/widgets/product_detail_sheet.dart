@@ -43,7 +43,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   /// 返回解析后的表格行列表；同时通过 [nonTableContent] 输出不在表格内的文字（如 blockquote 等）
   List<List<String>> _parseTable(String rawContent, [List<String>? nonTableContent]) {
     final rows = <List<String>>[];
-    for (final line in rawContent.split('\n')) {
+    for (final line in rawContent.split('
+')) {
       final trimmed = line.trim();
       if (trimmed.isEmpty) continue;
       // 非表格行（如 blockquote、行首无 | 的内容）
@@ -265,6 +266,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     tp.layout();
     return tp.width;
   }
+
 
   /// 配方表格测量数据结构
   class _TableMetrics {
@@ -645,7 +647,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     bool inFrontmatter = false;
     bool frontmatterEnded = false;
 
-    for (final line in rawContent.split('\n')) {
+    for (final line in rawContent.split('
+')) {
       final trimmed = line.trim();
 
       // 跟踪 frontmatter 边界
@@ -687,8 +690,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       }
     }
 
-    final preContent = preTableLines.join('\n');
-    final postContent = postTableLines.join('\n');
+    final preContent = preTableLines.join('
+');
+    final postContent = postTableLines.join('
+');
 
     // 去掉 frontmatter，只保留 body（表格和表格外内容）
     String bodyContent = rawContent;
