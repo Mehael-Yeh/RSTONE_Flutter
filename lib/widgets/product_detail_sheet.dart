@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/product_item.dart';
@@ -38,6 +37,12 @@ class ProductDetailSheet extends StatefulWidget {
 class _ProductDetailSheetState extends State<ProductDetailSheet> {
   /// 多配方时下拉选择的索引
   int _selectedFormulaIndex = 0;
+
+  /// 配方卡截图用的 RepaintBoundary key
+  final GlobalKey _formulaCardKey = GlobalKey();
+
+  /// 当前是否正在捕获配方卡（为 true 时不使用水平滚动，展开到完整宽度）
+  bool _isCapturing = false;
 
   /// 解析 markdown 表格数据
   /// [rawContent] 传入的完整 markdown 内容（可能包含多张表格和非表格文字）
@@ -78,144 +83,17 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     return rows;
   }
 
-  /// 用 Canvas 完整渲染表格为 PNG（不依赖截图，保证所有行都渲染）
-  /// [extraContent] blockquote 等表格外的文字，会渲染在表格下方
-  Future<void> _shareTableAsImage(
-    BuildContext context,
-    String title,
-    List<List<String>> rows, {
-    String? extraContent,
-  }) async {
-    if (rows.isEmpty) return;
+  /// 用 RepaintBoundary 捕获配方卡片的实际渲染内容（所见即所得）
+  Future<void> _shareCardAsImage(String title) async {
     try {
-      const double rowHeight = 36.0;
-      const double headerHeight = 40.0;
-      const double cellPaddingH = 16.0;
-      const double colMinWidth = 80.0;
-      const double scale = 2.0; // 2x 分辨率提升清晰度
+      final boundary = _formulaCardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return;
 
-      final header = rows.first;
-      final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
-      final colCount = header.length;
+      // 等待一帧确保渲染完成
+      await Future.delayed(const Duration(milliseconds: 200));
 
-      // 计算每列宽度（根据内容）
-      List<double> colWidths = List.filled(colCount, colMinWidth);
-      for (final row in rows) {
-        for (int i = 0; i < row.length && i < colCount; i++) {
-          final len = row[i].length * 10.0 + cellPaddingH * 2;
-          if (len > colWidths[i]) colWidths[i] = len.clamp(colMinWidth, 300.0);
-        }
-      }
-      final totalWidth = colWidths.reduce((a, b) => a + b) + 4;
-      // 计算标题高度（缩放后已是逻辑像素，直接用）
-      double titleHeight = 0;
-      if (title.isNotEmpty) {
-        final tp = TextPainter(
-          text: TextSpan(text: title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF9800))),
-          textDirection: TextDirection.ltr,
-        );
-        tp.layout(maxWidth: totalWidth - 24);
-        titleHeight = tp.height + 16; // 上下各 8px padding
-      }
-      // 计算 blockquote 文字高度
-      double extraHeight = 0;
-      if (extraContent != null && extraContent.trim().isNotEmpty) {
-        final tp = TextPainter(
-          text: TextSpan(text: extraContent, style: const TextStyle(fontSize: 12, height: 1.5)),
-          textDirection: TextDirection.ltr,
-        );
-        tp.layout(maxWidth: totalWidth - 24);
-        extraHeight = tp.height + 16; // 上下各 8px padding
-      }
-      final tableHeight = headerHeight + dataRows.length * rowHeight + 4;
-      final totalHeight = titleHeight + tableHeight + extraHeight;
-
-      final recorder = ui.PictureRecorder();
-      final canvas = Canvas(recorder);
-      canvas.scale(scale, scale); // 2x 缩放提升清晰度
-
-      // 背景
-      canvas.drawRect(
-        Rect.fromLTWH(0, 0, totalWidth, totalHeight),
-        Paint()..color = const Color(0xFF1E1E1E),
-      );
-
-      // 绘制标题（wiki 链接已转换为普通文字）
-      if (title.isNotEmpty) {
-        final titlePainter = TextPainter(
-          text: TextSpan(text: title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF9800))),
-          textDirection: TextDirection.ltr,
-        );
-        titlePainter.layout(maxWidth: totalWidth - 24);
-        titlePainter.paint(canvas, Offset(12, 8));
-      }
-
-      // 表头背景（表格从 titleHeight 开始）
-      canvas.drawRect(
-        Rect.fromLTWH(0, titleHeight, totalWidth, headerHeight),
-        Paint()..color = const Color(0xFF2D2D2D),
-      );
-
-      // 绘制表头（表格从 titleHeight 开始）
-      double x = 0;
-      for (int i = 0; i < colCount; i++) {
-        canvas.drawRect(
-          Rect.fromLTWH(x, titleHeight, colWidths[i], headerHeight),
-          Paint()..color = Colors.grey.shade800,
-        );
-        _drawCell(canvas, header[i], x, titleHeight, colWidths[i], headerHeight,
-            const Color(0xFFFF9800), true);
-        x += colWidths[i];
-      }
-
-      // 绘制数据行（表格从 titleHeight 开始）
-      for (int r = 0; r < dataRows.length; r++) {
-        final row = dataRows[r];
-        final y = titleHeight + headerHeight + r * rowHeight;
-        if (r.isOdd) {
-          canvas.drawRect(
-            Rect.fromLTWH(0, y, totalWidth, rowHeight),
-            Paint()..color = const Color(0xFF2A2A2A),
-          );
-        }
-        x = 0;
-        for (int i = 0; i < colCount; i++) {
-          _drawCell(canvas, i < row.length ? row[i] : '',
-              x, y, colWidths[i], rowHeight, const Color(0xFFB0B0B0), false);
-          x += colWidths[i];
-        }
-      }
-
-      // 边框
-      canvas.drawRect(
-        Rect.fromLTWH(0, 0, totalWidth, totalHeight),
-        Paint()
-          ..color = Colors.grey.shade700
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1,
-      );
-
-      // 绘制 blockquote 施工比例文字
-      if (extraContent != null && extraContent.trim().isNotEmpty) {
-        final textPainter = TextPainter(
-          text: TextSpan(
-            text: extraContent,
-            style: const TextStyle(
-              color: Color(0xFFB0B0B0),
-              fontSize: 12,
-              height: 1.5,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        );
-        textPainter.layout(maxWidth: totalWidth - 24);
-        final blockY = titleHeight + tableHeight + 8; // 标题+表格高度之后 + padding
-        textPainter.paint(canvas, Offset(12, blockY));
-      }
-
-      final picture = recorder.endRecording();
-      final img = await picture.toImage(totalWidth.toInt(), totalHeight.toInt());
-      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+      final image = await boundary.toImage(pixelRatio: 2.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
 
       final pngBytes = byteData.buffer.asUint8List();
@@ -229,29 +107,12 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         subject: '$title - 锐石 RSTONE',
       );
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('分享失败: $e'), backgroundColor: Colors.red),
         );
       }
     }
-  }
-
-  void _drawCell(Canvas canvas, String text, double x, double y,
-      double w, double h, Color color, bool bold) {
-    final tp = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    tp.layout(maxWidth: w - 8);
-    tp.paint(canvas, Offset(x + 8, y + (h - tp.height) / 2));
   }
 
   double _textWidth(String text, double fontSize) {
@@ -311,15 +172,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Column(
+          // 捕获模式下不使用水平滚动，让表格展开到完整宽度
+          if (_isCapturing)
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 表头行
                 _buildTableRow(header, colWidths, headerHeight, true, cellHPadding,
                     headerBg, headerText, borderColor),
-                // 数据行
                 for (int ri = 0; ri < dataRows.length; ri++)
                   _buildTableRow(
                     dataRows[ri].length >= colCount
@@ -329,8 +188,28 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                     ri.isOdd ? rowAlt : rowBg, cellText, borderColor,
                   ),
               ],
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 表头行
+                  _buildTableRow(header, colWidths, headerHeight, true, cellHPadding,
+                      headerBg, headerText, borderColor),
+                  // 数据行
+                  for (int ri = 0; ri < dataRows.length; ri++)
+                    _buildTableRow(
+                      dataRows[ri].length >= colCount
+                          ? dataRows[ri].take(colCount).toList()
+                          : List.generate(colCount, (i) => i < dataRows[ri].length ? dataRows[ri][i] : ''),
+                      colWidths, rowHeight, false, cellHPadding,
+                      ri.isOdd ? rowAlt : rowBg, cellText, borderColor,
+                    ),
+                ],
+              ),
             ),
-          ),
           // 表格下方的 blockquote 等额外文字，宽度与表格总列宽一致
           if (extraContent != null && extraContent.trim().isNotEmpty)
             Container(
@@ -617,10 +496,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     String bodyContent = rawContent;
     final fmEnd = bodyContent.indexOf('---', 4);
     if (fmEnd != -1) bodyContent = bodyContent.substring(fmEnd + 3).trim();
-    // 用 frontmatter 去除后的 body 解析表格行，供分享图片使用
-    final tableBodyRows = _parseTable(bodyContent);
 
-    return Container(
+    return RepaintBoundary(
+      key: _formulaCardKey,
+      child: Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
         color: const Color(0xFF2D2D2D),
@@ -651,12 +530,12 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                   tooltip: '分享表格',
-                  onPressed: () => _shareTableAsImage(
-                    context, title, tableBodyRows,
-                    extraContent: preContent.isNotEmpty
-                        ? '$preContent${postContent.isNotEmpty ? '\n$postContent' : ''}'
-                        : postContent,
-                  ),
+                  onPressed: () async {
+                    setState(() => _isCapturing = true);
+                    await Future.delayed(const Duration(milliseconds: 50));
+                    await _shareCardAsImage(title);
+                    if (mounted) setState(() => _isCapturing = false);
+                  },
                 ),
               ],
             ),
