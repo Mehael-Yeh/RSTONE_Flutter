@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -570,6 +571,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           const SizedBox(height: 8),
         ],
       ),
+    ),
     );
   }
 
