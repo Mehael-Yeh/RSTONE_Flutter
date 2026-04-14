@@ -8,8 +8,10 @@ import 'pages/product_applications_page.dart';
 
 /// 应用入口函数
 void main() async {
+  // 确保在执行异步初始化前完成 Flutter 引擎绑定。
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 统一系统状态栏样式，避免页面切换时出现亮暗不一致。
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -20,9 +22,11 @@ void main() async {
   final dataService = ObsidianDataService();
   final preferencesService = PreferencesService();
 
+  // 应用启动阶段完成本地偏好和静态资源数据初始化。
   await preferencesService.initialize();
   await dataService.initialize();
 
+  // 初始化完成后再挂载根组件，避免首帧出现空数据状态抖动。
   runApp(RstoneApp(
     dataService: dataService,
     preferencesService: preferencesService,
@@ -42,6 +46,7 @@ class RstoneApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 使用橙色种子生成 MD3 深色语义色板，统一全局视觉语言。
     final colorScheme = ColorScheme.fromSeed(
       seedColor: const Color(0xFFFF8A00),
       brightness: Brightness.dark,
@@ -51,6 +56,7 @@ class RstoneApp extends StatelessWidget {
       title: '锐石 RSTONE',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        // 启用 Material Design 3 组件行为与样式。
         useMaterial3: true,
         brightness: Brightness.dark,
         colorScheme: colorScheme,
@@ -62,7 +68,8 @@ class RstoneApp extends StatelessWidget {
           backgroundColor: colorScheme.surface,
           foregroundColor: colorScheme.onSurface,
         ),
-        cardTheme: CardThemeData(
+        // Flutter 3.24 使用 CardTheme（而非 CardThemeData）。
+        cardTheme: CardTheme(
           elevation: 0,
           color: colorScheme.surfaceContainer,
           shape: RoundedRectangleBorder(
@@ -70,6 +77,7 @@ class RstoneApp extends StatelessWidget {
           ),
         ),
         navigationBarTheme: NavigationBarThemeData(
+          // 底部导航使用低层级容器色，保证与内容区域层级分离。
           backgroundColor: colorScheme.surfaceContainerLow,
           indicatorColor: colorScheme.secondaryContainer,
           labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -108,7 +116,9 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  /// 当前底部导航索引。
   int _currentIndex = 0;
+  /// 使用 IndexedStack 保持三个主页面的状态。
   late final List<Widget> _pages;
 
   @override
@@ -130,11 +140,13 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // 切换 tab 时保留页面滚动位置和内部状态。
       body: IndexedStack(
         index: _currentIndex,
         children: _pages,
       ),
       bottomNavigationBar: NavigationBar(
+        // MD3 导航栏：采用目的地（destination）模型。
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
         destinations: const [
