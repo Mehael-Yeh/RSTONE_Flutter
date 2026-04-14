@@ -92,16 +92,28 @@ class ProductItem {
     }
 
     // 解析前置数据行
-    for (var line in frontmatterLines) {
+    for (int i = 0; i < frontmatterLines.length; i++) {
+      final line = frontmatterLines[i];
       if (line.trim().startsWith('tags:')) {
-        // 解析tags数组
-        final tagsMatch = RegExp(r'tags:\s*\n((?:\s*-\s*.+\n?)+)').firstMatch(content);
-        if (tagsMatch != null) {
-          final tagsContent = tagsMatch.group(1) ?? '';
-          tags = RegExp(r'-\s*(.+)\n?').allMatches(tagsContent)
-              .map((m) => m.group(1)?.trim() ?? '')
-              .where((t) => t.isNotEmpty)
-              .toList();
+        // 仅在 frontmatter 中解析 tags，避免把分隔符 "---" 误解析为 "--"
+        final parsedTags = <String>[];
+        for (int j = i + 1; j < frontmatterLines.length; j++) {
+          final candidate = frontmatterLines[j].trim();
+          if (candidate.startsWith('- ')) {
+            final tag = candidate.substring(2).trim();
+            if (tag.isNotEmpty) {
+              parsedTags.add(tag);
+            }
+            continue;
+          }
+
+          // 读到下一个字段或空行则结束 tags 列表读取
+          if (candidate.isEmpty || RegExp(r'^[^\s].*:\s*').hasMatch(candidate)) {
+            break;
+          }
+        }
+        if (parsedTags.isNotEmpty) {
+          tags = parsedTags;
         }
       } else if (line.trim().startsWith('工程师:')) {
         engineer = line.split(':').sublist(1).join(':').trim();
@@ -132,7 +144,8 @@ class ProductItem {
 
     // 解析tags的另一种格式
     if (tags.isEmpty) {
-      final tagsLine = RegExp(r'tags:\s*\[(.*?)\]').firstMatch(content);
+      final frontmatterContent = frontmatterLines.join('\n');
+      final tagsLine = RegExp(r'tags:\s*\[(.*?)\]').firstMatch(frontmatterContent);
       if (tagsLine != null) {
         tags = tagsLine.group(1)?.split(',').map((t) => t.trim().replaceAll('"', '')).toList() ?? [];
       }
