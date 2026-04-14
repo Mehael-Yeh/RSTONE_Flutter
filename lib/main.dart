@@ -68,7 +68,8 @@ class RstoneApp extends StatelessWidget {
           backgroundColor: colorScheme.surface,
           foregroundColor: colorScheme.onSurface,
         ),
-        cardTheme: CardThemeData(
+        // Flutter 3.24 使用 CardTheme（而非 CardThemeData）。
+        cardTheme: CardTheme(
           elevation: 0,
           color: colorScheme.surfaceContainer,
           shape: RoundedRectangleBorder(
