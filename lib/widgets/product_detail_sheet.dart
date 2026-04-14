@@ -39,6 +39,48 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   /// 多配方时下拉选择的索引
   int _selectedFormulaIndex = 0;
 
+  String _extractMarkdownBody(String rawContent) {
+    final normalized = rawContent.replaceAll('\r\n', '\n');
+    if (!normalized.startsWith('---\n')) {
+      return normalized.trim();
+    }
+
+    final endIndex = normalized.indexOf('\n---\n', 4);
+    if (endIndex == -1) {
+      return normalized.trim();
+    }
+    return normalized.substring(endIndex + 5).trim();
+  }
+
+  Future<void> _shareFullFormulaContent(BuildContext context, String title, String rawContent) async {
+    final converted = rawContent.replaceAllMapped(
+      RegExp(r'\[\[([^\]]+)\]\]'),
+      (m) => m.group(1) ?? m.group(0) ?? '',
+    ).trim();
+
+    if (converted.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('没有可分享的配方内容')),
+        );
+      }
+      return;
+    }
+
+    try {
+      await Share.share(
+        converted,
+        subject: '$title - 锐石 RSTONE',
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('分享失败: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   /// 解析 markdown 表格数据
   /// [rawContent] 传入的完整 markdown 内容（可能包含多张表格和非表格文字）
   /// 返回解析后的表格行列表；同时通过 [nonTableContent] 输出不在表格内的文字（如 blockquote 等）
@@ -390,15 +432,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     );
   }
 
-  Widget _markdownView(String content, ScrollController scrollController) {
+  Widget _markdownView(String content) {
     if (content.trim().isEmpty) return const SizedBox.shrink();
     // 把 Obsidian wiki 链接 [[XXX]] 转换为普通文字 XXX
     final converted = content.replaceAllMapped(
       RegExp(r'\[\[([^\]]+)\]\]'),
       (m) => m.group(1) ?? m.group(0) ?? '',
     );
-    return Markdown(
-      controller: scrollController,
+    return MarkdownBody(
       data: converted,
       styleSheet: MarkdownStyleSheet(
         p: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.6),
@@ -620,11 +661,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final postContent = postTableLines.join('\n');
 
     // 去掉 frontmatter，只保留 body（表格和表格外内容）
-    String bodyContent = rawContent;
-    final fmEnd = bodyContent.indexOf('---', 4);
-    if (fmEnd != -1) bodyContent = bodyContent.substring(fmEnd + 3).trim();
-    // 用 frontmatter 去除后的 body 解析表格行，供分享图片使用
-    final tableBodyRows = _parseTable(bodyContent);
+    final bodyContent = _extractMarkdownBody(rawContent);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -656,13 +693,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   icon: const Icon(Icons.share_outlined, color: Colors.grey, size: 18),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                  tooltip: '分享表格',
-                  onPressed: () => _shareTableAsImage(
-                    context, title, tableBodyRows,
-                    extraContent: preContent.isNotEmpty
-                        ? '$preContent${postContent.isNotEmpty ? '\n$postContent' : ''}'
-                        : postContent,
-                  ),
+                  tooltip: '分享配方全文',
+                  onPressed: () => _shareFullFormulaContent(context, title, rawContent),
                 ),
               ],
             ),
@@ -680,20 +712,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                 ),
               ),
             ),
-          _buildMdTable(bodyContent),
-          // 表格后的额外内容（如施工比例，如有）
-          if (postContent.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Text(
-                postContent,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                  height: 1.5,
-                ),
-              ),
-            ),
+          _buildMdTable(
+            bodyContent,
+            extraContent: postContent.isNotEmpty ? postContent : null,
+          ),
           const SizedBox(height: 8),
         ],
       ),
@@ -703,11 +725,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   @override
   Widget build(BuildContext context) {
     // 去掉 frontmatter 部分，只留 body
-    String bodyContent = widget.product.rawContent;
-    final frontmatterEnd = bodyContent.indexOf('---', 4);
-    if (frontmatterEnd != -1) {
-      bodyContent = bodyContent.substring(frontmatterEnd + 3).trim();
-    }
+    final bodyContent = _extractMarkdownBody(widget.product.rawContent);
 
     return NotificationListener<DraggableScrollableNotification>(
       onNotification: (notification) {
@@ -827,7 +845,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                 // MD 内容（不含 frontmatter）
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                  child: _markdownView(bodyContent, scrollController),
+                  child: _markdownView(bodyContent),
                 ),
               ],
             ),
