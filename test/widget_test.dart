@@ -1,30 +1,43 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:rst_flutter/main.dart';
+import 'package:rst_flutter/models/product_item.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('ProductItem.fromMdContent', () {
+    test('parses product fields and list-style tags', () {
+      const content = '''
+---
+tags:
+  - 水性
+  - UV
+工程师: 王工
+实验牌号: exp-01
+固含: 45
+---
+正文
+''';
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      final item = ProductItem.fromMdContent('assets/产品列表/RS1001.md', content);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+      expect(item.folder, '产品列表');
+      expect(item.fileName, 'RS1001');
+      expect(item.tags, ['水性', 'UV']);
+      expect(item.engineer, '王工');
+      expect(item.experimentalCode, 'exp-01');
+      expect(item.solidContent, '45');
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('detects formula folder and uses fallback table fields', () {
+      const content = '''
+| 栏1 | 栏2 |
+|---|---|
+| A | B |
+''';
+
+      final item = ProductItem.fromMdContent('assets/产品配方/RS1001-银.md', content);
+
+      expect(item.folder, '产品配方');
+      expect(item.getTableFields(), {'名称': 'RS1001-银'});
+    });
   });
 }
