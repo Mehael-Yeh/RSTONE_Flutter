@@ -62,7 +62,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           break;
         }
       }
-      if (isSep) continue;
+      // 仅跳过表头后的分隔线；如果首行长得像分隔线也先保留，避免误删首行
+      if (isSep && rows.isNotEmpty) continue;
       // 保留所有单元格（包括尾部空单元格），用 null 占位以保持列对齐
       // 同时把 Obsidian wiki 链接 [[XXX]] 转换为 XXX
       final cols = trimmed.split('|').map((s) {
@@ -331,17 +332,22 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               ],
             ),
           ),
-          // 表格下方的 blockquote 等额外文字，宽度与表格总列宽一致
+          // 表格下方的 blockquote 等额外文字，放入横向滚动容器，避免宽表撑爆布局
           if (extraContent != null && extraContent.trim().isNotEmpty)
-            Container(
-              width: totalTableWidth,
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              child: Text(
-                extraContent,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                  height: 1.5,
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: totalTableWidth,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                  child: Text(
+                    extraContent,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      height: 1.5,
+                    ),
+                  ),
                 ),
               ),
             ),

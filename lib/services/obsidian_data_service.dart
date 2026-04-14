@@ -177,7 +177,7 @@ class ObsidianDataService {
       _addLog('DataService: Error loading application index: $e');
     }
     
-    // 加载产品配方（配方文件夹直接列出所有md文件，无需索引）
+    // 加载产品配方（通过 assets/产品配方.json 索引逐个加载）
     _addLog('DataService: Loading formulas from assets...');
     try {
       final formulaAssetPath = 'assets/产品配方';
