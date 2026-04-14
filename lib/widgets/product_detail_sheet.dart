@@ -40,6 +40,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   int _selectedFormulaIndex = 0;
   String? _selectedApplicationFormulaName;
 
+  List<ProductItem> _deduplicateFormulasByFileName(List<ProductItem> formulas) {
+    final unique = <String, ProductItem>{};
+    for (final formula in formulas) {
+      unique.putIfAbsent(formula.fileName, () => formula);
+    }
+    return unique.values.toList();
+  }
+
   bool _isWaterBasedProduct() {
     return widget.product.tags.any((tag) => tag.contains('水性'));
   }
@@ -140,6 +148,16 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       const double cellPaddingH = 16.0;
       const double colMinWidth = 80.0;
       const double scale = 2.0; // 2x 分辨率提升清晰度
+      final cs = Theme.of(context).colorScheme;
+      final backgroundColor = cs.surface;
+      final headerBackgroundColor = cs.surfaceContainerHigh;
+      final headerCellColor = cs.surfaceContainerHighest;
+      final borderColor = cs.outlineVariant;
+      final rowAltColor = cs.surfaceContainerLowest;
+      final titleColor = cs.secondary;
+      final headerTextColor = cs.primary;
+      final bodyTextColor = cs.onSurface;
+      final extraTextColor = cs.onSurfaceVariant;
 
       final header = rows.first;
       final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
@@ -158,7 +176,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       double titleHeight = 0;
       if (title.isNotEmpty) {
         final tp = TextPainter(
-          text: TextSpan(text: title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF9800))),
+          text: TextSpan(text: title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: titleColor)),
           textDirection: TextDirection.ltr,
         );
         tp.layout(maxWidth: totalWidth - 24);
@@ -168,7 +186,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       double extraHeight = 0;
       if (extraContent != null && extraContent.trim().isNotEmpty) {
         final tp = TextPainter(
-          text: TextSpan(text: extraContent, style: const TextStyle(fontSize: 12, height: 1.5)),
+          text: TextSpan(text: extraContent, style: TextStyle(fontSize: 12, height: 1.5, color: extraTextColor)),
           textDirection: TextDirection.ltr,
         );
         tp.layout(maxWidth: totalWidth - 24);
@@ -184,13 +202,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       // 背景
       canvas.drawRect(
         Rect.fromLTWH(0, 0, totalWidth, totalHeight),
-        Paint()..color = const Color(0xFF1E1E1E),
+        Paint()..color = backgroundColor,
       );
 
       // 绘制标题（wiki 链接已转换为普通文字）
       if (title.isNotEmpty) {
         final titlePainter = TextPainter(
-          text: TextSpan(text: title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF9800))),
+          text: TextSpan(text: title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: titleColor)),
           textDirection: TextDirection.ltr,
         );
         titlePainter.layout(maxWidth: totalWidth - 24);
@@ -200,7 +218,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       // 表头背景（表格从 titleHeight 开始）
       canvas.drawRect(
         Rect.fromLTWH(0, titleHeight, totalWidth, headerHeight),
-        Paint()..color = const Color(0xFF2D2D2D),
+        Paint()..color = headerBackgroundColor,
       );
 
       // 绘制表头（表格从 titleHeight 开始）
@@ -208,10 +226,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       for (int i = 0; i < colCount; i++) {
         canvas.drawRect(
           Rect.fromLTWH(x, titleHeight, colWidths[i], headerHeight),
-          Paint()..color = Colors.grey.shade800,
+          Paint()..color = headerCellColor,
         );
         _drawCell(canvas, header[i], x, titleHeight, colWidths[i], headerHeight,
-            const Color(0xFFFF9800), true);
+            headerTextColor, true);
         x += colWidths[i];
       }
 
@@ -222,13 +240,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         if (r.isOdd) {
           canvas.drawRect(
             Rect.fromLTWH(0, y, totalWidth, rowHeight),
-            Paint()..color = const Color(0xFF2A2A2A),
+            Paint()..color = rowAltColor,
           );
         }
         x = 0;
         for (int i = 0; i < colCount; i++) {
           _drawCell(canvas, i < row.length ? row[i] : '',
-              x, y, colWidths[i], rowHeight, const Color(0xFFB0B0B0), false);
+              x, y, colWidths[i], rowHeight, bodyTextColor, false);
           x += colWidths[i];
         }
       }
@@ -237,7 +255,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       canvas.drawRect(
         Rect.fromLTWH(0, 0, totalWidth, totalHeight),
         Paint()
-          ..color = Colors.grey.shade700
+          ..color = borderColor
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1,
       );
@@ -247,8 +265,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         final textPainter = TextPainter(
           text: TextSpan(
             text: extraContent,
-            style: const TextStyle(
-              color: Color(0xFFB0B0B0),
+            style: TextStyle(
+              color: extraTextColor,
               fontSize: 12,
               height: 1.5,
             ),
@@ -668,13 +686,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       if (widget.product.midCoat != null && widget.product.midCoat!.isNotEmpty) widget.product.midCoat!,
       if (widget.product.topCoat != null && widget.product.topCoat!.isNotEmpty) widget.product.topCoat!,
     };
-    return widget.formulas.where((f) => keys.contains(f.fileName.replaceAll('.md', ''))).toList();
+    final linked = widget.formulas.where((f) => keys.contains(f.fileName.replaceAll('.md', ''))).toList();
+    return _deduplicateFormulasByFileName(linked);
   }
 
   /// 查找并渲染关联的产品配方（文件名以产品牌号开头，如 RS7767-银.md 对应 RS7767）
   Widget _buildLinkedFormulas() {
     final cs = Theme.of(context).colorScheme;
-    final matchedFormulas = widget.formulas.where((f) {
+    final matchedFormulas = _deduplicateFormulasByFileName(widget.formulas.where((f) {
       // 精确匹配：配方文件名以产品牌号+"-"开头（如 RS7767-银.md 匹配产品 RS7767）
       // experimentalCode 可能指向另一个系列的产品牌号，仅在非空且有明确匹配时才使用
       final hasExperimentalCodeMatch =
@@ -683,7 +702,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           f.fileName.startsWith(widget.product.experimentalCode!);
       return f.fileName.startsWith(widget.product.fileName + '-') ||
           hasExperimentalCodeMatch;
-    }).toList();
+    }).toList());
 
     if (matchedFormulas.isEmpty) return const SizedBox.shrink();
 
@@ -695,11 +714,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     }
 
     // 多配方：下拉选择器
-    final items = matchedFormulas.map((f) {
+    final items = matchedFormulas.asMap().entries.map((entry) {
+      final index = entry.key;
+      final formula = entry.value;
       return DropdownMenuItem(
-        value: matchedFormulas.indexOf(f),
+        value: index,
         child: Text(
-          f.fileName.replaceAll('.md', ''),
+          formula.fileName.replaceAll('.md', ''),
           style: TextStyle(color: cs.onSurface, fontSize: 13),
         ),
       );
