@@ -6,14 +6,11 @@ on:
       - main
 
 jobs:
-  # ── Step 1: Bump version & push tag ──────────────────────────────────────────
-  version:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
+      pull-requests: write
 
     steps:
       - name: Checkout
@@ -21,6 +18,12 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.0"
+          channel: "stable"
 
       - name: Get latest version
         id: version
@@ -58,48 +61,40 @@ jobs:
           git tag ${{ steps.version.outputs.tag }}
           git push origin main --tags
 
-  # ── Step 2a: Android APK ─────────────────────────────────────────────────────
-  android:
-    needs: version
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.24.0"
-          channel: "stable"
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Restore signing config
         run: |
+          # 还原 keystore 文件
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/rst_flutter.jks
+          # 生成 key.properties
           cat > android/key.properties << 'KEYEOF'
           storePassword=${{ secrets.KEYSTORE_STORE_PASSWORD }}
           keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}
           keyAlias=${{ secrets.KEYSTORE_KEY_ALIAS }}
           storeFile=rst_flutter.jks
           KEYEOF
+          cat android/key.properties
 
       - name: Get Flutter dependencies
         run: flutter pub get
 
       - name: Fetch latest data from Rstone
         run: |
+          # Clone Rstone repo to temporary directory
           git clone --depth 1 https://github.com/Mehael-Yeh/Rstone.git ../rstone_data
+
+          # Recreate assets directories and copy .md files
           mkdir -p assets/产品列表 assets/产品应用 assets/产品配方
           cp ../rstone_data/产品列表/*.md assets/产品列表/
           cp ../rstone_data/产品应用/*.md assets/产品应用/
           cp ../rstone_data/产品配方/*.md assets/产品配方/
+
+          # Generate JSON index files (array of .md filenames, one per line format)
           python3 -c "
           import os, json
+
           for folder, jsonfile in [
               ('产品列表', 'assets/产品列表.json'),
               ('产品应用', 'assets/产品应用.json'),
@@ -110,193 +105,38 @@ jobs:
                   json.dump(files, f, ensure_ascii=False, indent=2)
               print(f'{folder}: {len(files)} files')
           "
+
           echo "Done. Assets updated from Rstone."
 
       - name: Build Release APK (Android)
         run: |
           flutter build apk --release --split-per-abi
+          # 重命名为 RSTONE-{version}-{abi}-release.apk
           cd build/app/outputs/flutter-apk
           for apk in app-*-release.apk; do
             case "$apk" in
               app-armeabi-v7a-release.apk)  ABI=armeabi-v7a ;;
               app-arm64-v8a-release.apk)    ABI=arm64-v8a ;;
-              app-x86_64-release.apk)       ABI=x86_64 ;;
+              app-x86_64-release.apk)         ABI=x86_64 ;;
             esac
-            mv "$apk" "RSTONE-${{ needs.version.outputs.tag }}-${ABI}-release.apk"
+            mv "$apk" "RSTONE-${{ steps.version.outputs.tag }}-${ABI}-release.apk"
           done
-
-      - name: Upload Android Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-apks
-          path: build/app/outputs/flutter-apk/RSTONE-${{ needs.version.outputs.tag }}-*-release.apk
-
-  # ── Step 2b: Windows .exe ─────────────────────────────────────────────────────
-  windows:
-    needs: version
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.24.0"
-          channel: "stable"
-
-      - name: Enable Windows desktop
-        run: flutter config --enable-windows-desktop
-
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
-      - name: Fetch latest data from Rstone
-        shell: bash
-        run: |
-          git clone --depth 1 https://github.com/Mehael-Yeh/Rstone.git ../rstone_data
-          mkdir -p assets/产品列表 assets/产品应用 assets/产品配方
-          cp ../rstone_data/产品列表/*.md assets/产品列表/
-          cp ../rstone_data/产品应用/*.md assets/产品应用/
-          cp ../rstone_data/产品配方/*.md assets/产品配方/
-          python3 -c "
-          import os, json
-          for folder, jsonfile in [
-              ('产品列表', 'assets/产品列表.json'),
-              ('产品应用', 'assets/产品应用.json'),
-              ('产品配方', 'assets/产品配方.json'),
-          ]:
-              files = sorted([f for f in os.listdir(f'assets/{folder}') if f.endswith('.md')])
-              with open(jsonfile, 'w') as f:
-                  json.dump(files, f, ensure_ascii=False, indent=2)
-              print(f'{folder}: {len(files)} files')
-          "
-          echo "Done. Assets updated from Rstone."
-
-      - name: Build Windows executable
-        run: |
-          flutter build windows --release
-          cd build/windows/runner/Release
-          Compress-Archive -Path * -DestinationPath "RSTONE-${{ needs.version.outputs.tag }}-windows-release.zip"
           ls -la
 
-      - name: Upload Windows Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-exe
-          path: build/windows/runner/Release/RSTONE-${{ needs.version.outputs.tag }}-windows-release.zip
-
-  # ── Step 2c: iOS .ipa ─────────────────────────────────────────────────────────
-  ios:
-    needs: version
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.24.0"
-          channel: "stable"
-
-      - name: Enable iOS desktop
-        run: flutter config --enable-ios
-
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
-      - name: Fetch latest data from Rstone
-        run: |
-          git clone --depth 1 https://github.com/Mehael-Yeh/Rstone.git ../rstone_data
-          mkdir -p assets/产品列表 assets/产品应用 assets/产品配方
-          cp ../rstone_data/产品列表/*.md assets/产品列表/
-          cp ../rstone_data/产品应用/*.md assets/产品应用/
-          cp ../rstone_data/产品配方/*.md assets/产品配方/
-          python3 -c "
-          import os, json
-          for folder, jsonfile in [
-              ('产品列表', 'assets/产品列表.json'),
-              ('产品应用', 'assets/产品应用.json'),
-              ('产品配方', 'assets/产品配方.json'),
-          ]:
-              files = sorted([f for f in os.listdir(f'assets/{folder}') if f.endswith('.md')])
-              with open(jsonfile, 'w') as f:
-                  json.dump(files, f, ensure_ascii=False, indent=2)
-              print(f'{folder}: {len(files)} files')
-          "
-          echo "Done. Assets updated from Rstone."
-
-      - name: Install Apple Certificates
-        uses: apple-actions/import-codesign-certs@v2
-        with:
-          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_P12 }}
-          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-
-      - name: Provisioning Profile
-        env:
-          BUILD_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
-        run: |
-          echo "$BUILD_PROVISIONING_PROFILE" | base64 --decode -o build/ios/ProfileDistribution.mobileprovision
-
-      - name: Build iOS (ipa)
-        run: |
-          flutter build ios --release --no-codesign
-          cd build/ios/ipa
-          ls -la
-
-      - name: Upload iOS Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-ipa
-          path: build/ios/ipa/*.ipa
-
-  # ── Step 3: Create GitHub Release (upload all artifacts) ────────────────────
-  release:
-    needs: [version, android, windows, ios]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: List artifacts
-        run: |
-          find artifacts -type f | sort
-          echo "---"
-          ls -la artifacts/*/ 2>/dev/null || true
-
-      - name: Upload to GitHub Release
+      - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.version.outputs.tag }}
-          name: Alpha ${{ needs.version.outputs.tag }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Alpha ${{ steps.version.outputs.tag }}
           body: |
             ## Alpha Pre-release
-            自动构建版本: `${{ needs.version.outputs.tag }}`
+            自动构建版本: `${{ steps.version.outputs.tag }}`
             - 提交: `${{ github.sha }}`
             - 构建时间: `${{ github.event.head_commit.timestamp }}`
           files: |
-            artifacts/android-apks/RSTONE-${{ needs.version.outputs.tag }}-armeabi-v7a-release.apk
-            artifacts/android-apks/RSTONE-${{ needs.version.outputs.tag }}-arm64-v8a-release.apk
-            artifacts/android-apks/RSTONE-${{ needs.version.outputs.tag }}-x86_64-release.apk
-            artifacts/windows-exe/RSTONE-${{ needs.version.outputs.tag }}-windows-release.zip
-            artifacts/ios-ipa/*.ipa
+            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-x86_64-release.apk
           prerelease: true
           generate_release_notes: true
         env:
