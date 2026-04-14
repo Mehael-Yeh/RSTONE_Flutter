@@ -173,13 +173,15 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 捕获模式下不使用水平滚动，让表格展开到完整宽度
-          if (_isCapturing)
-            Column(
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 表头行
                 _buildTableRow(header, colWidths, headerHeight, true, cellHPadding,
                     headerBg, headerText, borderColor),
+                // 数据行
                 for (int ri = 0; ri < dataRows.length; ri++)
                   _buildTableRow(
                     dataRows[ri].length >= colCount
@@ -189,28 +191,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                     ri.isOdd ? rowAlt : rowBg, cellText, borderColor,
                   ),
               ],
-            )
-          else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 表头行
-                  _buildTableRow(header, colWidths, headerHeight, true, cellHPadding,
-                      headerBg, headerText, borderColor),
-                  // 数据行
-                  for (int ri = 0; ri < dataRows.length; ri++)
-                    _buildTableRow(
-                      dataRows[ri].length >= colCount
-                          ? dataRows[ri].take(colCount).toList()
-                          : List.generate(colCount, (i) => i < dataRows[ri].length ? dataRows[ri][i] : ''),
-                      colWidths, rowHeight, false, cellHPadding,
-                      ri.isOdd ? rowAlt : rowBg, cellText, borderColor,
-                    ),
-                ],
-              ),
             ),
+          ),
           // 表格下方的 blockquote 等额外文字，宽度与表格总列宽一致
           if (extraContent != null && extraContent.trim().isNotEmpty)
             Container(
@@ -502,6 +484,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       key: _formulaCardKey,
       child: Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      clipBehavior: _isCapturing ? Clip.none : Clip.hardEdge,
       decoration: BoxDecoration(
         color: const Color(0xFF2D2D2D),
         borderRadius: BorderRadius.circular(12),
@@ -533,7 +516,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   tooltip: '分享表格',
                   onPressed: () async {
                     setState(() => _isCapturing = true);
-                    await Future.delayed(const Duration(milliseconds: 50));
                     await _shareCardAsImage(title);
                     if (mounted) setState(() => _isCapturing = false);
                   },
