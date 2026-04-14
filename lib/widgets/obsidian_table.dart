@@ -4,30 +4,15 @@ import '../models/product_item.dart';
 import 'product_detail_sheet.dart';
 
 /// Obsidian 风格的表格组件，支持列拖拽重排和排序
-/// 
-/// 支持两种视图模式：
-/// - 移动端：卡片式列表展示
-/// - 桌面端：完整表格展示
-/// 
-/// 用户可点击表头进行升序/降序切换，也可编辑列的显示顺序。
 class ObsidianTable extends StatefulWidget {
-  /// 数据项列表
   final List<ProductItem> items;
-  /// 配方列表（用于详情弹窗）
   final List<ProductItem> formulas;
-  /// 默认显示的列
   final List<String> defaultColumns;
-  /// 是否为移动端视图
   final bool isMobile;
-  /// 列顺序变更回调
   final Function(List<String>) onColumnsChanged;
-  /// 排序列变更回调
   final Function(String?) onSortChanged;
-  /// 排序方向变更回调
   final Function(bool) onSortDirectionChanged;
-  /// 当前排序列
   final String? currentSortColumn;
-  /// 是否降序
   final bool sortDescending;
 
   const ObsidianTable({
@@ -48,9 +33,9 @@ class ObsidianTable extends StatefulWidget {
 }
 
 class _ObsidianTableState extends State<ObsidianTable> {
-  /// 当前显示的列顺序
+  /// 当前可见列顺序（可拖拽重排）。
   late List<String> _columns;
-  /// 是否处于列编辑模式
+  /// 是否进入列编辑模式。
   bool _isEditingColumns = false;
 
   @override
@@ -59,115 +44,42 @@ class _ObsidianTableState extends State<ObsidianTable> {
     _columns = List.from(widget.defaultColumns);
   }
 
-  /// 显示排序选择底部弹窗
-  void _showSortMenu() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF2D2D2D),
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  '选择排序列',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const Divider(color: Colors.grey),
-              ..._columns.map((col) {
-                final isSelected = col == widget.currentSortColumn;
-                return ListTile(
-                  title: Text(
-                    col,
-                    style: TextStyle(
-                      color: isSelected ? Colors.orange : Colors.white,
-                    ),
-                  ),
-                  trailing: isSelected
-                      ? Icon(
-                          widget.sortDescending
-                              ? Icons.arrow_downward
-                              : Icons.arrow_upward,
-                          color: Colors.orange,
-                        )
-                      : null,
-                  onTap: () {
-                    if (isSelected) {
-                      // 已选中的列再次点击则切换排序方向
-                      widget.onSortDirectionChanged(!widget.sortDescending);
-                    } else {
-                      widget.onSortChanged(col);
-                    }
-                    Navigator.pop(context);
-                  },
-                );
-              }),
-              if (widget.currentSortColumn != null)
-                ListTile(
-                  title: const Text(
-                    '清除排序',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                  onTap: () {
-                    widget.onSortChanged(null);
-                    Navigator.pop(context);
-                  },
-                ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  /// 进入列编辑模式
   void _showColumnEditor() {
-    setState(() {
-      _isEditingColumns = true;
-    });
+    setState(() => _isEditingColumns = true);
   }
 
-  /// 保存新的列顺序
   void _saveColumnOrder(List<String> newColumns) {
     setState(() {
+      // 同步本地状态并通过回调持久化到偏好设置。
       _columns = newColumns;
       _isEditingColumns = false;
       widget.onColumnsChanged(newColumns);
     });
   }
 
-  /// 获取排序后的数据列表
   List<ProductItem> _getSortedItems() {
+    // 无排序列时直接返回原始数据，避免额外拷贝。
     if (widget.currentSortColumn == null) return widget.items;
-    
+
     final sortCol = widget.currentSortColumn!;
     final sorted = List<ProductItem>.from(widget.items);
-    
+
     sorted.sort((a, b) {
-      final aFields = a.getTableFields();
-      final bFields = b.getTableFields();
-      
-      final aVal = aFields[sortCol] ?? '';
-      final bVal = bFields[sortCol] ?? '';
-      
+      final aVal = a.getTableFields()[sortCol] ?? '';
+      final bVal = b.getTableFields()[sortCol] ?? '';
       final result = aVal.compareTo(bVal);
       return widget.sortDescending ? -result : result;
     });
-    
+
     return sorted;
+  }
+
+  bool _isWaterBased(ProductItem item) {
+    return item.tags.any((t) => t.contains('水性'));
   }
 
   @override
   Widget build(BuildContext context) {
-    // 列编辑模式和表格展示模式二选一
     if (_isEditingColumns) {
       return _buildColumnEditor();
     }
@@ -175,16 +87,18 @@ class _ObsidianTableState extends State<ObsidianTable> {
   }
 
   Widget _buildColumnEditor() {
+    final cs = Theme.of(context).colorScheme;
+
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(16),
-          color: const Color(0xFF2D2D2D),
+          color: cs.surfaceContainer,
           child: Row(
             children: [
-              const Text(
+              Text(
                 '拖动调整列顺序',
-                style: TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: cs.onSurface, fontSize: 16),
               ),
               const Spacer(),
               TextButton(
@@ -192,17 +106,15 @@ class _ObsidianTableState extends State<ObsidianTable> {
                 child: const Text('取消'),
               ),
               const SizedBox(width: 8),
-              ElevatedButton(
+              FilledButton(
                 onPressed: () => _saveColumnOrder(_columns),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                ),
                 child: const Text('保存'),
               ),
             ],
           ),
         ),
         Expanded(
+          // ReorderableWrap 支持拖拽后自动换行，适合移动端窄屏。
           child: ReorderableWrap(
             spacing: 8,
             runSpacing: 8,
@@ -219,19 +131,16 @@ class _ObsidianTableState extends State<ObsidianTable> {
                 key: ValueKey(col),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3D3D3D),
+                  color: cs.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                  border: Border.all(color: cs.outlineVariant),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      col,
-                      style: const TextStyle(color: Colors.white),
-                    ),
+                    Text(col, style: TextStyle(color: cs.onSurface)),
                     const SizedBox(width: 8),
-                    const Icon(Icons.drag_handle, color: Colors.grey, size: 20),
+                    Icon(Icons.drag_handle, color: cs.onSurfaceVariant, size: 20),
                   ],
                 ),
               );
@@ -243,22 +152,22 @@ class _ObsidianTableState extends State<ObsidianTable> {
   }
 
   Widget _buildTable() {
+    final cs = Theme.of(context).colorScheme;
     final sortedItems = _getSortedItems();
-    
-    // 移动端简化显示
+
     if (widget.isMobile) {
+      // 移动端使用卡片化信息密度，提升触控可读性。
       return ListView.builder(
         itemCount: sortedItems.length,
         itemBuilder: (context, index) {
           final item = sortedItems[index];
           final fields = item.getTableFields();
-          
+
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            color: const Color(0xFF2D2D2D),
             child: InkWell(
               onTap: () => ProductDetailSheet.show(context, item, formulas: widget.formulas),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
@@ -266,17 +175,40 @@ class _ObsidianTableState extends State<ObsidianTable> {
                   children: [
                     Row(
                       children: [
+                        Container(
+                          width: 4,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: item.folder == '产品列表'
+                                ? (_isWaterBased(item)
+                                    ? Colors.blue.shade400
+                                    : Colors.orange.shade400)
+                                : cs.primary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             fields[_columns.first] ?? item.displayName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                            style: TextStyle(
+                              color: cs.onSurface,
+                              fontWeight: FontWeight.w700,
                               fontSize: 16,
                             ),
                           ),
                         ),
-                        const Icon(Icons.chevron_right, color: Colors.grey),
+                        if (item.folder == '产品列表')
+                          Chip(
+                            visualDensity: VisualDensity.compact,
+                            label: Text(_isWaterBased(item) ? '水性' : '油性'),
+                            backgroundColor: (_isWaterBased(item)
+                                    ? Colors.blue
+                                    : Colors.orange)
+                                .withOpacity(0.18),
+                            side: BorderSide.none,
+                          ),
+                        Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
                       ],
                     ),
                     if (_columns.length > 1) ...[
@@ -290,12 +222,12 @@ class _ObsidianTableState extends State<ObsidianTable> {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.grey[800],
-                              borderRadius: BorderRadius.circular(4),
+                              color: cs.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               '$col: $val',
-                              style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                             ),
                           );
                         }).toList(),
@@ -309,13 +241,12 @@ class _ObsidianTableState extends State<ObsidianTable> {
         },
       );
     }
-    
-    // 桌面端完整表格
+
     return Column(
       children: [
-        // 表头
+        // 桌面端表头：支持点击列名切换排序方向。
         Container(
-          color: const Color(0xFF2D2D2D),
+          color: cs.surfaceContainer,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Row(
             children: [
@@ -337,7 +268,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                           Text(
                             col,
                             style: TextStyle(
-                              color: isSorted ? Colors.orange : Colors.white,
+                              color: isSorted ? cs.primary : cs.onSurface,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -348,7 +279,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                   ? Icons.arrow_downward
                                   : Icons.arrow_upward,
                               size: 14,
-                              color: Colors.orange,
+                              color: cs.primary,
                             ),
                           ],
                         ],
@@ -358,44 +289,59 @@ class _ObsidianTableState extends State<ObsidianTable> {
                 );
               }),
               IconButton(
-                icon: const Icon(Icons.edit, color: Colors.grey, size: 20),
+                icon: Icon(Icons.edit, color: cs.onSurfaceVariant, size: 20),
                 onPressed: _showColumnEditor,
                 tooltip: '编辑列',
               ),
             ],
           ),
         ),
-        const Divider(height: 1, color: Colors.grey),
-        // 表格内容
+        Divider(height: 1, color: cs.outlineVariant),
         Expanded(
+          // 表格主体使用斑马纹分层，增强长列表扫描效率。
           child: ListView.builder(
             itemCount: sortedItems.length,
             itemBuilder: (context, index) {
               final item = sortedItems[index];
               final fields = item.getTableFields();
-              
+
               return InkWell(
                 onTap: () => ProductDetailSheet.show(context, item, formulas: widget.formulas),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                   decoration: BoxDecoration(
-                    color: index % 2 == 0
-                        ? const Color(0xFF1E1E1E)
-                        : const Color(0xFF252525),
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey[800]!),
-                    ),
+                    color: index.isEven ? cs.surface : cs.surfaceContainerLowest,
+                    border: Border(bottom: BorderSide(color: cs.outlineVariant)),
                   ),
                   child: Row(
                     children: _columns.map((col) {
                       final val = fields[col] ?? '';
                       return Expanded(
-                        child: Text(
-                          val,
-                          style: TextStyle(
-                            color: val.isEmpty ? Colors.grey[600] : Colors.white70,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          children: [
+                            if (col == _columns.first && item.folder == '产品列表') ...[
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: _isWaterBased(item)
+                                      ? Colors.blue.shade400
+                                      : Colors.orange.shade400,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            Expanded(
+                              child: Text(
+                                val,
+                                style: TextStyle(
+                                  color: val.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     }).toList(),
