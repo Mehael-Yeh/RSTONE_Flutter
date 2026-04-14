@@ -261,12 +261,27 @@ class ObsidianDataService {
   /// 返回匹配的产品和应用列表
   List<ProductItem> search(String query) {
     if (query.isEmpty) return [];
-    
-    final keywords = query
-        .toLowerCase()
+
+    final normalizedQuery = query.toLowerCase().trim();
+    final keywords = normalizedQuery
         .split(RegExp(r'\s+'))
         .where((k) => k.isNotEmpty)
         .toList();
+
+    if (keywords.length <= 1) {
+      // 未使用空格时，额外按“中文片段 + 英文数字片段”拆分，
+      // 例如：水性PU / PU水性 → [水性, pu]
+      final segmented = RegExp(r'[\u4e00-\u9fff]+|[a-z0-9]+')
+          .allMatches(normalizedQuery)
+          .map((m) => m.group(0) ?? '')
+          .where((k) => k.isNotEmpty)
+          .toList();
+      if (segmented.length > 1) {
+        keywords
+          ..clear()
+          ..addAll(segmented);
+      }
+    }
     
     if (keywords.isEmpty) return [];
     
