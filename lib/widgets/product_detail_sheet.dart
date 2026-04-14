@@ -237,12 +237,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
       final pngBytes = byteData.buffer.asUint8List();
       final tempDir = await getTemporaryDirectory();
-      final fileName = '${title.replaceAll('配方：', '').replaceAll(' ', '_')}.png';
+      final safeTitle = title.replaceAll('配方：', '').replaceAll(RegExp(r'[\\/:*?"<>|\\s]+'), '_');
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = '${safeTitle}_$timestamp.png';
       final file = File('${tempDir.path}/$fileName');
-      await file.writeAsBytes(pngBytes);
+      await file.writeAsBytes(pngBytes, flush: true);
 
       await Share.shareXFiles(
-        [XFile(file.path)],
+        [XFile(file.path, mimeType: 'image/png', name: fileName)],
         subject: '$title - 锐石 RSTONE',
       );
     } catch (e) {
