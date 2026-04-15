@@ -9,10 +9,10 @@ import 'widgets/product_detail_sheet.dart';
 
 /// 应用入口函数
 void main() async {
-  // 确保 Flutter 绑定已初始化（异步操作的前置条件）
+  // 确保在执行异步初始化前完成 Flutter 引擎绑定。
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // 设置状态栏样式：透明背景、白色图标
+
+  // 统一系统状态栏样式，避免页面切换时出现亮暗不一致。
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -20,24 +20,22 @@ void main() async {
     ),
   );
 
-  // 初始化数据服务
-  // - dataService: 负责从 Asset 加载产品/应用/配方数据
-  // - preferencesService: 负责用户偏好设置（如列排序、列顺序）的持久化
   final dataService = ObsidianDataService();
   final preferencesService = PreferencesService();
-  
+
+  // 应用启动阶段完成本地偏好和静态资源数据初始化。
   await preferencesService.initialize();
   await dataService.initialize();
 
-  // 启动应用
+  // 初始化完成后再挂载根组件，避免首帧出现空数据状态抖动。
   runApp(RstoneApp(
     dataService: dataService,
     preferencesService: preferencesService,
   ));
 }
 
-/// 根组件 - 应用级主题配置
-class RstoneApp extends StatelessWidget {
+/// 根组件 - 应用级 MD3 主题配置
+class RstoneApp extends StatefulWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
 
@@ -48,49 +46,120 @@ class RstoneApp extends StatelessWidget {
   });
 
   @override
+  State<RstoneApp> createState() => _RstoneAppState();
+}
+
+class _RstoneAppState extends State<RstoneApp> {
+  late ThemeMode _themeMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _themeMode = _themeModeFromString(widget.preferencesService.getThemeMode());
+  }
+
+  ThemeMode _themeModeFromString(String mode) {
+    switch (mode) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  String _themeModeToString(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'light';
+      case ThemeMode.dark:
+        return 'dark';
+      case ThemeMode.system:
+        return 'system';
+    }
+  }
+
+  Future<void> _updateThemeMode(ThemeMode mode) async {
+    setState(() => _themeMode = mode);
+    await widget.preferencesService.saveThemeMode(_themeModeToString(mode));
+  }
+
+  ThemeData _buildTheme(Brightness brightness) {
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFFFF8A00),
+      brightness: brightness,
+    );
+    return ThemeData(
+      // 启用 Material Design 3 组件行为与样式。
+      useMaterial3: true,
+      brightness: brightness,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: colorScheme.surface,
+      appBarTheme: AppBarTheme(
+        centerTitle: true,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+      ),
+      // Flutter 3.24 使用 CardTheme（而非 CardThemeData）。
+      cardTheme: CardTheme(
+        elevation: 0,
+        color: colorScheme.surfaceContainer,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        // 底部导航使用低层级容器色，保证与内容区域层级分离。
+        backgroundColor: colorScheme.surfaceContainerLow,
+        indicatorColor: colorScheme.secondaryContainer,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          );
+        }),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: colorScheme.inverseSurface,
+        contentTextStyle: TextStyle(color: colorScheme.onInverseSurface),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '锐石 RSTONE',
       debugShowCheckedModeBanner: false,
-      // 深色主题配置
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: Colors.orange,
-        // 整体背景色：深灰黑色
-        scaffoldBackgroundColor: const Color(0xFF1A1A1A),
-        // 导航栏背景色
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF2D2D2D),
-          foregroundColor: Colors.white,
-        ),
-        // 卡片背景色
-        cardTheme: const CardTheme(
-          color: Color(0xFF2D2D2D),
-        ),
-        // 颜色方案：主色调橙色
-        colorScheme: ColorScheme.dark(
-          primary: Colors.orange,
-          secondary: Colors.orange[700]!,
-        ),
-      ),
+      theme: _buildTheme(Brightness.light),
+      darkTheme: _buildTheme(Brightness.dark),
+      themeMode: _themeMode,
       home: MainScreen(
-        dataService: dataService,
-        preferencesService: preferencesService,
+        dataService: widget.dataService,
+        preferencesService: widget.preferencesService,
+        onThemeModeChanged: _updateThemeMode,
+        themeMode: _themeMode,
       ),
     );
   }
 }
 
-/// 主屏幕 - 底部导航容器
-/// 包含三个主要页面：搜索、产品列表、产品应用
 class MainScreen extends StatefulWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
+  final Future<void> Function(ThemeMode) onThemeModeChanged;
+  final ThemeMode themeMode;
 
   const MainScreen({
     super.key,
     required this.dataService,
     required this.preferencesService,
+    required this.onThemeModeChanged,
+    required this.themeMode,
   });
 
   @override
@@ -98,44 +167,41 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  /// 当前选中的导航索引
+  /// 当前底部导航索引。
   int _currentIndex = 0;
-
-  /// 页面列表（延迟初始化，避免在 initState 中创建复杂的 StatefulWidget）
-  late final List<Widget> _pages;
-
-  @override
-  void initState() {
-    super.initState();
-    _pages = [
-      // 搜索页面（首页）
-      SearchPage(dataService: widget.dataService),
-      // 产品列表页面
-      ProductListPage(
-        dataService: widget.dataService,
-        preferencesService: widget.preferencesService,
-      ),
-      // 产品应用页面
-      ProductApplicationsPage(
-        dataService: widget.dataService,
-        preferencesService: widget.preferencesService,
-      ),
-    ];
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // IndexedStack 保持页面状态，只切换显示而不重建
+      // 切换 tab 时保留页面滚动位置和内部状态。
       body: IndexedStack(
         index: _currentIndex,
-        children: _pages,
+        children: [
+          SearchPage(
+            dataService: widget.dataService,
+            preferencesService: widget.preferencesService,
+            onThemeModeChanged: widget.onThemeModeChanged,
+            themeMode: widget.themeMode,
+          ),
+          ProductListPage(
+            dataService: widget.dataService,
+            preferencesService: widget.preferencesService,
+          ),
+          ProductApplicationsPage(
+            dataService: widget.dataService,
+            preferencesService: widget.preferencesService,
+          ),
+        ],
       ),
-      // 底部导航栏
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: Color(0xFF3D3D3D), width: 1),
+      bottomNavigationBar: NavigationBar(
+        // MD3 导航栏：采用目的地（destination）模型。
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) => setState(() => _currentIndex = index),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.search_outlined),
+            selectedIcon: Icon(Icons.search),
+            label: '搜索',
           ),
         ),
         child: BottomNavigationBar(

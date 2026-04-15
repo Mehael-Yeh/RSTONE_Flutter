@@ -1,13 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
 import '../services/obsidian_data_service.dart';
+import '../services/preferences_service.dart';
 
-/// 设置页面
+/// 设置页面（MD3）
 class SettingsPage extends StatefulWidget {
   final ObsidianDataService dataService;
+  final PreferencesService preferencesService;
+  final ThemeMode themeMode;
+  final Future<void> Function(ThemeMode) onThemeModeChanged;
 
-  const SettingsPage({super.key, required this.dataService});
+  const SettingsPage({
+    super.key,
+    required this.dataService,
+    required this.preferencesService,
+    required this.themeMode,
+    required this.onThemeModeChanged,
+  });
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -15,10 +28,12 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   String _appVersion = '...';
+  late ThemeMode _selectedThemeMode;
 
   @override
   void initState() {
     super.initState();
+    _selectedThemeMode = widget.themeMode;
     _loadVersion();
   }
 
@@ -27,242 +42,178 @@ class _SettingsPageState extends State<SettingsPage> {
     if (mounted) setState(() => _appVersion = 'v${pkg.version}');
   }
 
+  Future<void> _onThemeChanged(ThemeMode mode) async {
+    setState(() => _selectedThemeMode = mode);
+    await widget.onThemeModeChanged(mode);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF2D2D2D),
-        title: const Text(
-          '设置',
-          style: TextStyle(color: Colors.white),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      appBar: AppBar(title: const Text('设置')),
       body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          // 数据统计
-          _buildSection(
+          _buildSectionCard(
+            title: '外观',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '主题模式',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                SegmentedButton<ThemeMode>(
+                  segments: const [
+                    ButtonSegment<ThemeMode>(
+                      value: ThemeMode.system,
+                      label: Text('自动'),
+                      icon: Icon(Icons.brightness_auto),
+                    ),
+                    ButtonSegment<ThemeMode>(
+                      value: ThemeMode.light,
+                      label: Text('浅色'),
+                      icon: Icon(Icons.light_mode),
+                    ),
+                    ButtonSegment<ThemeMode>(
+                      value: ThemeMode.dark,
+                      label: Text('深色'),
+                      icon: Icon(Icons.dark_mode),
+                    ),
+                  ],
+                  selected: {_selectedThemeMode},
+                  onSelectionChanged: (selection) {
+                    if (selection.isNotEmpty) {
+                      _onThemeChanged(selection.first);
+                    }
+                  },
+                  showSelectedIcon: false,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
             title: '数据统计',
-            children: [
-              _buildInfoTile(
-                icon: Icons.inventory_2,
-                title: '产品数量',
-                value: '${widget.dataService.products.length}',
-              ),
-              _buildInfoTile(
-                icon: Icons.apps,
-                title: '应用数量',
-                value: '${widget.dataService.applications.length}',
-              ),
-              _buildInfoTile(
-                icon: Icons.check_circle,
-                title: '初始化状态',
-                value: widget.dataService.isInitialized ? '已完成' : '未完成',
-              ),
-            ],
+            child: Column(
+              children: [
+                _buildInfoTile(icon: Icons.inventory_2, title: '产品数量', value: '${widget.dataService.products.length}'),
+                _buildInfoTile(icon: Icons.apps, title: '应用数量', value: '${widget.dataService.applications.length}'),
+                _buildInfoTile(
+                  icon: Icons.check_circle,
+                  title: '初始化状态',
+                  value: widget.dataService.isInitialized ? '已完成' : '未完成',
+                ),
+              ],
+            ),
           ),
-          
-          // 日志功能
-          _buildSection(
+          const SizedBox(height: 12),
+          _buildSectionCard(
             title: '日志',
-            children: [
-              ListTile(
-                leading: const Icon(Icons.list_alt, color: Colors.orange),
-                title: const Text(
-                  '查看日志',
-                  style: TextStyle(color: Colors.white),
-                ),
-                subtitle: Text(
-                  '${widget.dataService.logs.length} 条日志',
-                  style: TextStyle(color: Colors.grey[500]),
-                ),
-                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => LogViewerPage(dataService: widget.dataService),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.copy, color: Colors.orange),
-                title: const Text(
-                  '复制日志',
-                  style: TextStyle(color: Colors.white),
-                ),
-                subtitle: Text(
-                  '复制所有日志到剪贴板',
-                  style: TextStyle(color: Colors.grey[500]),
-                ),
-                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                onTap: () {
-                  final logs = widget.dataService.logs.join('\n');
-                  Clipboard.setData(ClipboardData(text: logs));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('日志已复制到剪贴板'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text(
-                  '清除日志',
-                  style: TextStyle(color: Colors.white),
-                ),
-                subtitle: Text(
-                  '清空所有日志记录',
-                  style: TextStyle(color: Colors.grey[500]),
-                ),
-                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      backgroundColor: const Color(0xFF2D2D2D),
-                      title: const Text(
-                        '确认清除',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      content: const Text(
-                        '确定要清除所有日志吗？',
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('取消'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            widget.dataService.clearLogs();
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('日志已清除'),
-                                backgroundColor: Colors.orange,
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                          ),
-                          child: const Text('清除'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-          
-          // 数据管理
-          _buildSection(
-            title: '数据管理',
-            children: [
-              ListTile(
-                leading: const Icon(Icons.refresh, color: Colors.orange),
-                title: const Text(
-                  '重新加载数据',
-                  style: TextStyle(color: Colors.white),
-                ),
-                subtitle: Text(
-                  '从内置资源重新加载产品数据',
-                  style: TextStyle(color: Colors.grey[500]),
-                ),
-                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                onTap: () async {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => const AlertDialog(
-                      backgroundColor: Color(0xFF2D2D2D),
-                      content: Row(
-                        children: [
-                          CircularProgressIndicator(color: Colors.orange),
-                          SizedBox(width: 20),
-                          Text(
-                            '正在重新加载...',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                  
-                  await widget.dataService.clearData();
-                  await widget.dataService.initialize();
-                  
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('重新加载完成！产品: ${widget.dataService.products.length}, 应用: ${widget.dataService.applications.length}'),
-                        backgroundColor: Colors.green,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.list_alt),
+                  title: const Text('查看日志'),
+                  subtitle: Text('${widget.dataService.logs.length} 条日志'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LogViewerPage(dataService: widget.dataService),
                       ),
                     );
-                  }
-                },
-              ),
-            ],
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.copy_all),
+                  title: const Text('复制日志'),
+                  subtitle: const Text('复制所有日志到剪贴板'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    final logs = widget.dataService.logs.join('\n');
+                    Clipboard.setData(ClipboardData(text: logs));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('日志已复制到剪贴板')),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.delete_outline, color: cs.error),
+                  title: const Text('清除日志'),
+                  subtitle: const Text('清空所有日志记录'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _confirmClearLogs,
+                ),
+              ],
+            ),
           ),
-          
-          // 关于
-          _buildSection(
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            title: '产品笔记',
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.file_download_outlined),
+                  title: const Text('导出产品笔记'),
+                  subtitle: const Text('导出 Markdown 文件用于提报'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _exportProductNotes,
+                ),
+                ListTile(
+                  leading: Icon(Icons.delete_sweep_outlined, color: cs.error),
+                  title: const Text('清除所有产品笔记'),
+                  subtitle: const Text('清空全部项目反馈记录'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _confirmClearAllProductNotes,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
             title: '关于',
-            children: [
-              _buildInfoTile(
-                icon: Icons.info_outline,
-                title: '版本',
-                value: _appVersion,
-              ),
-              _buildInfoTile(
-                icon: Icons.diamond,
-                title: '应用名称',
-                value: '锐石 / RSTONE',
-              ),
-              _buildInfoTile(
-                icon: Icons.code,
-                title: '技术栈',
-                value: 'Flutter 3.24',
-              ),
-            ],
+            child: Column(
+              children: [
+                _buildInfoTile(icon: Icons.info_outline, title: '版本', value: _appVersion),
+                _buildInfoTile(icon: Icons.diamond, title: '应用名称', value: '锐石 / RSTONE'),
+                _buildInfoTile(icon: Icons.code, title: '技术栈', value: 'Flutter 3.24'),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSection({required String title, required List<Widget> children}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            title,
-            style: TextStyle(
-              color: Colors.orange[300],
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+  Widget _buildSectionCard({required String title, required Widget child}) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 2, 4, 8),
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
             ),
-          ),
+            child,
+          ],
         ),
-        Container(
-          color: const Color(0xFF2D2D2D),
-          child: Column(children: children),
-        ),
-      ],
+      ),
     );
   }
 
@@ -272,20 +223,108 @@ class _SettingsPageState extends State<SettingsPage> {
     required String value,
   }) {
     return ListTile(
-      leading: Icon(icon, color: Colors.orange),
-      title: Text(
-        title,
-        style: const TextStyle(color: Colors.white),
-      ),
+      leading: Icon(icon),
+      title: Text(title),
       trailing: Text(
         value,
-        style: TextStyle(color: Colors.grey[400]),
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
     );
   }
+
+  Future<void> _confirmClearLogs() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认清除'),
+        content: const Text('确定要清除所有日志吗？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('清除')),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      widget.dataService.clearLogs();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('日志已清除')));
+      }
+    }
+  }
+
+  Future<void> _exportProductNotes() async {
+    final notes = widget.preferencesService.getAllProductNotes();
+    if (notes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('暂无可导出的笔记')),
+      );
+      return;
+    }
+
+    final buffer = StringBuffer();
+    final sortedKeys = notes.keys.toList()..sort();
+    for (final key in sortedKeys) {
+      final content = notes[key]?.trim() ?? '';
+      if (content.isEmpty) continue;
+      buffer.writeln('# $key');
+      buffer.writeln(content);
+      buffer.writeln();
+    }
+    final markdownContent = buffer.toString().trim();
+    if (markdownContent.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('暂无可导出的笔记')),
+      );
+      return;
+    }
+
+    final directory = await getTemporaryDirectory();
+    final file = File('${directory.path}/产品笔记.md');
+    await file.writeAsString(markdownContent);
+
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      subject: '产品笔记',
+      text: '产品笔记导出文件（Markdown）',
+    );
+  }
+
+  Future<void> _confirmClearAllProductNotes() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认清除笔记'),
+        content: const Text('该操作将删除所有产品笔记，是否继续？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('继续')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final reconfirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('二次确认'),
+        content: const Text('请再次确认：清除后不可恢复。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('返回')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('确认清除')),
+        ],
+      ),
+    );
+    if (reconfirmed != true) return;
+
+    await widget.preferencesService.clearAllProductNotes();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已清除所有产品笔记')));
+    }
+  }
+
 }
 
-/// 日志查看页面
 class LogViewerPage extends StatefulWidget {
   final ObsidianDataService dataService;
 
@@ -297,13 +336,13 @@ class LogViewerPage extends StatefulWidget {
 
 class _LogViewerPageState extends State<LogViewerPage> {
   final ScrollController _scrollController = ScrollController();
-  
+
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
   }
-  
+
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -316,15 +355,11 @@ class _LogViewerPageState extends State<LogViewerPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2D2D2D),
-        title: const Text(
-          '日志',
-          style: TextStyle(color: Colors.white),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('日志'),
         actions: [
           IconButton(
             icon: const Icon(Icons.arrow_downward),
@@ -337,10 +372,7 @@ class _LogViewerPageState extends State<LogViewerPage> {
               final logs = widget.dataService.logs.join('\n');
               Clipboard.setData(ClipboardData(text: logs));
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('日志已复制'),
-                  backgroundColor: Colors.green,
-                ),
+                const SnackBar(content: Text('日志已复制')),
               );
             },
             tooltip: '复制日志',
@@ -352,12 +384,9 @@ class _LogViewerPageState extends State<LogViewerPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.article_outlined, size: 64, color: Colors.grey[700]),
+                  Icon(Icons.article_outlined, size: 64, color: cs.outline),
                   const SizedBox(height: 16),
-                  Text(
-                    '暂无日志',
-                    style: TextStyle(color: Colors.grey[500]),
-                  ),
+                  Text('暂无日志', style: TextStyle(color: cs.onSurfaceVariant)),
                 ],
               ),
             )
@@ -368,31 +397,29 @@ class _LogViewerPageState extends State<LogViewerPage> {
               itemCount: widget.dataService.logs.length,
               itemBuilder: (context, index) {
                 final log = widget.dataService.logs[index];
-                Color textColor = Colors.white70;
-                
+                Color textColor = cs.onSurface;
+
                 if (log.contains('ERROR')) {
-                  textColor = Colors.red[300]!;
+                  textColor = cs.error;
                 } else if (log.contains('complete') || log.contains('成功')) {
-                  textColor = Colors.green[300]!;
+                  textColor = Colors.green.shade400;
                 } else if (log.contains('Starting') || log.contains('Loading')) {
-                  textColor = Colors.blue[300]!;
+                  textColor = Colors.blue.shade400;
                 } else if (log.contains('Warning') || log.contains('failed')) {
-                  textColor = Colors.orange[300]!;
+                  textColor = Colors.orange.shade400;
                 }
-                
-                return Container(
-                  margin: const EdgeInsets.symmetric(vertical: 1),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2D2D2D),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    log,
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      color: textColor,
+
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 2),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Text(
+                      log,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: textColor,
+                      ),
                     ),
                   ),
                 );
