@@ -115,6 +115,16 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                 setState(() {});
               });
             },
+            itemBuilder: (context) => const [
+              PopupMenuItem<bool>(
+                value: false,
+                child: Text('A-Z'),
+              ),
+              PopupMenuItem<bool>(
+                value: true,
+                child: Text('Z-A'),
+              ),
+            ],
           ),
         ],
       ),
