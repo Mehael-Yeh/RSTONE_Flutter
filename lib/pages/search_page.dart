@@ -239,8 +239,11 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     return NoteSwipeTile(
       onNoteTap: () => _openNoteEditor(item),
       noteButtonInsets: const EdgeInsets.only(bottom: 10),
-      noteButtonBorderRadius: BorderRadius.circular(16),
+      noteButtonBorderRadius: const BorderRadius.horizontal(
+        left: Radius.circular(16),
+      ),
       child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         margin: const EdgeInsets.only(bottom: 10),
         child: InkWell(
           onTap: () {
