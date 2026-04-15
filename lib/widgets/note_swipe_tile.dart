@@ -6,6 +6,8 @@ class NoteSwipeTile extends StatefulWidget {
   final VoidCallback onNoteTap;
   final EdgeInsets noteButtonInsets;
   final BorderRadius noteButtonBorderRadius;
+  final double noteButtonWidthFactor;
+  final double noteButtonRightOverlap;
 
   const NoteSwipeTile({
     super.key,
@@ -13,6 +15,8 @@ class NoteSwipeTile extends StatefulWidget {
     required this.onNoteTap,
     this.noteButtonInsets = EdgeInsets.zero,
     this.noteButtonBorderRadius = BorderRadius.zero,
+    this.noteButtonWidthFactor = 0.2,
+    this.noteButtonRightOverlap = 12,
   });
 
   @override
@@ -31,7 +35,8 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
         final availableWidth = (constraints.maxWidth - widget.noteButtonInsets.horizontal)
             .clamp(0.0, double.infinity)
             .toDouble();
-        final revealWidth = availableWidth * 0.25;
+        final revealWidth = (availableWidth * widget.noteButtonWidthFactor).clamp(56.0, 120.0).toDouble();
+        final buttonWidth = (revealWidth + widget.noteButtonRightOverlap).clamp(revealWidth, 140.0).toDouble();
 
         return Stack(
           children: [
@@ -41,17 +46,17 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: SizedBox(
-                    width: revealWidth,
+                    width: buttonWidth,
                     height: double.infinity,
-                    child: FilledButton.icon(
+                    child: FilledButton(
                       onPressed: widget.onNoteTap,
-                      icon: const Icon(Icons.note_alt_outlined),
-                      label: const Text('笔记'),
+                      child: const Icon(Icons.note_alt_outlined, size: 20),
                       style: FilledButton.styleFrom(
                         backgroundColor: cs.primaryContainer,
                         foregroundColor: cs.onPrimaryContainer,
                         elevation: 0,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(
                           borderRadius: widget.noteButtonBorderRadius,
                         ),
