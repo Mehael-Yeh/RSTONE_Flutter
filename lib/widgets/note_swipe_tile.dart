@@ -50,6 +50,8 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
                       style: FilledButton.styleFrom(
                         backgroundColor: cs.primaryContainer,
                         foregroundColor: cs.onPrimaryContainer,
+                        elevation: 0,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(
                           borderRadius: widget.noteButtonBorderRadius,
                         ),
