@@ -31,9 +31,9 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
             Positioned.fill(
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: SizedBox(
                   width: revealWidth,
+                  height: double.infinity,
                   child: FilledButton.icon(
                     onPressed: widget.onNoteTap,
                     icon: const Icon(Icons.note_alt_outlined),
@@ -42,7 +42,7 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
                       backgroundColor: cs.primaryContainer,
                       foregroundColor: cs.onPrimaryContainer,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(0),
                       ),
                     ),
                   ),
@@ -111,12 +111,17 @@ class _NoteEditorDialogState extends State<NoteEditorDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text('笔记 - ${widget.title}'),
+      contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       content: SizedBox(
-        width: 360,
+        width: 460,
+        height: 320,
         child: TextField(
           controller: _controller,
-          maxLines: 6,
-          minLines: 4,
+          expands: true,
+          maxLines: null,
+          minLines: null,
+          textAlignVertical: TextAlignVertical.top,
           decoration: const InputDecoration(
             hintText: '请输入记录内容',
             border: OutlineInputBorder(),
@@ -124,15 +129,9 @@ class _NoteEditorDialogState extends State<NoteEditorDialog> {
         ),
       ),
       actions: [
-        IconButton(
-          tooltip: '关闭',
+        FilledButton(
           onPressed: _closeAndSave,
-          icon: const Text('✘', style: TextStyle(fontSize: 18)),
-        ),
-        IconButton(
-          tooltip: '确认',
-          onPressed: _closeAndSave,
-          icon: const Text('✔', style: TextStyle(fontSize: 18)),
+          child: const Text('确认'),
         ),
       ],
     );
