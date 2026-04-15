@@ -168,6 +168,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   /// 当前底部导航索引。
   int _currentIndex = 0;
+  int _pageChangeSignal = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -181,21 +182,30 @@ class _MainScreenState extends State<MainScreen> {
             preferencesService: widget.preferencesService,
             onThemeModeChanged: widget.onThemeModeChanged,
             themeMode: widget.themeMode,
+            pageChangeSignal: _pageChangeSignal,
           ),
           ProductListPage(
             dataService: widget.dataService,
             preferencesService: widget.preferencesService,
+            pageChangeSignal: _pageChangeSignal,
           ),
           ProductApplicationsPage(
             dataService: widget.dataService,
             preferencesService: widget.preferencesService,
+            pageChangeSignal: _pageChangeSignal,
           ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         // MD3 导航栏：采用目的地（destination）模型。
         selectedIndex: _currentIndex,
-        onDestinationSelected: (index) => setState(() => _currentIndex = index),
+        onDestinationSelected: (index) {
+          if (index == _currentIndex) return;
+          setState(() {
+            _currentIndex = index;
+            _pageChangeSignal++;
+          });
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.search_outlined),
