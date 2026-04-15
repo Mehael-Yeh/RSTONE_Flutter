@@ -3,6 +3,7 @@ import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
 import '../widgets/obsidian_table.dart';
+import '../widgets/product_detail_sheet.dart';
 
 /// 产品应用页面
 class ProductApplicationsPage extends StatefulWidget {
@@ -58,11 +59,13 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   }
 
   void _onColumnsChanged(List<String> columns) {
+    ProductDetailSheet.hideIfOpen(context);
     widget.preferencesService.saveApplicationColumns(columns);
     setState(() => _columns = columns);
   }
 
   void _onSortChanged(String? column) {
+    ProductDetailSheet.hideIfOpen(context);
     widget.preferencesService.saveApplicationSort(column);
     widget.preferencesService.saveApplicationSortDesc(false);
     setState(() {
@@ -72,6 +75,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   }
 
   void _onSortDirectionChanged(bool descending) {
+    ProductDetailSheet.hideIfOpen(context);
     widget.preferencesService.saveApplicationSortDesc(descending);
     setState(() => _sortDescending = descending);
   }
@@ -103,12 +107,13 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
       appBar: AppBar(
         title: const Text('产品应用'),
         actions: [
-          PopupMenuButton<bool>(
-            tooltip: '排序',
-            icon: const Icon(Icons.sort_by_alpha),
-            onSelected: (descending) {
-              _onSortChanged(_nameSortColumn);
-              _onSortDirectionChanged(descending);
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              ProductDetailSheet.hideIfOpen(context);
+              widget.dataService.initialize().then((_) {
+                setState(() {});
+              });
             },
             itemBuilder: (context) => const [
               PopupMenuItem<bool>(
