@@ -159,6 +159,7 @@ class _ProductListPageState extends State<ProductListPage> {
               onColumnsChanged: _onColumnsChanged,
               onSortChanged: _onSortChanged,
               onSortDirectionChanged: _onSortDirectionChanged,
+              preferencesService: widget.preferencesService,
               currentSortColumn: _sortColumn,
               sortDescending: _sortDescending,
             ),

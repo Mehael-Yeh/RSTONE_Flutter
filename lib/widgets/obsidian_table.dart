@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:reorderables/reorderables.dart';
 import '../models/product_item.dart';
+import '../services/preferences_service.dart';
+import 'note_swipe_tile.dart';
 import 'product_detail_sheet.dart';
 
 /// Obsidian 风格的表格组件，支持列拖拽重排和排序
@@ -14,6 +16,7 @@ class ObsidianTable extends StatefulWidget {
   final Function(bool) onSortDirectionChanged;
   final String? currentSortColumn;
   final bool sortDescending;
+  final PreferencesService preferencesService;
 
   const ObsidianTable({
     super.key,
@@ -24,6 +27,7 @@ class ObsidianTable extends StatefulWidget {
     required this.onColumnsChanged,
     required this.onSortChanged,
     required this.onSortDirectionChanged,
+    required this.preferencesService,
     this.currentSortColumn,
     this.sortDescending = false,
   });
@@ -76,6 +80,21 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
   bool _isWaterBased(ProductItem item) {
     return item.tags.any((t) => t.contains('水性'));
+  }
+
+  Future<void> _openNoteEditor(ProductItem item) async {
+    final note = await showDialog<String>(
+      context: context,
+      builder: (context) => NoteEditorDialog(
+        title: item.displayName,
+        initialValue: widget.preferencesService.getProductNote(item.displayName),
+      ),
+    );
+    if (note == null) return;
+    await widget.preferencesService.saveProductNote(item.displayName, note);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
+    }
   }
 
   @override
@@ -163,67 +182,70 @@ class _ObsidianTableState extends State<ObsidianTable> {
           final item = sortedItems[index];
           final fields = item.getTableFields();
 
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: InkWell(
-              onTap: () => ProductDetailSheet.show(context, item, formulas: widget.formulas),
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 4,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: item.folder == '产品列表'
-                                ? (_isWaterBased(item)
-                                    ? Colors.blue.shade400
-                                    : Colors.orange.shade400)
-                                : cs.primary,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            fields[_columns.first] ?? item.displayName,
-                            style: TextStyle(
-                              color: cs.onSurface,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                        Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
-                      ],
-                    ),
-                    if (_columns.length > 1) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
-                        children: _columns.skip(1).take(4).map((col) {
-                          final val = fields[col];
-                          if (val == null || val.isEmpty) return const SizedBox.shrink();
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          return NoteSwipeTile(
+            onNoteTap: () => _openNoteEditor(item),
+            child: Card(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: InkWell(
+                onTap: () => ProductDetailSheet.show(context, item, formulas: widget.formulas),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 44,
                             decoration: BoxDecoration(
-                              color: cs.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(6),
+                              color: item.folder == '产品列表'
+                                  ? (_isWaterBased(item)
+                                      ? Colors.blue.shade400
+                                      : Colors.orange.shade400)
+                                  : cs.primary,
+                              borderRadius: BorderRadius.circular(8),
                             ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
                             child: Text(
-                              '$col: $val',
-                              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                              fields[_columns.first] ?? item.displayName,
+                              style: TextStyle(
+                                color: cs.onSurface,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
                             ),
-                          );
-                        }).toList(),
+                          ),
+                          Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+                        ],
                       ),
+                      if (_columns.length > 1) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: _columns.skip(1).take(4).map((col) {
+                            final val = fields[col];
+                            if (val == null || val.isEmpty) return const SizedBox.shrink();
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: cs.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '$col: $val',
+                                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -295,27 +317,30 @@ class _ObsidianTableState extends State<ObsidianTable> {
               final item = sortedItems[index];
               final fields = item.getTableFields();
 
-              return InkWell(
-                onTap: () => ProductDetailSheet.show(context, item, formulas: widget.formulas),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: index.isEven ? cs.surface : cs.surfaceContainerLowest,
-                    border: Border(bottom: BorderSide(color: cs.outlineVariant)),
-                  ),
-                  child: Row(
-                    children: _columns.map((col) {
-                      final val = fields[col] ?? '';
-                      return Expanded(
-                        child: Text(
-                          val,
-                          style: TextStyle(
-                            color: val.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
+              return NoteSwipeTile(
+                onNoteTap: () => _openNoteEditor(item),
+                child: InkWell(
+                  onTap: () => ProductDetailSheet.show(context, item, formulas: widget.formulas),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: index.isEven ? cs.surface : cs.surfaceContainerLowest,
+                      border: Border(bottom: BorderSide(color: cs.outlineVariant)),
+                    ),
+                    child: Row(
+                      children: _columns.map((col) {
+                        final val = fields[col] ?? '';
+                        return Expanded(
+                          child: Text(
+                            val,
+                            style: TextStyle(
+                              color: val.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ),
               );
