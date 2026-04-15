@@ -52,6 +52,47 @@ class ProductDetailSheet extends StatefulWidget {
 class _ProductDetailSheetState extends State<ProductDetailSheet> {
   /// 多配方时下拉选择的索引
   int _selectedFormulaIndex = 0;
+  String? _selectedApplicationFormulaName;
+
+  List<ProductItem> _deduplicateFormulasByFileName(List<ProductItem> formulas) {
+    final unique = <String, ProductItem>{};
+    for (final formula in formulas) {
+      unique.putIfAbsent(formula.fileName, () => formula);
+    }
+    return unique.values.toList();
+  }
+
+  bool _isWaterBasedProduct() {
+    return widget.product.tags.any((tag) => tag.contains('水性'));
+  }
+
+  Color _folderAccent(ColorScheme cs) {
+    if (widget.product.folder == '产品列表') {
+      return _isWaterBasedProduct() ? cs.primary : cs.tertiary;
+    }
+    return cs.secondary;
+  }
+
+  String _withUnit(String label, String value) {
+    final trimmed = value.trim();
+    switch (label) {
+      case '固含':
+        return trimmed.contains('%') ? trimmed : '$trimmed%';
+      case '羟值':
+        return trimmed.toLowerCase().contains('mgkoh/g') ? trimmed : '$trimmed mgKOH/g';
+      default:
+        return trimmed;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final linked = _getApplicationLinkedFormulas();
+    if (linked.isNotEmpty) {
+      _selectedApplicationFormulaName = linked.first.fileName.replaceAll('.md', '');
+    }
+  }
 
   String _extractMarkdownBody(String rawContent) {
     final normalized = rawContent.replaceAll('\r\n', '\n');
@@ -121,6 +162,16 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       const double cellPaddingH = 16.0;
       const double colMinWidth = 80.0;
       const double scale = 2.0; // 2x 分辨率提升清晰度
+      final cs = Theme.of(context).colorScheme;
+      final backgroundColor = cs.surface;
+      final headerBackgroundColor = cs.surfaceContainerHigh;
+      final headerCellColor = cs.surfaceContainerHighest;
+      final borderColor = cs.outlineVariant;
+      final rowAltColor = cs.surfaceContainerLowest;
+      final titleColor = cs.secondary;
+      final headerTextColor = cs.primary;
+      final bodyTextColor = cs.onSurface;
+      final extraTextColor = cs.onSurfaceVariant;
 
       final header = rows.first;
       final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
@@ -139,7 +190,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       double titleHeight = 0;
       if (title.isNotEmpty) {
         final tp = TextPainter(
-          text: TextSpan(text: title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF9800))),
+          text: TextSpan(text: title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: titleColor)),
           textDirection: TextDirection.ltr,
         );
         tp.layout(maxWidth: totalWidth - 24);
@@ -149,7 +200,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       double extraHeight = 0;
       if (extraContent != null && extraContent.trim().isNotEmpty) {
         final tp = TextPainter(
-          text: TextSpan(text: extraContent, style: const TextStyle(fontSize: 12, height: 1.5)),
+          text: TextSpan(text: extraContent, style: TextStyle(fontSize: 12, height: 1.5, color: extraTextColor)),
           textDirection: TextDirection.ltr,
         );
         tp.layout(maxWidth: totalWidth - 24);
@@ -165,13 +216,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       // 背景
       canvas.drawRect(
         Rect.fromLTWH(0, 0, totalWidth, totalHeight),
-        Paint()..color = const Color(0xFF1E1E1E),
+        Paint()..color = backgroundColor,
       );
 
       // 绘制标题（wiki 链接已转换为普通文字）
       if (title.isNotEmpty) {
         final titlePainter = TextPainter(
-          text: TextSpan(text: title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF9800))),
+          text: TextSpan(text: title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: titleColor)),
           textDirection: TextDirection.ltr,
         );
         titlePainter.layout(maxWidth: totalWidth - 24);
@@ -181,7 +232,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       // 表头背景（表格从 titleHeight 开始）
       canvas.drawRect(
         Rect.fromLTWH(0, titleHeight, totalWidth, headerHeight),
-        Paint()..color = const Color(0xFF2D2D2D),
+        Paint()..color = headerBackgroundColor,
       );
 
       // 绘制表头（表格从 titleHeight 开始）
@@ -189,10 +240,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       for (int i = 0; i < colCount; i++) {
         canvas.drawRect(
           Rect.fromLTWH(x, titleHeight, colWidths[i], headerHeight),
-          Paint()..color = Colors.grey.shade800,
+          Paint()..color = headerCellColor,
         );
         _drawCell(canvas, header[i], x, titleHeight, colWidths[i], headerHeight,
-            const Color(0xFFFF9800), true);
+            headerTextColor, true);
         x += colWidths[i];
       }
 
@@ -203,13 +254,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         if (r.isOdd) {
           canvas.drawRect(
             Rect.fromLTWH(0, y, totalWidth, rowHeight),
-            Paint()..color = const Color(0xFF2A2A2A),
+            Paint()..color = rowAltColor,
           );
         }
         x = 0;
         for (int i = 0; i < colCount; i++) {
           _drawCell(canvas, i < row.length ? row[i] : '',
-              x, y, colWidths[i], rowHeight, const Color(0xFFB0B0B0), false);
+              x, y, colWidths[i], rowHeight, bodyTextColor, false);
           x += colWidths[i];
         }
       }
@@ -218,7 +269,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       canvas.drawRect(
         Rect.fromLTWH(0, 0, totalWidth, totalHeight),
         Paint()
-          ..color = Colors.grey.shade700
+          ..color = borderColor
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1,
       );
@@ -228,8 +279,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         final textPainter = TextPainter(
           text: TextSpan(
             text: extraContent,
-            style: const TextStyle(
-              color: Color(0xFFB0B0B0),
+            style: TextStyle(
+              color: extraTextColor,
               fontSize: 12,
               height: 1.5,
             ),
@@ -300,6 +351,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   /// [tableContent] 应为去掉 frontmatter 后的纯 markdown 表格内容
   /// [extraContent] 表格外的文字（如 blockquote 施工比例），渲染在表格下方，宽度与表格总列宽一致
   Widget _buildMdTable(String tableContent, {String? extraContent}) {
+    final cs = Theme.of(context).colorScheme;
     final rows = _parseTable(tableContent);
     if (rows.isEmpty) return const SizedBox.shrink();
 
@@ -327,19 +379,19 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     while (colWidths.length < colCount) colWidths.add(minColWidth);
     final totalTableWidth = colWidths.reduce((a, b) => a + b);
 
-    const Color borderColor = Color(0xFF3D3D3D);
-    const Color headerBg = Color(0xFF2D2D2D);
-    const Color rowAlt = Color(0xFF252525);
-    const Color rowBg = Color(0xFF1E1E1E);
-    const Color headerText = Color(0xFFFF9800);
-    const Color cellText = Color(0xFFB0B0B0);
+    final borderColor = cs.outlineVariant;
+    final headerBg = cs.surfaceContainerHigh;
+    final rowAlt = cs.surfaceContainerLowest;
+    final rowBg = cs.surfaceContainer;
+    final headerText = cs.primary;
+    final cellText = cs.onSurface;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       decoration: BoxDecoration(
         color: rowBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade700),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,8 +426,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                   child: Text(
                     extraContent,
-                    style: const TextStyle(
-                      color: Colors.white70,
+                    style: TextStyle(
+                      color: cs.onSurfaceVariant,
                       fontSize: 12,
                       height: 1.5,
                     ),
@@ -424,6 +476,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
   Widget _markdownView(String content) {
     if (content.trim().isEmpty) return const SizedBox.shrink();
+    final cs = Theme.of(context).colorScheme;
     // 把 Obsidian wiki 链接 [[XXX]] 转换为普通文字 XXX
     final converted = content.replaceAllMapped(
       RegExp(r'\[\[([^\]]+)\]\]'),
@@ -432,24 +485,24 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     return MarkdownBody(
       data: converted,
       styleSheet: MarkdownStyleSheet(
-        p: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.6),
-        h1: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-        h2: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-        h3: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-        listBullet: const TextStyle(color: Colors.white70),
-        code: TextStyle(color: Colors.cyan[300], backgroundColor: Colors.grey[900]),
+        p: TextStyle(color: cs.onSurfaceVariant, fontSize: 14, height: 1.6),
+        h1: TextStyle(color: cs.onSurface, fontSize: 20, fontWeight: FontWeight.bold),
+        h2: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+        h3: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
+        listBullet: TextStyle(color: cs.onSurfaceVariant),
+        code: TextStyle(color: cs.secondary, backgroundColor: cs.surfaceContainerHighest),
         codeblockDecoration: BoxDecoration(
-          color: Colors.grey[900],
+          color: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
         blockquoteDecoration: BoxDecoration(
           border: Border(
-            left: BorderSide(color: Colors.blue[300]!, width: 3),
+            left: BorderSide(color: cs.primary, width: 3),
           ),
         ),
         horizontalRuleDecoration: BoxDecoration(
           border: Border(
-            top: BorderSide(color: Colors.grey[700]!, width: 1),
+            top: BorderSide(color: cs.outlineVariant, width: 1),
           ),
         ),
       ),
@@ -459,7 +512,11 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
   /// 从 frontmatter 提取配方相关字段，生成结构化表格
   Widget _buildFormulaTable() {
+    final cs = Theme.of(context).colorScheme;
     final fields = <MapEntry<String, String>>[];
+    final linkedByName = {
+      for (final f in _getApplicationLinkedFormulas()) f.fileName.replaceAll('.md', ''): f,
+    };
 
     void add(String label, String? value) {
       if (value != null && value.isNotEmpty) {
@@ -477,19 +534,19 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF2D2D2D),
+        color: cs.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade800),
+        border: Border.all(color: cs.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Text(
-              '配方信息',
+              '应用信息',
               style: TextStyle(
-                color: Colors.orange,
+                color: cs.primary,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
@@ -508,29 +565,149 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
                       e.key,
-                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: linkedByName.containsKey(e.value)
+                        ? InkWell(
+                            onTap: () => setState(() => _selectedApplicationFormulaName = e.value),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Text(
+                              e.value,
+                              style: TextStyle(
+                                color: _selectedApplicationFormulaName == e.value
+                                    ? cs.primary
+                                    : cs.secondary,
+                                fontSize: 13,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            e.value,
+                            style: TextStyle(color: cs.onSurface, fontSize: 13),
+                          ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+          if (_selectedApplicationFormulaName != null &&
+              linkedByName[_selectedApplicationFormulaName!] != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
+              child: _buildFormulaCard(
+                '配方：$_selectedApplicationFormulaName',
+                linkedByName[_selectedApplicationFormulaName!]!.rawContent,
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  /// 产品元数据表（放在配方之前，且与配方分区展示）
+  Widget _buildProductMetaTable() {
+    if (widget.product.folder != '产品列表') return const SizedBox.shrink();
+
+    final entries = <MapEntry<String, String>>[
+      if (widget.product.experimentalCode?.isNotEmpty == true)
+        MapEntry('实验牌号', widget.product.experimentalCode!),
+      if (widget.product.engineer?.isNotEmpty == true)
+        MapEntry('工程师', widget.product.engineer!),
+      if (widget.product.solidContent?.isNotEmpty == true)
+        MapEntry('固含', widget.product.solidContent!),
+      if (widget.product.hydroxylValue?.isNotEmpty == true)
+        MapEntry('羟值', widget.product.hydroxylValue!),
+      if (widget.product.waterContactAngle?.isNotEmpty == true)
+        MapEntry('水接触角', widget.product.waterContactAngle!),
+      if (widget.product.technologySource?.isNotEmpty == true)
+        MapEntry('技术源', widget.product.technologySource!),
+      if (widget.product.benchmark?.isNotEmpty == true)
+        MapEntry('对标', widget.product.benchmark!),
+      if (widget.product.viscosity?.isNotEmpty == true)
+        MapEntry('粘度', widget.product.viscosity!),
+    ];
+
+    if (entries.isEmpty) return const SizedBox.shrink();
+    final cs = Theme.of(context).colorScheme;
+    final typeColor = _folderAccent(cs);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                Icon(Icons.table_view, size: 16, color: typeColor),
+                const SizedBox(width: 6),
+                Text(
+                  '产品信息',
+                  style: TextStyle(
+                    color: typeColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Table(
+            columnWidths: const {0: FixedColumnWidth(90), 1: FlexColumnWidth(1)},
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+            children: entries.map((e) {
+              return TableRow(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text(
+                      e.key,
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
                     ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
-                      e.value,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      _withUnit(e.key, e.value),
+                      style: TextStyle(color: cs.onSurface, fontSize: 13),
                     ),
                   ),
                 ],
               );
             }).toList(),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
         ],
       ),
     );
   }
 
+  List<ProductItem> _getApplicationLinkedFormulas() {
+    if (widget.product.folder != '产品应用') return const [];
+    final keys = <String>{
+      if (widget.product.primer != null && widget.product.primer!.isNotEmpty) widget.product.primer!,
+      if (widget.product.midCoat != null && widget.product.midCoat!.isNotEmpty) widget.product.midCoat!,
+      if (widget.product.topCoat != null && widget.product.topCoat!.isNotEmpty) widget.product.topCoat!,
+    };
+    final linked = widget.formulas.where((f) => keys.contains(f.fileName.replaceAll('.md', ''))).toList();
+    return _deduplicateFormulasByFileName(linked);
+  }
+
   /// 查找并渲染关联的产品配方（文件名以产品牌号开头，如 RS7767-银.md 对应 RS7767）
   Widget _buildLinkedFormulas() {
-    final matchedFormulas = widget.formulas.where((f) {
+    final cs = Theme.of(context).colorScheme;
+    final matchedFormulas = _deduplicateFormulasByFileName(widget.formulas.where((f) {
       // 精确匹配：配方文件名以产品牌号+"-"开头（如 RS7767-银.md 匹配产品 RS7767）
       // experimentalCode 可能指向另一个系列的产品牌号，仅在非空且有明确匹配时才使用
       final hasExperimentalCodeMatch =
@@ -539,7 +716,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           f.fileName.startsWith(widget.product.experimentalCode!);
       return f.fileName.startsWith(widget.product.fileName + '-') ||
           hasExperimentalCodeMatch;
-    }).toList();
+    }).toList());
 
     if (matchedFormulas.isEmpty) return const SizedBox.shrink();
 
@@ -551,12 +728,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     }
 
     // 多配方：下拉选择器
-    final items = matchedFormulas.map((f) {
+    final items = matchedFormulas.asMap().entries.map((entry) {
+      final index = entry.key;
+      final formula = entry.value;
       return DropdownMenuItem(
-        value: matchedFormulas.indexOf(f),
+        value: index,
         child: Text(
-          f.fileName.replaceAll('.md', ''),
-          style: const TextStyle(color: Colors.white, fontSize: 13),
+          formula.fileName.replaceAll('.md', ''),
+          style: TextStyle(color: cs.onSurface, fontSize: 13),
         ),
       );
     }).toList();
@@ -571,16 +750,16 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFF2D2D2D),
+            color: cs.surfaceContainer,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade700),
+            border: Border.all(color: cs.outlineVariant),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<int>(
               value: _selectedFormulaIndex.clamp(0, matchedFormulas.length - 1),
               isExpanded: true,
-              dropdownColor: const Color(0xFF2D2D2D),
-              icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
+              dropdownColor: cs.surfaceContainerHigh,
+              icon: Icon(Icons.arrow_drop_down, color: cs.onSurfaceVariant),
               items: items,
               onChanged: (val) {
                 if (val != null) setState(() => _selectedFormulaIndex = val);
@@ -609,6 +788,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   Widget _buildFormulaCard(String title, String rawContent) {
+    final cs = Theme.of(context).colorScheme;
     // 以表格位置为基准提取内容：
     // - 表格前的内容 → 渲染在表格上方
     // - 表格后的内容 → 渲染在表格下方
@@ -676,9 +856,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF2D2D2D),
+        color: cs.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade800),
+        border: Border.all(color: cs.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -687,20 +867,20 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
             padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
             child: Row(
               children: [
-                const Icon(Icons.science_outlined, color: Colors.cyan, size: 16),
+                Icon(Icons.science_outlined, color: cs.secondary, size: 16),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.cyan,
+                    style: TextStyle(
+                      color: cs.secondary,
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.share_outlined, color: Colors.grey, size: 18),
+                  icon: Icon(Icons.share_outlined, color: cs.onSurfaceVariant, size: 18),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                   tooltip: '分享配方图片',
@@ -720,8 +900,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
               child: Text(
                 preContent,
-                style: const TextStyle(
-                  color: Colors.white70,
+                style: TextStyle(
+                  color: cs.onSurfaceVariant,
                   fontSize: 12,
                   height: 1.5,
                 ),
@@ -739,6 +919,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final folderAccent = _folderAccent(cs);
     // 去掉 frontmatter 部分，只留 body
     final bodyContent = _extractMarkdownBody(widget.product.rawContent);
     final markdownContent = _hasLinkedFormulasForCurrentProduct()
@@ -765,9 +947,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         maxChildSize: 1.0,
         builder: (context, scrollController) {
           return Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: ListView(
               controller: scrollController,
@@ -781,7 +963,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[600],
+                      color: cs.outlineVariant,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -794,17 +976,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: widget.product.folder == '产品列表'
-                              ? Colors.blue.withOpacity(0.2)
-                              : Colors.green.withOpacity(0.2),
+                          color: folderAccent.withOpacity(0.16),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           widget.product.folder,
                           style: TextStyle(
-                            color: widget.product.folder == '产品列表'
-                                ? Colors.blue[300]
-                                : Colors.green[300],
+                            color: folderAccent,
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
@@ -814,8 +992,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                       Expanded(
                         child: Text(
                           widget.product.displayName,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: cs.onSurface,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -824,12 +1002,12 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                       ),
                       IconButton(
                         onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close, color: Colors.grey),
+                        icon: Icon(Icons.close, color: cs.onSurfaceVariant),
                       ),
                     ],
                   ),
                 ),
-                const Divider(color: Colors.grey, height: 1),
+                Divider(color: cs.outlineVariant, height: 1),
                 // 标签
                 if (widget.product.tags.isNotEmpty)
                   Padding(
@@ -841,13 +1019,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.2),
+                            color: cs.secondaryContainer,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             tag,
-                            style: const TextStyle(
-                              color: Colors.orange,
+                            style: TextStyle(
+                              color: cs.onSecondaryContainer,
                               fontSize: 12,
                             ),
                           ),
@@ -857,6 +1035,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   ),
                 // 配方表格（仅产品应用有配方字段）
                 if (widget.product.folder == '产品应用') _buildFormulaTable(),
+                // 产品详情字段表格（位于配方区块之前）
+                if (widget.product.folder == '产品列表') _buildProductMetaTable(),
                 // 产品配方 section：文件名以当前产品牌号+"-"开头时显示
                 if (widget.product.folder == '产品列表')
                   _buildLinkedFormulas(),

@@ -22,6 +22,10 @@ class PreferencesService {
   static const String _applicationSortKey = 'application_sort';
   /// 产品应用排序方向存储键
   static const String _applicationSortDescKey = 'application_sort_desc';
+  /// 主题模式存储键（system/light/dark）
+  static const String _themeModeKey = 'theme_mode';
+  /// 产品笔记存储键（Map<项目名称, 笔记内容>）
+  static const String _productNotesKey = 'product_notes';
 
   /// SharedPreferences 实例
   SharedPreferences? _prefs;
@@ -110,5 +114,61 @@ class PreferencesService {
   /// 保存产品应用排序方向
   Future<void> saveApplicationSortDesc(bool descending) async {
     await _prefs?.setBool(_applicationSortDescKey, descending);
+  }
+
+  /// 获取主题模式，默认跟随系统。
+  String getThemeMode() {
+    return _prefs?.getString(_themeModeKey) ?? 'system';
+  }
+
+  /// 保存主题模式（system/light/dark）。
+  Future<void> saveThemeMode(String mode) async {
+    await _prefs?.setString(_themeModeKey, mode);
+  }
+
+  /// 获取全部产品笔记。
+  Map<String, String> getAllProductNotes() {
+    final saved = _prefs?.getString(_productNotesKey);
+    if (saved == null || saved.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(saved);
+      if (decoded is! Map) return {};
+      final result = <String, String>{};
+      decoded.forEach((key, value) {
+        final noteKey = key.toString().trim();
+        final noteValue = value?.toString() ?? '';
+        if (noteKey.isNotEmpty && noteValue.isNotEmpty) {
+          result[noteKey] = noteValue;
+        }
+      });
+      return result;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// 获取单个项目的笔记。
+  String getProductNote(String itemName) {
+    return getAllProductNotes()[itemName] ?? '';
+  }
+
+  /// 保存单个项目笔记。空内容会移除对应项目。
+  Future<void> saveProductNote(String itemName, String note) async {
+    final normalizedName = itemName.trim();
+    if (normalizedName.isEmpty) return;
+
+    final notes = getAllProductNotes();
+    final normalizedNote = note.trim();
+    if (normalizedNote.isEmpty) {
+      notes.remove(normalizedName);
+    } else {
+      notes[normalizedName] = normalizedNote;
+    }
+    await _prefs?.setString(_productNotesKey, jsonEncode(notes));
+  }
+
+  /// 清除所有产品笔记。
+  Future<void> clearAllProductNotes() async {
+    await _prefs?.remove(_productNotesKey);
   }
 }

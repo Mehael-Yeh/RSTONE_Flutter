@@ -40,6 +40,7 @@ class _ProductListPageState extends State<ProductListPage> {
   List<String> _columns = [];
   String? _sortColumn;
   bool _sortDescending = false;
+  static const String _nameSortColumn = '牌号';
 
   @override
   void initState() {
@@ -107,14 +108,8 @@ class _ProductListPageState extends State<ProductListPage> {
     final items = _getSortedItems();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2D2D2D),
-        title: const Text(
-          '产品列表',
-          style: TextStyle(color: Colors.white),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('产品列表'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -124,6 +119,16 @@ class _ProductListPageState extends State<ProductListPage> {
                 setState(() {});
               });
             },
+            itemBuilder: (context) => const [
+              PopupMenuItem<bool>(
+                value: false,
+                child: Text('A-Z'),
+              ),
+              PopupMenuItem<bool>(
+                value: true,
+                child: Text('Z-A'),
+              ),
+            ],
           ),
         ],
       ),
@@ -159,6 +164,7 @@ class _ProductListPageState extends State<ProductListPage> {
               onColumnsChanged: _onColumnsChanged,
               onSortChanged: _onSortChanged,
               onSortDirectionChanged: _onSortDirectionChanged,
+              preferencesService: widget.preferencesService,
               currentSortColumn: _sortColumn,
               sortDescending: _sortDescending,
             ),

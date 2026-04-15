@@ -1,32 +1,55 @@
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
+import '../services/preferences_service.dart';
+import '../widgets/note_swipe_tile.dart';
 import '../widgets/product_detail_sheet.dart';
 import 'settings_page.dart';
 
-/// 搜索页面（主界面）
-/// 
-/// 提供产品/应用的关键词搜索功能，支持实时搜索和结果展示。
 class SearchPage extends StatefulWidget {
   final ObsidianDataService dataService;
+  final PreferencesService preferencesService;
+  final Future<void> Function(ThemeMode) onThemeModeChanged;
+  final ThemeMode themeMode;
 
-  const SearchPage({super.key, required this.dataService});
+  const SearchPage({
+    super.key,
+    required this.dataService,
+    required this.preferencesService,
+    required this.onThemeModeChanged,
+    required this.themeMode,
+  });
 
   @override
   State<SearchPage> createState() => _SearchPageState();
 }
 
 class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
-  /// 搜索框文本控制器
+  /// 搜索输入控制器。
   final TextEditingController _searchController = TextEditingController();
-  /// 搜索框焦点控制节点
+  /// 搜索框焦点控制（用于生命周期时主动收起键盘）。
   final FocusNode _searchFocusNode = FocusNode();
-  /// 搜索结果列表
+  /// 当前搜索结果集合。
   List<ProductItem> _results = [];
-  /// 是否正在搜索（搜索框有内容）
+  /// 搜索框中是否存在关键词。
   bool _isSearching = false;
-  /// 是否显示结果列表
+  /// 是否展示结果区域（仅在有输入时展示）。
   bool _showResults = false;
+
+  Future<void> _openNoteEditor(ProductItem item) async {
+    final note = await showDialog<String>(
+      context: context,
+      builder: (context) => NoteEditorDialog(
+        title: item.displayName,
+        initialValue: widget.preferencesService.getProductNote(item.displayName),
+      ),
+    );
+    if (note == null) return;
+    await widget.preferencesService.saveProductNote(item.displayName, note);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
+    }
+  }
 
   @override
   void initState() {
@@ -45,28 +68,27 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // 应用切到后台或失活时，清除搜索框焦点，防止键盘在后台继续显示
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
       _searchFocusNode.unfocus();
     }
   }
 
-  /// 搜索内容变化时触发：更新搜索状态、延迟执行搜索
   void _onSearchChanged() {
     ProductDetailSheet.hideIfOpen(context);
     final query = _searchController.text.trim();
+    // 输入非空时切换到“搜索态”。
     setState(() {
       _isSearching = query.isNotEmpty;
       _showResults = query.isNotEmpty;
     });
-    
+
     if (query.isEmpty) {
+      // 清空输入后立即清空结果，避免显示旧数据。
       setState(() => _results = []);
       return;
     }
-    
-    // 延迟搜索 150ms，避免用户输入过程中频繁触发搜索
+
+    // 轻量防抖，降低频繁输入时的检索开销。
     Future.delayed(const Duration(milliseconds: 150), () {
       if (_searchController.text.trim() == query) {
         final results = widget.dataService.search(query);
@@ -79,52 +101,73 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // 统一使用语义色，避免硬编码颜色导致主题割裂。
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
       body: SafeArea(
         child: Column(
           children: [
-            // 顶部应用标题
             Padding(
-              padding: const EdgeInsets.only(top: 16, bottom: 8),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Row(
                 children: [
-                  const SizedBox(width: 48), // Spacer for settings button
-                  const Expanded(
-                    child: Center(
-                      child: Text(
-                        '锐石',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
+                  Expanded(
+                    child: Text(
+                      '锐石',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.settings, color: Colors.white70),
+                  IconButton.filledTonal(
                     onPressed: () {
                       _searchFocusNode.unfocus();
                       ProductDetailSheet.hideIfOpen(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => SettingsPage(dataService: widget.dataService),
+                          builder: (context) => SettingsPage(
+                            dataService: widget.dataService,
+                            preferencesService: widget.preferencesService,
+                            themeMode: widget.themeMode,
+                            onThemeModeChanged: widget.onThemeModeChanged,
+                          ),
                         ),
                       );
                     },
+                    icon: const Icon(Icons.settings_outlined),
                   ),
                 ],
               ),
             ),
-            // 搜索框区域
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              padding: EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: _isSearching ? 8 : 24,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: SearchBar(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                hintText: '搜索产品、标签...',
+                leading: const Icon(Icons.search),
+                trailing: _isSearching
+                    ? [
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _showResults = false;
+                              _results = [];
+                            });
+                          },
+                        )
+                      ]
+                    : null,
+                elevation: WidgetStateProperty.all(0),
+                // 使用容器高层级色强化输入控件与背景的层级关系。
+                backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHigh),
+                side: WidgetStatePropertyAll(
+                  BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                ),
               ),
               child: Column(
                 children: [
@@ -187,53 +230,18 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                         '找到 ${_results.length} 个结果',
                         style: TextStyle(color: Colors.grey[500], fontSize: 12),
                       ),
-                    ),
-                ],
+                ),
               ),
-            ),
-            // 结果列表
             Expanded(
               child: _showResults
                   ? _results.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.search_off, size: 64, color: Colors.grey[700]),
-                              const SizedBox(height: 16),
-                              Text(
-                                '未找到相关结果',
-                                style: TextStyle(color: Colors.grey[500]),
-                              ),
-                            ],
-                          ),
-                        )
+                      ? _buildEmptyState()
                       : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                           itemCount: _results.length,
-                          itemBuilder: (context, index) {
-                            final item = _results[index];
-                            return _buildResultItem(item);
-                          },
+                          itemBuilder: (context, index) => _buildResultItem(_results[index]),
                         )
-                  : Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.diamond_outlined, size: 80, color: Colors.grey[800]),
-                          const SizedBox(height: 16),
-                          Text(
-                            '输入关键词搜索',
-                            style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '支持产品名称、标签等',
-                            style: TextStyle(color: Colors.grey[700], fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ),
+                  : _buildIdleState(),
             ),
           ],
         ),
@@ -241,103 +249,132 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildIdleState() {
+    final style = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    return Center(
+      // 初始引导态：提示可搜索字段。
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.diamond_outlined, size: 64, color: cs.outline),
+          const SizedBox(height: 16),
+          Text('输入关键词搜索', style: style.titleMedium),
+          const SizedBox(height: 6),
+          Text('支持产品名称、标签等', style: style.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    final style = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    return Center(
+      // 搜索无结果态：给出明确反馈，减少误操作困惑。
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search_off, size: 56, color: cs.outline),
+          const SizedBox(height: 12),
+          Text('未找到相关结果', style: style.titleMedium?.copyWith(color: cs.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildResultItem(ProductItem item) {
+    final cs = Theme.of(context).colorScheme;
     final isProductList = item.folder == '产品列表';
-    
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      color: const Color(0xFF2D2D2D),
-      child: InkWell(
-        onTap: () {
-        _searchFocusNode.unfocus();
-        ProductDetailSheet.show(context, item, formulas: widget.dataService.formulas);
-      },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // 类型标签
-              Container(
-                width: 4,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: isProductList ? Colors.blue : Colors.green,
-                  borderRadius: BorderRadius.circular(2),
+    final tagColor = isProductList ? cs.primary : cs.tertiary;
+
+    return NoteSwipeTile(
+      onNoteTap: () => _openNoteEditor(item),
+      noteButtonInsets: const EdgeInsets.only(bottom: 10),
+      noteButtonBorderRadius: const BorderRadius.horizontal(
+        left: Radius.circular(16),
+      ),
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.only(bottom: 10),
+        child: InkWell(
+          onTap: () {
+            _searchFocusNode.unfocus();
+            ProductDetailSheet.show(context, item, formulas: widget.dataService.formulas);
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  // 左侧竖条作为信息类型视觉锚点（产品/应用）。
+                  width: 4,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: tagColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              // 内容
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.displayName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.displayName,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
                             ),
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: (isProductList ? Colors.blue : Colors.green)
-                                .withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            isProductList ? '产品' : '应用',
-                            style: TextStyle(
-                              color: isProductList ? Colors.blue[300] : Colors.green[300],
-                              fontSize: 11,
+                          Chip(
+                            visualDensity: VisualDensity.compact,
+                            label: Text(isProductList ? '产品' : '应用'),
+                            labelStyle: Theme.of(context).textTheme.labelSmall,
+                            backgroundColor: tagColor.withOpacity(0.14),
+                            side: BorderSide(
+                              color: tagColor.withOpacity(0.35),
                             ),
                           ),
+                        ],
+                      ),
+                      if (item.tags.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: item.tags.take(4).map((tag) {
+                            return Chip(
+                              visualDensity: VisualDensity.compact,
+                              label: Text(tag),
+                              labelStyle: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(color: cs.onSecondaryContainer),
+                              backgroundColor: cs.secondaryContainer,
+                              side: BorderSide(
+                                color: cs.outlineVariant,
+                              ),
+                            );
+                          }).toList(),
                         ),
                       ],
-                    ),
-                    if (item.tags.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: item.tags.take(4).map((tag) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              tag,
-                              style: const TextStyle(
-                                color: Colors.orange,
-                                fontSize: 11,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const Icon(Icons.chevron_right, color: Colors.grey),
-            ],
+                const Icon(Icons.chevron_right),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
 }
