@@ -6,6 +6,7 @@ typedef NoteTapCallback = Future<void> Function();
 class NoteSwipeTile extends StatefulWidget {
   final Widget child;
   final NoteTapCallback onNoteTap;
+  final int resetSignal;
   final EdgeInsets noteButtonInsets;
   final BorderRadius noteButtonBorderRadius;
   final double noteButtonWidthFactor;
@@ -15,6 +16,7 @@ class NoteSwipeTile extends StatefulWidget {
     super.key,
     required this.child,
     required this.onNoteTap,
+    this.resetSignal = 0,
     this.noteButtonInsets = EdgeInsets.zero,
     this.noteButtonBorderRadius = BorderRadius.zero,
     this.noteButtonWidthFactor = 0.2,
@@ -26,12 +28,50 @@ class NoteSwipeTile extends StatefulWidget {
 }
 
 class _NoteSwipeTileState extends State<NoteSwipeTile> {
+  static _NoteSwipeTileState? _activeTile;
   double _offsetX = 0;
+
+  bool get _isRevealed => _offsetX > 0;
+
+  void _collapse() {
+    if (!mounted || _offsetX == 0) return;
+    setState(() => _offsetX = 0);
+  }
+
+  void _markAsActiveIfNeeded() {
+    if (!_isRevealed) return;
+    if (!identical(_activeTile, this)) {
+      _activeTile?._collapse();
+      _activeTile = this;
+    }
+  }
 
   Future<void> _handleNoteTap() async {
     await widget.onNoteTap();
     if (!mounted) return;
-    setState(() => _offsetX = 0);
+    _collapse();
+    if (identical(_activeTile, this)) {
+      _activeTile = null;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant NoteSwipeTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.resetSignal != widget.resetSignal) {
+      _collapse();
+      if (identical(_activeTile, this)) {
+        _activeTile = null;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    if (identical(_activeTile, this)) {
+      _activeTile = null;
+    }
+    super.dispose();
   }
 
   @override
@@ -79,11 +119,17 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
                 setState(() {
                   _offsetX = (_offsetX + details.delta.dx).clamp(0, revealWidth);
                 });
+                _markAsActiveIfNeeded();
               },
               onHorizontalDragEnd: (_) {
                 setState(() {
                   _offsetX = _offsetX >= revealWidth * 0.5 ? revealWidth : 0;
                 });
+                if (_isRevealed) {
+                  _markAsActiveIfNeeded();
+                } else if (identical(_activeTile, this)) {
+                  _activeTile = null;
+                }
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
