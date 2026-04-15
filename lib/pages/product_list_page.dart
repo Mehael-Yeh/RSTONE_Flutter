@@ -119,6 +119,10 @@ class _ProductListPageState extends State<ProductListPage> {
                 setState(() {});
               });
             },
+          ),
+          PopupMenuButton<bool>(
+            icon: const Icon(Icons.sort_by_alpha),
+            onSelected: _onSortDirectionChanged,
             itemBuilder: (context) => const [
               PopupMenuItem<bool>(
                 value: false,
