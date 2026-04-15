@@ -17,6 +17,7 @@ class ObsidianTable extends StatefulWidget {
   final String? currentSortColumn;
   final bool sortDescending;
   final PreferencesService preferencesService;
+  final int noteResetSignal;
 
   const ObsidianTable({
     super.key,
@@ -28,6 +29,7 @@ class ObsidianTable extends StatefulWidget {
     required this.onSortChanged,
     required this.onSortDirectionChanged,
     required this.preferencesService,
+    this.noteResetSignal = 0,
     this.currentSortColumn,
     this.sortDescending = false,
   });
@@ -184,6 +186,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
           return NoteSwipeTile(
             onNoteTap: () => _openNoteEditor(item),
+            resetSignal: widget.noteResetSignal,
             noteButtonInsets: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             noteButtonBorderRadius: const BorderRadius.horizontal(
               left: Radius.circular(12),
@@ -324,6 +327,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
               return NoteSwipeTile(
                 onNoteTap: () => _openNoteEditor(item),
+                resetSignal: widget.noteResetSignal,
                 child: InkWell(
                   onTap: () => ProductDetailSheet.show(context, item, formulas: widget.formulas),
                   child: Container(
