@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
+import '../widgets/note_swipe_tile.dart';
 import '../widgets/product_detail_sheet.dart';
 import 'settings_page.dart';
 
@@ -34,6 +35,21 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
   bool _isSearching = false;
   /// 是否展示结果区域（仅在有输入时展示）。
   bool _showResults = false;
+
+  Future<void> _openNoteEditor(ProductItem item) async {
+    final note = await showDialog<String>(
+      context: context,
+      builder: (context) => NoteEditorDialog(
+        title: item.displayName,
+        initialValue: widget.preferencesService.getProductNote(item.displayName),
+      ),
+    );
+    if (note == null) return;
+    await widget.preferencesService.saveProductNote(item.displayName, note);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
+    }
+  }
 
   @override
   void initState() {
@@ -220,79 +236,82 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     final isProductList = item.folder == '产品列表';
     final tagColor = isProductList ? cs.primary : cs.tertiary;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        onTap: () {
-          _searchFocusNode.unfocus();
-          ProductDetailSheet.show(context, item, formulas: widget.dataService.formulas);
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(
-                // 左侧竖条作为信息类型视觉锚点（产品/应用）。
-                width: 4,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: tagColor,
-                  borderRadius: BorderRadius.circular(12),
+    return NoteSwipeTile(
+      onNoteTap: () => _openNoteEditor(item),
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 10),
+        child: InkWell(
+          onTap: () {
+            _searchFocusNode.unfocus();
+            ProductDetailSheet.show(context, item, formulas: widget.dataService.formulas);
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  // 左侧竖条作为信息类型视觉锚点（产品/应用）。
+                  width: 4,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: tagColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.displayName,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.displayName,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
                           ),
-                        ),
-                        Chip(
-                          visualDensity: VisualDensity.compact,
-                          label: Text(isProductList ? '产品' : '应用'),
-                          labelStyle: Theme.of(context).textTheme.labelSmall,
-                          backgroundColor: tagColor.withOpacity(0.14),
-                          side: BorderSide(
-                            color: tagColor.withOpacity(0.35),
+                          Chip(
+                            visualDensity: VisualDensity.compact,
+                            label: Text(isProductList ? '产品' : '应用'),
+                            labelStyle: Theme.of(context).textTheme.labelSmall,
+                            backgroundColor: tagColor.withOpacity(0.14),
+                            side: BorderSide(
+                              color: tagColor.withOpacity(0.35),
+                            ),
                           ),
+                        ],
+                      ),
+                      if (item.tags.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: item.tags.take(4).map((tag) {
+                            return Chip(
+                              visualDensity: VisualDensity.compact,
+                              label: Text(tag),
+                              labelStyle: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(color: cs.onSecondaryContainer),
+                              backgroundColor: cs.secondaryContainer,
+                              side: BorderSide(
+                                color: cs.outlineVariant,
+                              ),
+                            );
+                          }).toList(),
                         ),
                       ],
-                    ),
-                    if (item.tags.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: item.tags.take(4).map((tag) {
-                          return Chip(
-                            visualDensity: VisualDensity.compact,
-                            label: Text(tag),
-                            labelStyle: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(color: cs.onSecondaryContainer),
-                            backgroundColor: cs.secondaryContainer,
-                            side: BorderSide(
-                              color: cs.outlineVariant,
-                            ),
-                          );
-                        }).toList(),
-                      ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const Icon(Icons.chevron_right),
-            ],
+                const Icon(Icons.chevron_right),
+              ],
+            ),
           ),
         ),
       ),
