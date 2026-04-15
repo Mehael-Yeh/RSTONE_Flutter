@@ -3,6 +3,7 @@ import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
 import '../widgets/obsidian_table.dart';
+import '../widgets/product_detail_sheet.dart';
 
 /// 产品列表页面
 class ProductListPage extends StatefulWidget {
@@ -61,11 +62,13 @@ class _ProductListPageState extends State<ProductListPage> {
   }
 
   void _onColumnsChanged(List<String> columns) {
+    ProductDetailSheet.hideIfOpen(context);
     widget.preferencesService.saveProductListColumns(columns);
     setState(() => _columns = columns);
   }
 
   void _onSortChanged(String? column) {
+    ProductDetailSheet.hideIfOpen(context);
     widget.preferencesService.saveProductListSort(column);
     widget.preferencesService.saveProductListSortDesc(false);
     setState(() {
@@ -75,6 +78,7 @@ class _ProductListPageState extends State<ProductListPage> {
   }
 
   void _onSortDirectionChanged(bool descending) {
+    ProductDetailSheet.hideIfOpen(context);
     widget.preferencesService.saveProductListSortDesc(descending);
     setState(() => _sortDescending = descending);
   }
@@ -115,6 +119,7 @@ class _ProductListPageState extends State<ProductListPage> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
+              ProductDetailSheet.hideIfOpen(context);
               widget.dataService.initialize().then((_) {
                 setState(() {});
               });
