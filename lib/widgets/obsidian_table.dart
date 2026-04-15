@@ -242,7 +242,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                '$col: $val',
+                                col == '标签' ? val : '$col: $val',
                                 style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                               ),
                             );
