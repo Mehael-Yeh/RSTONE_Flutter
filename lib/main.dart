@@ -5,6 +5,7 @@ import 'services/preferences_service.dart';
 import 'pages/search_page.dart';
 import 'pages/product_list_page.dart';
 import 'pages/product_applications_page.dart';
+import 'widgets/product_detail_sheet.dart';
 
 /// 应用入口函数
 void main() async {
@@ -140,7 +141,10 @@ class _MainScreenState extends State<MainScreen> {
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           // 切换导航时更新索引，重建 UI
-          onTap: (index) => setState(() => _currentIndex = index),
+          onTap: (index) {
+            ProductDetailSheet.hideIfOpen(context);
+            setState(() => _currentIndex = index);
+          },
           backgroundColor: const Color(0xFF2D2D2D),
           selectedItemColor: Colors.orange,   // 选中项：橙色
           unselectedItemColor: Colors.grey,   // 未选中项：灰色

@@ -54,6 +54,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
 
   /// 搜索内容变化时触发：更新搜索状态、延迟执行搜索
   void _onSearchChanged() {
+    ProductDetailSheet.hideIfOpen(context);
     final query = _searchController.text.trim();
     setState(() {
       _isSearching = query.isNotEmpty;
@@ -105,6 +106,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                     icon: const Icon(Icons.settings, color: Colors.white70),
                     onPressed: () {
                       _searchFocusNode.unfocus();
+                      ProductDetailSheet.hideIfOpen(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -156,6 +158,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                                 icon: const Icon(Icons.clear, color: Colors.grey),
                                 onPressed: () {
                                   _searchController.clear();
+                                  ProductDetailSheet.hideIfOpen(context);
                                   setState(() {
                                     _showResults = false;
                                     _results = [];

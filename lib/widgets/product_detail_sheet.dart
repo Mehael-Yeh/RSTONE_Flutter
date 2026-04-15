@@ -18,17 +18,31 @@ import '../models/product_item.dart';
 class ProductDetailSheet extends StatefulWidget {
   final ProductItem product;
   final List<ProductItem> formulas;
+  static bool _isShowing = false;
 
   const ProductDetailSheet({super.key, required this.product, this.formulas = const []});
 
   /// 显示产品详情弹窗的便捷方法
-  static void show(BuildContext context, ProductItem product, {List<ProductItem> formulas = const []}) {
-    showModalBottomSheet(
+  static Future<void> show(BuildContext context, ProductItem product, {List<ProductItem> formulas = const []}) async {
+    if (_isShowing) {
+      hideIfOpen(context);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+    }
+
+    _isShowing = true;
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => ProductDetailSheet(product: product, formulas: formulas),
-    );
+    ).whenComplete(() {
+      _isShowing = false;
+    });
+  }
+
+  static void hideIfOpen(BuildContext context) {
+    if (!_isShowing) return;
+    Navigator.of(context, rootNavigator: true).maybePop();
   }
 
   @override
@@ -579,6 +593,21 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     );
   }
 
+  bool _hasLinkedFormulasForCurrentProduct() {
+    if (widget.product.folder != '产品列表') return false;
+    return widget.formulas.any((f) {
+      final formulaName = f.fileName.replaceAll('.md', '');
+      return formulaName.startsWith('${widget.product.fileName}-');
+    });
+  }
+
+  String _removeStandaloneWikiLines(String content) {
+    return content
+        .split('\n')
+        .where((line) => !RegExp(r'^\s*\[\[[^\]]+\]\]\s*$').hasMatch(line))
+        .join('\n');
+  }
+
   Widget _buildFormulaCard(String title, String rawContent) {
     // 以表格位置为基准提取内容：
     // - 表格前的内容 → 渲染在表格上方
@@ -712,6 +741,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   Widget build(BuildContext context) {
     // 去掉 frontmatter 部分，只留 body
     final bodyContent = _extractMarkdownBody(widget.product.rawContent);
+    final markdownContent = _hasLinkedFormulasForCurrentProduct()
+        ? _removeStandaloneWikiLines(bodyContent)
+        : bodyContent;
 
     return NotificationListener<DraggableScrollableNotification>(
       onNotification: (notification) {
@@ -831,7 +863,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                 // MD 内容（不含 frontmatter）
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                  child: _markdownView(bodyContent),
+                  child: _markdownView(markdownContent),
                 ),
               ],
             ),
