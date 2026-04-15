@@ -169,67 +169,13 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                   BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
                 ),
               ),
-              child: Column(
-                children: [
-                  // 搜索框
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    height: _isSearching ? 48 : 56,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2D2D2D),
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: _isSearching
-                          ? []
-                          : [
-                              BoxShadow(
-                                color: Colors.orange.withOpacity(0.1),
-                                blurRadius: 20,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                    ),
-                    child: TextField(
-                      controller: _searchController,
-                      focusNode: _searchFocusNode,
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                      decoration: InputDecoration(
-                        hintText: '搜索产品、标签...',
-                        hintStyle: TextStyle(color: Colors.grey[500]),
-                        prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
-                        suffixIcon: _isSearching
-                            ? IconButton(
-                                icon: const Icon(Icons.clear, color: Colors.grey),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  ProductDetailSheet.hideIfOpen(context);
-                                  setState(() {
-                                    _showResults = false;
-                                    _results = [];
-                                  });
-                                },
-                              )
-                            : null,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                      ),
-                      onTap: () {
-                        if (_searchController.text.isNotEmpty) {
-                          setState(() => _showResults = true);
-                        }
-                      },
-                    ),
-                  ),
-                  // 结果数量
-                  if (_isSearching && _results.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Text(
-                        '找到 ${_results.length} 个结果',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                      ),
+            ),
+            if (_isSearching && _results.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  '找到 ${_results.length} 个结果',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
                 ),
               ),
             Expanded(
