@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+typedef NoteTapCallback = Future<void> Function();
+
 /// 可右滑露出“笔记”按钮的容器。
 class NoteSwipeTile extends StatefulWidget {
   final Widget child;
-  final VoidCallback onNoteTap;
+  final NoteTapCallback onNoteTap;
   final EdgeInsets noteButtonInsets;
   final BorderRadius noteButtonBorderRadius;
   final double noteButtonWidthFactor;
@@ -25,6 +27,12 @@ class NoteSwipeTile extends StatefulWidget {
 
 class _NoteSwipeTileState extends State<NoteSwipeTile> {
   double _offsetX = 0;
+
+  Future<void> _handleNoteTap() async {
+    await widget.onNoteTap();
+    if (!mounted) return;
+    setState(() => _offsetX = 0);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +57,7 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
                     width: buttonWidth,
                     height: double.infinity,
                     child: FilledButton(
-                      onPressed: widget.onNoteTap,
+                      onPressed: _handleNoteTap,
                       child: const Icon(Icons.note_alt_outlined, size: 20),
                       style: FilledButton.styleFrom(
                         backgroundColor: cs.primaryContainer,
