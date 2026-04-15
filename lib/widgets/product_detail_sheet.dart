@@ -18,17 +18,31 @@ import '../models/product_item.dart';
 class ProductDetailSheet extends StatefulWidget {
   final ProductItem product;
   final List<ProductItem> formulas;
+  static bool _isShowing = false;
 
   const ProductDetailSheet({super.key, required this.product, this.formulas = const []});
 
   /// 显示产品详情弹窗的便捷方法
-  static void show(BuildContext context, ProductItem product, {List<ProductItem> formulas = const []}) {
-    showModalBottomSheet(
+  static Future<void> show(BuildContext context, ProductItem product, {List<ProductItem> formulas = const []}) async {
+    if (_isShowing) {
+      hideIfOpen(context);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+    }
+
+    _isShowing = true;
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => ProductDetailSheet(product: product, formulas: formulas),
-    );
+    ).whenComplete(() {
+      _isShowing = false;
+    });
+  }
+
+  static void hideIfOpen(BuildContext context) {
+    if (!_isShowing) return;
+    Navigator.of(context, rootNavigator: true).maybePop();
   }
 
   @override
@@ -769,7 +783,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   String _removeStandaloneWikiLines(String content) {
     return content
         .split('\n')
-        .where((line) => !RegExp(r'^\s*(\[\[[^\]]+\]\]\s*)+$').hasMatch(line))
+        .where((line) => !RegExp(r'^\s*\[\[[^\]]+\]\]\s*$').hasMatch(line))
         .join('\n');
   }
 
