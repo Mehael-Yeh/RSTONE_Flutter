@@ -11,6 +11,7 @@ class SearchPage extends StatefulWidget {
   final PreferencesService preferencesService;
   final Future<void> Function(ThemeMode) onThemeModeChanged;
   final ThemeMode themeMode;
+  final int pageChangeSignal;
 
   const SearchPage({
     super.key,
@@ -18,6 +19,7 @@ class SearchPage extends StatefulWidget {
     required this.preferencesService,
     required this.onThemeModeChanged,
     required this.themeMode,
+    this.pageChangeSignal = 0,
   });
 
   @override
@@ -35,6 +37,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
   bool _isSearching = false;
   /// 是否展示结果区域（仅在有输入时展示）。
   bool _showResults = false;
+  int _noteResetSignal = 0;
 
   Future<void> _openNoteEditor(ProductItem item) async {
     final note = await showDialog<String>(
@@ -80,6 +83,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     setState(() {
       _isSearching = query.isNotEmpty;
       _showResults = query.isNotEmpty;
+      _noteResetSignal++;
     });
 
     if (query.isEmpty) {
@@ -97,6 +101,14 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
         }
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pageChangeSignal != widget.pageChangeSignal) {
+      setState(() => _noteResetSignal++);
+    }
   }
 
   @override
@@ -238,6 +250,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
 
     return NoteSwipeTile(
       onNoteTap: () => _openNoteEditor(item),
+      resetSignal: _noteResetSignal,
       noteButtonInsets: const EdgeInsets.only(bottom: 10),
       noteButtonBorderRadius: const BorderRadius.horizontal(
         left: Radius.circular(16),

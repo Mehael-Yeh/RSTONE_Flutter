@@ -9,11 +9,13 @@ import '../widgets/product_detail_sheet.dart';
 class ProductListPage extends StatefulWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
+  final int pageChangeSignal;
 
   const ProductListPage({
     super.key,
     required this.dataService,
     required this.preferencesService,
+    this.pageChangeSignal = 0,
   });
 
   @override
@@ -40,7 +42,7 @@ class _ProductListPageState extends State<ProductListPage> {
   List<String> _columns = [];
   String? _sortColumn;
   bool _sortDescending = false;
-  static const String _nameSortColumn = '牌号';
+  int _noteResetSignal = 0;
 
   @override
   void initState() {
@@ -65,7 +67,10 @@ class _ProductListPageState extends State<ProductListPage> {
   void _onColumnsChanged(List<String> columns) {
     ProductDetailSheet.hideIfOpen(context);
     widget.preferencesService.saveProductListColumns(columns);
-    setState(() => _columns = columns);
+    setState(() {
+      _columns = columns;
+      _noteResetSignal++;
+    });
   }
 
   void _onSortChanged(String? column) {
@@ -75,13 +80,25 @@ class _ProductListPageState extends State<ProductListPage> {
     setState(() {
       _sortColumn = column;
       _sortDescending = false;
+      _noteResetSignal++;
     });
   }
 
   void _onSortDirectionChanged(bool descending) {
     ProductDetailSheet.hideIfOpen(context);
     widget.preferencesService.saveProductListSortDesc(descending);
-    setState(() => _sortDescending = descending);
+    setState(() {
+      _sortDescending = descending;
+      _noteResetSignal++;
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant ProductListPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pageChangeSignal != widget.pageChangeSignal) {
+      setState(() => _noteResetSignal++);
+    }
   }
 
   List<ProductItem> _getSortedItems() {
@@ -111,15 +128,6 @@ class _ProductListPageState extends State<ProductListPage> {
       appBar: AppBar(
         title: const Text('产品列表'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ProductDetailSheet.hideIfOpen(context);
-              widget.dataService.initialize().then((_) {
-                setState(() {});
-              });
-            },
-          ),
           PopupMenuButton<bool>(
             icon: const Icon(Icons.sort_by_alpha),
             onSelected: _onSortDirectionChanged,
@@ -171,6 +179,7 @@ class _ProductListPageState extends State<ProductListPage> {
               preferencesService: widget.preferencesService,
               currentSortColumn: _sortColumn,
               sortDescending: _sortDescending,
+              noteResetSignal: _noteResetSignal,
             ),
     );
   }
