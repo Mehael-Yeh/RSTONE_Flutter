@@ -155,6 +155,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
               onColumnsChanged: _onColumnsChanged,
               onSortChanged: _onSortChanged,
               onSortDirectionChanged: _onSortDirectionChanged,
+              preferencesService: widget.preferencesService,
               currentSortColumn: _sortColumn,
               sortDescending: _sortDescending,
             ),
