@@ -119,16 +119,6 @@ class _ProductListPageState extends State<ProductListPage> {
                 setState(() {});
               });
             },
-            itemBuilder: (context) => const [
-              PopupMenuItem<bool>(
-                value: false,
-                child: Text('A-Z'),
-              ),
-              PopupMenuItem<bool>(
-                value: true,
-                child: Text('Z-A'),
-              ),
-            ],
           ),
         ],
       ),
