@@ -184,6 +184,8 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
           return NoteSwipeTile(
             onNoteTap: () => _openNoteEditor(item),
+            noteButtonInsets: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            noteButtonBorderRadius: BorderRadius.circular(12),
             child: Card(
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: InkWell(
