@@ -184,7 +184,12 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
           return NoteSwipeTile(
             onNoteTap: () => _openNoteEditor(item),
+            noteButtonInsets: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            noteButtonBorderRadius: const BorderRadius.horizontal(
+              left: Radius.circular(12),
+            ),
             child: Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: InkWell(
                 onTap: () => ProductDetailSheet.show(context, item, formulas: widget.formulas),
@@ -237,7 +242,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                '$col: $val',
+                                col == '标签' ? val : '$col: $val',
                                 style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                               ),
                             );

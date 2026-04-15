@@ -1,14 +1,24 @@
 import 'package:flutter/material.dart';
 
+typedef NoteTapCallback = Future<void> Function();
+
 /// 可右滑露出“笔记”按钮的容器。
 class NoteSwipeTile extends StatefulWidget {
   final Widget child;
-  final VoidCallback onNoteTap;
+  final NoteTapCallback onNoteTap;
+  final EdgeInsets noteButtonInsets;
+  final BorderRadius noteButtonBorderRadius;
+  final double noteButtonWidthFactor;
+  final double noteButtonRightOverlap;
 
   const NoteSwipeTile({
     super.key,
     required this.child,
     required this.onNoteTap,
+    this.noteButtonInsets = EdgeInsets.zero,
+    this.noteButtonBorderRadius = BorderRadius.zero,
+    this.noteButtonWidthFactor = 0.2,
+    this.noteButtonRightOverlap = 12,
   });
 
   @override
@@ -18,31 +28,46 @@ class NoteSwipeTile extends StatefulWidget {
 class _NoteSwipeTileState extends State<NoteSwipeTile> {
   double _offsetX = 0;
 
+  Future<void> _handleNoteTap() async {
+    await widget.onNoteTap();
+    if (!mounted) return;
+    setState(() => _offsetX = 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final revealWidth = constraints.maxWidth * 0.25;
+        final availableWidth = (constraints.maxWidth - widget.noteButtonInsets.horizontal)
+            .clamp(0.0, double.infinity)
+            .toDouble();
+        final revealWidth = (availableWidth * widget.noteButtonWidthFactor).clamp(56.0, 120.0).toDouble();
+        final buttonWidth = (revealWidth + widget.noteButtonRightOverlap).clamp(revealWidth, 140.0).toDouble();
 
         return Stack(
           children: [
             Positioned.fill(
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: revealWidth,
-                  height: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: widget.onNoteTap,
-                    icon: const Icon(Icons.note_alt_outlined),
-                    label: const Text('笔记'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: cs.primaryContainer,
-                      foregroundColor: cs.onPrimaryContainer,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(0),
+              child: Padding(
+                padding: widget.noteButtonInsets,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: buttonWidth,
+                    height: double.infinity,
+                    child: FilledButton(
+                      onPressed: _handleNoteTap,
+                      child: const Icon(Icons.note_alt_outlined, size: 20),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: cs.primaryContainer,
+                        foregroundColor: cs.onPrimaryContainer,
+                        elevation: 0,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: widget.noteButtonBorderRadius,
+                        ),
                       ),
                     ),
                   ),
