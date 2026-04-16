@@ -31,10 +31,14 @@ class TdsPdfService {
     final parsed = _parseTdsSections(body);
 
     final doc = pw.Document();
+    final baseFont = await PdfGoogleFonts.notoSansSCRegular();
+    final boldFont = await PdfGoogleFonts.notoSansSCBold();
+
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(24, 20, 24, 20),
+        theme: pw.ThemeData.withFont(base: baseFont, bold: boldFont),
         build: (context) => [
           _buildHeader(product),
           pw.SizedBox(height: 16),
