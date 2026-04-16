@@ -278,6 +278,35 @@ class ObsidianDataService {
     return map;
   }
 
+  /// 扩展关键词，包含自身以及同义词规则中的正向/反向映射。
+  Set<String> _expandedKeywords(String keyword) {
+    final normalized = keyword.toLowerCase().trim();
+    if (normalized.isEmpty) return <String>{};
+
+    final expanded = <String>{normalized};
+    final queue = <String>[normalized];
+    final visited = <String>{};
+
+    while (queue.isNotEmpty) {
+      final current = queue.removeLast();
+      if (!visited.add(current)) continue;
+
+      for (final alias in _tagAliasRules[current] ?? const <String>{}) {
+        if (expanded.add(alias)) {
+          queue.add(alias);
+        }
+      }
+
+      for (final entry in _tagAliasRules.entries) {
+        if (entry.value.contains(current) && expanded.add(entry.key)) {
+          queue.add(entry.key);
+        }
+      }
+    }
+
+    return expanded;
+  }
+
   /// 从Asset复制数据到私有目录
   Future<void> _copyAssetsToPrivateDir(Directory dataDir) async {
     try {
