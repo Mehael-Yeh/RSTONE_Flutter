@@ -33,9 +33,11 @@ flutter:
     - assets/产品列表/
     - assets/产品应用/
     - assets/产品配方/
+    - assets/产品TDS/
     - assets/产品列表.json
     - assets/产品应用.json
     - assets/产品配方.json
+    - assets/产品TDS.json
     - assets/tag_alias_rules.txt
 
 flutter_launcher_icons:
