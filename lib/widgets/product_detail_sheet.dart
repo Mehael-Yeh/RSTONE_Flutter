@@ -19,12 +19,23 @@ import '../services/tds_pdf_service.dart';
 class ProductDetailSheet extends StatefulWidget {
   final ProductItem product;
   final List<ProductItem> formulas;
+  final String? tdsContent;
   static bool _isShowing = false;
 
-  const ProductDetailSheet({super.key, required this.product, this.formulas = const []});
+  const ProductDetailSheet({
+    super.key,
+    required this.product,
+    this.formulas = const [],
+    this.tdsContent,
+  });
 
   /// 显示产品详情弹窗的便捷方法
-  static Future<void> show(BuildContext context, ProductItem product, {List<ProductItem> formulas = const []}) async {
+  static Future<void> show(
+    BuildContext context,
+    ProductItem product, {
+    List<ProductItem> formulas = const [],
+    String? tdsContent,
+  }) async {
     if (_isShowing) {
       hideIfOpen(context);
       await Future<void>.delayed(const Duration(milliseconds: 120));
@@ -35,7 +46,11 @@ class ProductDetailSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => ProductDetailSheet(product: product, formulas: formulas),
+      builder: (context) => ProductDetailSheet(
+        product: product,
+        formulas: formulas,
+        tdsContent: tdsContent,
+      ),
     ).whenComplete(() {
       _isShowing = false;
     });
@@ -57,7 +72,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   bool _isGeneratingTds = false;
 
   Future<void> _handleGenerateTds() async {
-    if (_isGeneratingTds || widget.product.folder != '产品列表') {
+    if (_isGeneratingTds || widget.product.folder != '产品列表' || widget.tdsContent == null) {
       return;
     }
 
@@ -66,7 +81,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     });
 
     try {
-      await TdsPdfService.generateAndShareTds(widget.product);
+      await TdsPdfService.generateAndShareTds(
+        widget.product,
+        tdsMarkdown: widget.tdsContent!,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('TDS 已生成并打开分享面板')),
@@ -1030,7 +1048,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (widget.product.folder == '产品列表')
+                      if (widget.product.folder == '产品列表' && widget.tdsContent != null)
                         Padding(
                           padding: const EdgeInsets.only(right: 4),
                           child: InkWell(

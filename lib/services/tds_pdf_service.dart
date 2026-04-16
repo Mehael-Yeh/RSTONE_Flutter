@@ -11,8 +11,11 @@ import '../models/product_item.dart';
 class TdsPdfService {
   static final RegExp _headingReg = RegExp(r'^(#{1,3})\s*(.+)$');
 
-  static Future<File> generateAndShareTds(ProductItem product) async {
-    final bytes = await _buildPdf(product);
+  static Future<File> generateAndShareTds(
+    ProductItem product, {
+    required String tdsMarkdown,
+  }) async {
+    final bytes = await _buildPdf(product, tdsMarkdown: tdsMarkdown);
     final dir = await getTemporaryDirectory();
     final safeName = product.fileName.replaceAll(RegExp(r'[\\/:*?"<>|\s]+'), '_');
     final file = File('${dir.path}/${safeName}_TDS.pdf');
@@ -26,8 +29,11 @@ class TdsPdfService {
     return file;
   }
 
-  static Future<Uint8List> _buildPdf(ProductItem product) async {
-    final body = _extractMarkdownBody(product.rawContent);
+  static Future<Uint8List> _buildPdf(
+    ProductItem product, {
+    required String tdsMarkdown,
+  }) async {
+    final body = _extractMarkdownBody(tdsMarkdown);
     final parsed = _parseTdsSections(body);
 
     final doc = pw.Document();
