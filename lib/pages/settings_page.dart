@@ -115,6 +115,21 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 12),
           _buildSectionCard(
+            title: '标签搜索规则',
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.rule_folder_outlined),
+                  title: const Text('查看/编辑规则文档'),
+                  subtitle: const Text('用于搜索同义词扩展，例如 PA6 → 尼龙'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _openTagAliasRuleEditor,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
             title: '日志',
             child: Column(
               children: [
@@ -190,6 +205,56 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _openTagAliasRuleEditor() async {
+    final controller = TextEditingController(text: widget.dataService.tagAliasRulesRaw);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('标签同义词规则'),
+        content: SizedBox(
+          width: 680,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '每行一条规则：左侧是可匹配标签（可用“、”分隔多个），右侧是扩展词。\n格式示例：PA、PA6、PA66 -> 尼龙',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 18,
+                minLines: 12,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: '# 支持注释行\nPA、PA6、PA66 -> 尼龙',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (saved != true) return;
+
+    await widget.dataService.saveTagAliasRules(controller.text);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('标签规则已保存，搜索将立即生效')),
     );
   }
 
