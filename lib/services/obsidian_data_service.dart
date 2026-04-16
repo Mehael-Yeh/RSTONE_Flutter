@@ -18,6 +18,10 @@ class ObsidianDataService {
   static const String _productsAssetPath = 'assets/产品列表';
   /// 产品应用 Asset 目录路径
   static const String _applicationsAssetPath = 'assets/产品应用';
+  /// 标签同义词规则文档（默认内置）
+  static const String _tagAliasRulesAssetPath = 'assets/tag_alias_rules.txt';
+  /// 标签同义词规则文档（用户可编辑）
+  static const String _tagAliasRulesFileName = 'tag_alias_rules.txt';
   
   /// 产品列表数据
   List<ProductItem> _products = [];
@@ -25,6 +29,10 @@ class ObsidianDataService {
   List<ProductItem> _applications = [];
   /// 产品配方数据
   List<ProductItem> _formulas = [];
+  /// 标签同义词规则文本（可被设置页展示/编辑）
+  String _tagAliasRulesRaw = '';
+  /// 标签同义词映射（key -> 可匹配词）
+  Map<String, Set<String>> _tagAliasRules = {};
   /// 是否已完成初始化
   bool _initialized = false;
   
@@ -34,6 +42,8 @@ class ObsidianDataService {
   List<ProductItem> get products => _products;
   List<ProductItem> get applications => _applications;
   List<ProductItem> get formulas => _formulas;
+  String get tagAliasRulesRaw => _tagAliasRulesRaw;
+  Map<String, Set<String>> get tagAliasRules => _tagAliasRules;
   bool get isInitialized => _initialized;
   List<String> get logs => List.unmodifiable(_logs);
 
@@ -64,6 +74,7 @@ class ObsidianDataService {
       // 第一步：直接从Asset加载（最可靠）
       _addLog('DataService: Loading from assets...');
       await _loadFromAssetsOnly();
+      await _loadTagAliasRules();
       _addLog('DataService: Asset load complete. Products: ${_products.length}, Applications: ${_applications.length}');
       
       // 第二步：如果Asset加载失败，从私有目录加载
@@ -199,6 +210,74 @@ class ObsidianDataService {
     }
   }
 
+  /// 加载标签同义词规则（优先用户私有目录，其次内置 Asset）。
+  Future<void> _loadTagAliasRules() async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final dataDir = Directory('${appDir.path}/rst_data');
+    final customRuleFile = File('${dataDir.path}/$_tagAliasRulesFileName');
+    String rawContent = '';
+
+    if (await customRuleFile.exists()) {
+      try {
+        rawContent = await customRuleFile.readAsString();
+        _addLog('DataService: Loaded custom tag alias rules from private dir');
+      } catch (e) {
+        _addLog('DataService: Failed to read custom tag alias rules: $e');
+      }
+    }
+
+    if (rawContent.trim().isEmpty) {
+      try {
+        rawContent = await rootBundle.loadString(_tagAliasRulesAssetPath);
+        _addLog('DataService: Loaded default tag alias rules from assets');
+      } catch (e) {
+        _addLog('DataService: Failed to load asset tag alias rules: $e');
+        rawContent = '';
+      }
+    }
+
+    _tagAliasRulesRaw = rawContent;
+    _tagAliasRules = _parseTagAliasRules(rawContent);
+    _addLog('DataService: Parsed ${_tagAliasRules.length} tag alias keys');
+  }
+
+  /// 保存标签同义词规则到私有目录，并更新内存映射。
+  Future<void> saveTagAliasRules(String rawContent) async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final dataDir = Directory('${appDir.path}/rst_data');
+    await dataDir.create(recursive: true);
+    final customRuleFile = File('${dataDir.path}/$_tagAliasRulesFileName');
+    await customRuleFile.writeAsString(rawContent);
+    _tagAliasRulesRaw = rawContent;
+    _tagAliasRules = _parseTagAliasRules(rawContent);
+    _addLog('DataService: Saved custom tag alias rules');
+  }
+
+  /// 解析规则文档：支持 `A->B` 与 `A→B`，并支持左侧多 key（逗号分隔）。
+  Map<String, Set<String>> _parseTagAliasRules(String rawContent) {
+    final map = <String, Set<String>>{};
+    final lines = rawContent.split('\n');
+
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
+      final parts = trimmed.split(RegExp(r'\s*(?:->|→)\s*'));
+      if (parts.length != 2) continue;
+      final keysPart = parts[0].trim();
+      final value = parts[1].trim().toLowerCase();
+      if (keysPart.isEmpty || value.isEmpty) continue;
+
+      final keys = keysPart
+          .split(RegExp(r'[、,，]'))
+          .map((k) => k.trim().toLowerCase())
+          .where((k) => k.isNotEmpty);
+      for (final key in keys) {
+        map.putIfAbsent(key, () => <String>{}).add(value);
+      }
+    }
+    return map;
+  }
+
   /// 从Asset复制数据到私有目录
   Future<void> _copyAssetsToPrivateDir(Directory dataDir) async {
     try {
@@ -290,16 +369,28 @@ class ObsidianDataService {
     
     _addLog('DataService: Searching for keywords: $keywords');
     
+    Set<String> _buildSearchableTags(ProductItem item) {
+      final searchable = <String>{};
+      for (final rawTag in item.tags) {
+        final normalizedTag = rawTag.toLowerCase();
+        if (normalizedTag.isEmpty) continue;
+        searchable.add(normalizedTag);
+        searchable.addAll(_tagAliasRules[normalizedTag] ?? {});
+      }
+      return searchable;
+    }
+
     bool containsKeyword(ProductItem item, String keyword) {
+      final searchableTagsText = _buildSearchableTags(item).join(' ');
       final singleKeywordSearchText =
-          '${item.fileName} ${item.experimentalCode ?? ''} ${item.tags.join(' ')}'
+          '${item.fileName} ${item.experimentalCode ?? ''} $searchableTagsText'
               .toLowerCase();
       return singleKeywordSearchText.contains(keyword);
     }
 
     bool matchesMixedKeywordsInTagsOnly(ProductItem item) {
-      final tagsText = item.tags.join(' ').toLowerCase();
-      return keywords.every((keyword) => tagsText.contains(keyword));
+      final tagsText = _buildSearchableTags(item).join(' ').toLowerCase();
+      return keywords.every(tagsText.contains);
     }
 
     for (var product in _products) {
