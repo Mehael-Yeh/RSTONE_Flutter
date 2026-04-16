@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/product_item.dart';
+import '../services/tds_pdf_service.dart';
 
 /// 产品详情底部弹窗
 /// 
@@ -53,6 +54,35 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   /// 多配方时下拉选择的索引
   int _selectedFormulaIndex = 0;
   String? _selectedApplicationFormulaName;
+  bool _isGeneratingTds = false;
+
+  Future<void> _handleGenerateTds() async {
+    if (_isGeneratingTds || widget.product.folder != '产品列表') {
+      return;
+    }
+
+    setState(() {
+      _isGeneratingTds = true;
+    });
+
+    try {
+      await TdsPdfService.generateAndShareTds(widget.product);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('TDS 已生成并打开分享面板')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('TDS 生成失败：$e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isGeneratingTds = false;
+      });
+    }
+  }
 
   List<ProductItem> _deduplicateFormulasByFileName(List<ProductItem> formulas) {
     final unique = <String, ProductItem>{};
@@ -1000,6 +1030,38 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (widget.product.folder == '产品列表')
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: _isGeneratingTds ? null : _handleGenerateTds,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: cs.secondaryContainer,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: _isGeneratingTds
+                                  ? SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: cs.onSecondaryContainer,
+                                      ),
+                                    )
+                                  : Text(
+                                      'TDS',
+                                      style: TextStyle(
+                                        color: cs.onSecondaryContainer,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
                       IconButton(
                         onPressed: () => Navigator.pop(context),
                         icon: Icon(Icons.close, color: cs.onSurfaceVariant),
