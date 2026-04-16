@@ -385,7 +385,8 @@ class ObsidianDataService {
       final singleKeywordSearchText =
           '${item.fileName} ${item.experimentalCode ?? ''} $searchableTagsText'
               .toLowerCase();
-      return singleKeywordSearchText.contains(keyword);
+      final expanded = _expandedKeywords(keyword);
+      return expanded.any(singleKeywordSearchText.contains);
     }
 
     bool matchesMixedKeywordsInTagsOnly(ProductItem item) {
