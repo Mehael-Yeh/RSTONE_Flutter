@@ -369,26 +369,29 @@ class ObsidianDataService {
     
     _addLog('DataService: Searching for keywords: $keywords');
     
-    Set<String> _expandedKeywords(String keyword) {
-      final expanded = <String>{keyword};
-      expanded.addAll(_tagAliasRules[keyword] ?? {});
-      return expanded;
+    Set<String> _buildSearchableTags(ProductItem item) {
+      final searchable = <String>{};
+      for (final rawTag in item.tags) {
+        final normalizedTag = rawTag.toLowerCase();
+        if (normalizedTag.isEmpty) continue;
+        searchable.add(normalizedTag);
+        searchable.addAll(_tagAliasRules[normalizedTag] ?? {});
+      }
+      return searchable;
     }
 
     bool containsKeyword(ProductItem item, String keyword) {
+      final searchableTagsText = _buildSearchableTags(item).join(' ');
       final singleKeywordSearchText =
-          '${item.fileName} ${item.experimentalCode ?? ''} ${item.tags.join(' ')}'
+          '${item.fileName} ${item.experimentalCode ?? ''} $searchableTagsText'
               .toLowerCase();
       final expanded = _expandedKeywords(keyword);
       return expanded.any(singleKeywordSearchText.contains);
     }
 
     bool matchesMixedKeywordsInTagsOnly(ProductItem item) {
-      final tagsText = item.tags.join(' ').toLowerCase();
-      return keywords.every((keyword) {
-        final expanded = _expandedKeywords(keyword);
-        return expanded.any(tagsText.contains);
-      });
+      final tagsText = _buildSearchableTags(item).join(' ').toLowerCase();
+      return keywords.every(tagsText.contains);
     }
 
     for (var product in _products) {
