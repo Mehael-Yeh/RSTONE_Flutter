@@ -31,14 +31,10 @@ class TdsPdfService {
     final parsed = _parseTdsSections(body);
 
     final doc = pw.Document();
-    final baseFont = await PdfGoogleFonts.notoSansScRegular();
-    final boldFont = await PdfGoogleFonts.notoSansScBold();
-
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(24, 20, 24, 20),
-        theme: pw.ThemeData.withFont(base: baseFont, bold: boldFont),
         build: (context) => [
           _buildHeader(product),
           pw.SizedBox(height: 16),
@@ -169,14 +165,14 @@ class TdsPdfService {
         pw.SizedBox(height: 4),
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: const [
+          children: [
             pw.Text('地址 ADD: 浙江省嘉兴市秀洲区油车港镇永越大厦11楼1102', style: pw.TextStyle(fontSize: 11)),
             pw.Text('电话/传真 TEL/FAX: 15067388778 0573-82203606', style: pw.TextStyle(fontSize: 11)),
           ],
         ),
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: const [
+          children: [
             pw.Text('网址 WEBSITE: http://www.rstone-resin.com/', style: pw.TextStyle(fontSize: 11)),
             pw.Text('邮箱 EMAIL: zhoulei22kb@rstone-resin.com', style: pw.TextStyle(fontSize: 11)),
           ],
