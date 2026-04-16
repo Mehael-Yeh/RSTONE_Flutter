@@ -371,6 +371,79 @@ class ObsidianDataService {
   List<ProductItem> search(String query) {
     if (query.isEmpty) return [];
 
+    Set<String> _buildSearchableTags(ProductItem item) {
+      final searchable = <String>{};
+      for (final rawTag in item.tags) {
+        final normalizedTag = rawTag.toLowerCase();
+        if (normalizedTag.isEmpty) continue;
+        searchable.add(normalizedTag);
+        searchable.addAll(_tagAliasRules[normalizedTag] ?? {});
+      }
+      return searchable;
+    }
+
+    Set<String> _buildKnownTagTerms() {
+      final knownTerms = <String>{};
+
+      void addFromItem(ProductItem item) {
+        knownTerms.addAll(_buildSearchableTags(item));
+      }
+
+      for (final product in _products) {
+        addFromItem(product);
+      }
+      for (final app in _applications) {
+        addFromItem(app);
+      }
+
+      for (final entry in _tagAliasRules.entries) {
+        knownTerms.add(entry.key);
+        knownTerms.addAll(entry.value);
+      }
+
+      return knownTerms.where((term) => term.isNotEmpty).toSet();
+    }
+
+    List<String> _segmentByKnownTerms(String input, Set<String> knownTerms) {
+      final source = input.toLowerCase().trim();
+      if (source.isEmpty) return const <String>[];
+      if (!RegExp(r'^[\u4e00-\u9fff]+$').hasMatch(source)) {
+        return <String>[source];
+      }
+
+      final matchesAt = List<List<String>>.generate(source.length + 1, (_) => <String>[]);
+      for (final term in knownTerms) {
+        if (term.isEmpty || term == source || term.length > source.length) continue;
+        if (!RegExp(r'^[\u4e00-\u9fff]+$').hasMatch(term)) continue;
+        var start = source.indexOf(term);
+        while (start != -1) {
+          matchesAt[start].add(term);
+          start = source.indexOf(term, start + 1);
+        }
+      }
+
+      final best = List<List<String>?>.filled(source.length + 1, null);
+      best[0] = <String>[];
+      for (var i = 0; i < source.length; i++) {
+        final prefix = best[i];
+        if (prefix == null) continue;
+        for (final term in matchesAt[i]) {
+          final next = i + term.length;
+          final candidate = [...prefix, term];
+          final existing = best[next];
+          if (existing == null || candidate.length > existing.length) {
+            best[next] = candidate;
+          }
+        }
+      }
+
+      final segmented = best[source.length];
+      if (segmented != null && segmented.length > 1) {
+        return segmented;
+      }
+      return <String>[source];
+    }
+
     final normalizedQuery = query.toLowerCase().trim();
     final keywords = normalizedQuery
         .split(RegExp(r'\s+'))
@@ -391,23 +464,22 @@ class ObsidianDataService {
           ..addAll(segmented);
       }
     }
+
+    if (keywords.length == 1) {
+      final knownTerms = _buildKnownTagTerms();
+      final segmented = _segmentByKnownTerms(keywords.first, knownTerms);
+      if (segmented.length > 1) {
+        keywords
+          ..clear()
+          ..addAll(segmented);
+      }
+    }
     
     if (keywords.isEmpty) return [];
     
     final results = <ProductItem>[];
     
     _addLog('DataService: Searching for keywords: $keywords');
-    
-    Set<String> _buildSearchableTags(ProductItem item) {
-      final searchable = <String>{};
-      for (final rawTag in item.tags) {
-        final normalizedTag = rawTag.toLowerCase();
-        if (normalizedTag.isEmpty) continue;
-        searchable.add(normalizedTag);
-        searchable.addAll(_tagAliasRules[normalizedTag] ?? {});
-      }
-      return searchable;
-    }
 
     bool containsKeyword(ProductItem item, String keyword) {
       final searchableTagsText = _buildSearchableTags(item).join(' ');
@@ -420,7 +492,10 @@ class ObsidianDataService {
 
     bool matchesMixedKeywordsInTagsOnly(ProductItem item) {
       final tagsText = _buildSearchableTags(item).join(' ').toLowerCase();
-      return keywords.every(tagsText.contains);
+      return keywords.every((keyword) {
+        final expanded = _expandedKeywords(keyword);
+        return expanded.any(tagsText.contains);
+      });
     }
 
     for (var product in _products) {
