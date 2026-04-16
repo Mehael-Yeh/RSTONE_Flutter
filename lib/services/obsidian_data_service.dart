@@ -407,14 +407,10 @@ class ObsidianDataService {
     List<String> _segmentByKnownTerms(String input, Set<String> knownTerms) {
       final source = input.toLowerCase().trim();
       if (source.isEmpty) return const <String>[];
-      if (!RegExp(r'^[\u4e00-\u9fff]+$').hasMatch(source)) {
-        return <String>[source];
-      }
 
       final matchesAt = List<List<String>>.generate(source.length + 1, (_) => <String>[]);
       for (final term in knownTerms) {
         if (term.isEmpty || term == source || term.length > source.length) continue;
-        if (!RegExp(r'^[\u4e00-\u9fff]+$').hasMatch(term)) continue;
         var start = source.indexOf(term);
         while (start != -1) {
           matchesAt[start].add(term);
@@ -451,9 +447,19 @@ class ObsidianDataService {
         .toList();
 
     if (keywords.length <= 1) {
+      final knownTerms = _buildKnownTagTerms();
+      final segmentedByKnownTerms = _segmentByKnownTerms(normalizedQuery, knownTerms);
+      if (segmentedByKnownTerms.length > 1) {
+        keywords
+          ..clear()
+          ..addAll(segmentedByKnownTerms);
+      }
+    }
+
+    if (keywords.length <= 1) {
       // 未使用空格时，额外按“中文片段 + 英文数字片段”拆分，
       // 例如：水性PU / PU水性 → [水性, pu]
-      final segmented = RegExp(r'[\u4e00-\u9fff]+|[a-z0-9]+')
+      final segmented = RegExp(r'[\u4e00-\u9fff]+|[a-z0-9-]+')
           .allMatches(normalizedQuery)
           .map((m) => m.group(0) ?? '')
           .where((k) => k.isNotEmpty)
@@ -481,12 +487,31 @@ class ObsidianDataService {
     
     _addLog('DataService: Searching for keywords: $keywords');
 
+    bool isDigitsOnly(String keyword) => RegExp(r'^\d+$').hasMatch(keyword);
+
+    bool startsWithNumericBody(String? code, String numericKeyword) {
+      if (code == null || code.isEmpty) return false;
+      final normalizedCode = code.toLowerCase().trim();
+      final normalizedKeyword = numericKeyword.toLowerCase().trim();
+      if (normalizedKeyword.isEmpty) return false;
+
+      final firstDigitIndex = normalizedCode.indexOf(RegExp(r'\d'));
+      if (firstDigitIndex == -1) return false;
+      final numericBody = normalizedCode.substring(firstDigitIndex);
+      return numericBody.startsWith(normalizedKeyword);
+    }
+
     bool containsKeyword(ProductItem item, String keyword) {
       final searchableTagsText = _buildSearchableTags(item).join(' ');
       final singleKeywordSearchText =
           '${item.fileName} ${item.experimentalCode ?? ''} $searchableTagsText'
               .toLowerCase();
       final expanded = _expandedKeywords(keyword);
+      if (isDigitsOnly(keyword)) {
+        final numericKeyword = keyword.toLowerCase();
+        return startsWithNumericBody(item.fileName, numericKeyword) ||
+            startsWithNumericBody(item.experimentalCode, numericKeyword);
+      }
       return expanded.any(singleKeywordSearchText.contains);
     }
 
