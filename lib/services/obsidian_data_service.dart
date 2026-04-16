@@ -447,6 +447,16 @@ class ObsidianDataService {
         .toList();
 
     if (keywords.length <= 1) {
+      final knownTerms = _buildKnownTagTerms();
+      final segmentedByKnownTerms = _segmentByKnownTerms(normalizedQuery, knownTerms);
+      if (segmentedByKnownTerms.length > 1) {
+        keywords
+          ..clear()
+          ..addAll(segmentedByKnownTerms);
+      }
+    }
+
+    if (keywords.length <= 1) {
       // 未使用空格时，额外按“中文片段 + 英文数字片段”拆分，
       // 例如：水性PU / PU水性 → [水性, pu]
       final segmented = RegExp(r'[\u4e00-\u9fff]+|[a-z0-9-]+')
@@ -499,8 +509,7 @@ class ObsidianDataService {
       final expanded = _expandedKeywords(keyword);
       if (isDigitsOnly(keyword)) {
         final numericKeyword = keyword.toLowerCase();
-        return
-            startsWithNumericBody(item.fileName, numericKeyword) ||
+        return startsWithNumericBody(item.fileName, numericKeyword) ||
             startsWithNumericBody(item.experimentalCode, numericKeyword);
       }
       return expanded.any(singleKeywordSearchText.contains);
