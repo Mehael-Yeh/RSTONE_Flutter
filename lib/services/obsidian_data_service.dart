@@ -254,8 +254,9 @@ class ObsidianDataService {
 
   /// 搜索产品和应用
   /// 
-  /// 分词 AND 匹配：所有关键词都必须出现在 searchText 中才算匹配。
-  /// 搜索范围包括：文件名、标签、工程师、实验牌号、固含、基材、底漆、中漆、面漆。
+  /// 搜索规则：
+  /// 1) 单关键词：搜索范围包括文件名（产品牌号/应用名称）、实验牌号、标签。
+  /// 2) 混合关键词（空格分词或自动分段后>=2个关键词）：仅在标签内进行 AND 匹配。
   /// 
   /// [query] 搜索关键词，支持空格分隔多个关键词
   /// 返回匹配的产品和应用列表
@@ -289,18 +290,32 @@ class ObsidianDataService {
     
     _addLog('DataService: Searching for keywords: $keywords');
     
-    bool matchesAllKeywords(String searchText) {
-      return keywords.every((keyword) => searchText.contains(keyword));
+    bool containsKeyword(ProductItem item, String keyword) {
+      final singleKeywordSearchText =
+          '${item.fileName} ${item.experimentalCode ?? ''} ${item.tags.join(' ')}'
+              .toLowerCase();
+      return singleKeywordSearchText.contains(keyword);
     }
-    
+
+    bool matchesMixedKeywordsInTagsOnly(ProductItem item) {
+      final tagsText = item.tags.join(' ').toLowerCase();
+      return keywords.every((keyword) => tagsText.contains(keyword));
+    }
+
     for (var product in _products) {
-      if (matchesAllKeywords(product.searchText)) {
+      final matched = keywords.length == 1
+          ? containsKeyword(product, keywords.first)
+          : matchesMixedKeywordsInTagsOnly(product);
+      if (matched) {
         results.add(product);
       }
     }
-    
+
     for (var app in _applications) {
-      if (matchesAllKeywords(app.searchText)) {
+      final matched = keywords.length == 1
+          ? containsKeyword(app, keywords.first)
+          : matchesMixedKeywordsInTagsOnly(app);
+      if (matched) {
         results.add(app);
       }
     }
