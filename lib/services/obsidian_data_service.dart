@@ -18,6 +18,10 @@ class ObsidianDataService {
   static const String _productsAssetPath = 'assets/产品列表';
   /// 产品应用 Asset 目录路径
   static const String _applicationsAssetPath = 'assets/产品应用';
+  /// TDS Asset 索引文件路径
+  static const String _tdsAssetIndex = 'assets/产品TDS.json';
+  /// TDS Asset 目录路径（文件名格式：产品名称.TDS.md）
+  static const String _tdsAssetPath = 'assets/产品TDS';
   /// 标签同义词规则文档（默认内置）
   static const String _tagAliasRulesAssetPath = 'assets/tag_alias_rules.txt';
   /// 标签同义词规则文档（用户可编辑）
@@ -31,6 +35,8 @@ class ObsidianDataService {
   List<ProductItem> _formulas = [];
   /// 标签同义词规则文本（可被设置页展示/编辑）
   String _tagAliasRulesRaw = '';
+  /// TDS 文档缓存（key: 产品名称，value: 对应 .TDS.md 文本）
+  Map<String, String> _tdsByProduct = {};
   /// 标签同义词映射（key -> 可匹配词）
   Map<String, Set<String>> _tagAliasRules = {};
   /// 是否已完成初始化
@@ -44,8 +50,10 @@ class ObsidianDataService {
   List<ProductItem> get formulas => _formulas;
   String get tagAliasRulesRaw => _tagAliasRulesRaw;
   Map<String, Set<String>> get tagAliasRules => _tagAliasRules;
+  Map<String, String> get tdsByProduct => Map.unmodifiable(_tdsByProduct);
   bool get isInitialized => _initialized;
   List<String> get logs => List.unmodifiable(_logs);
+  String? tdsForProduct(String productName) => _tdsByProduct[productName];
 
   void _addLog(String message) {
     final timestamp = DateTime.now().toString().substring(11, 19);
@@ -207,6 +215,27 @@ class ObsidianDataService {
       }
     } catch (e) {
       _addLog('DataService: Error loading formulas: $e');
+    }
+
+    // 加载 TDS 文档（通过 assets/产品TDS.json 索引逐个加载）
+    _addLog('DataService: Loading TDS from assets...');
+    try {
+      final tdsIndexContent = await rootBundle.loadString(_tdsAssetIndex);
+      final List<dynamic> tdsFiles = jsonDecode(tdsIndexContent);
+      _addLog('DataService: Found ${tdsFiles.length} TDS files');
+
+      for (final fileNameDynamic in tdsFiles) {
+        final fileName = fileNameDynamic.toString();
+        try {
+          final content = await rootBundle.loadString('$_tdsAssetPath/$fileName');
+          final productName = fileName.replaceAll('.TDS.md', '');
+          _tdsByProduct[productName] = content;
+        } catch (e) {
+          _addLog('DataService: Error loading TDS $fileName: $e');
+        }
+      }
+    } catch (e) {
+      _addLog('DataService: TDS index not found or failed to parse: $e');
     }
   }
 
