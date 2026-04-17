@@ -261,7 +261,12 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
         child: InkWell(
           onTap: () {
             _searchFocusNode.unfocus();
-            ProductDetailSheet.show(context, item, formulas: widget.dataService.formulas);
+            ProductDetailSheet.show(
+              context,
+              item,
+              formulas: widget.dataService.formulas,
+              tdsContent: widget.dataService.tdsForProduct(item.fileName),
+            );
           },
           borderRadius: BorderRadius.circular(16),
           child: Padding(

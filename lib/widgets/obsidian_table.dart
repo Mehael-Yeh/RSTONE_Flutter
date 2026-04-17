@@ -9,6 +9,7 @@ import 'product_detail_sheet.dart';
 class ObsidianTable extends StatefulWidget {
   final List<ProductItem> items;
   final List<ProductItem> formulas;
+  final Map<String, String> tdsByProduct;
   final List<String> defaultColumns;
   final bool isMobile;
   final Function(List<String>) onColumnsChanged;
@@ -23,6 +24,7 @@ class ObsidianTable extends StatefulWidget {
     super.key,
     required this.items,
     required this.formulas,
+    required this.tdsByProduct,
     required this.defaultColumns,
     required this.isMobile,
     required this.onColumnsChanged,
@@ -82,6 +84,46 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
   bool _isWaterBased(ProductItem item) {
     return item.tags.any((t) => t.contains('水性'));
+  }
+
+  String? _tdsOf(ProductItem item) {
+    if (item.folder != '产品列表') return null;
+    final direct = widget.tdsByProduct[item.fileName];
+    if (direct != null) return direct;
+
+    for (final candidate in _tdsLookupCandidates(item.fileName)) {
+      for (final entry in widget.tdsByProduct.entries) {
+        if (_normalizeProductKey(entry.key) == candidate) {
+          return entry.value;
+        }
+      }
+    }
+    return null;
+  }
+
+  Iterable<String> _tdsLookupCandidates(String productName) sync* {
+    final normalized = _normalizeProductKey(productName);
+    if (normalized.isNotEmpty) yield normalized;
+
+    final baseName = productName.split('-').first.trim();
+    final normalizedBase = _normalizeProductKey(baseName);
+    if (normalizedBase.isNotEmpty && normalizedBase != normalized) {
+      yield normalizedBase;
+    }
+
+    if (normalized.startsWith('RS')) {
+      yield 'RD${normalized.substring(2)}';
+    } else if (normalized.startsWith('RD')) {
+      yield 'RS${normalized.substring(2)}';
+    }
+  }
+
+  String _normalizeProductKey(String raw) {
+    return raw
+        .toUpperCase()
+        .replaceAll('.TDS.MD', '')
+        .replaceAll('.MD', '')
+        .replaceAll(RegExp(r'[^A-Z0-9]'), '');
   }
 
   Future<void> _openNoteEditor(ProductItem item) async {
@@ -195,7 +237,12 @@ class _ObsidianTableState extends State<ObsidianTable> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: InkWell(
-                onTap: () => ProductDetailSheet.show(context, item, formulas: widget.formulas),
+                onTap: () => ProductDetailSheet.show(
+                  context,
+                  item,
+                  formulas: widget.formulas,
+                  tdsContent: _tdsOf(item),
+                ),
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -329,7 +376,12 @@ class _ObsidianTableState extends State<ObsidianTable> {
                 onNoteTap: () => _openNoteEditor(item),
                 resetSignal: widget.noteResetSignal,
                 child: InkWell(
-                  onTap: () => ProductDetailSheet.show(context, item, formulas: widget.formulas),
+                  onTap: () => ProductDetailSheet.show(
+                    context,
+                    item,
+                    formulas: widget.formulas,
+                    tdsContent: _tdsOf(item),
+                  ),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                     decoration: BoxDecoration(
