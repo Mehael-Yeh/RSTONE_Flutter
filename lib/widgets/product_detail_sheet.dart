@@ -8,6 +8,8 @@ import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/product_item.dart';
 import '../services/tds_pdf_service.dart';
+import 'product_detail/formula_content_parser.dart';
+import 'product_detail/markdown_table_parser.dart';
 
 /// 产品详情底部弹窗
 /// 
@@ -189,57 +191,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     }
   }
 
-  String _extractMarkdownBody(String rawContent) {
-    final normalized = rawContent.replaceAll('\r\n', '\n');
-    if (!normalized.startsWith('---\n')) {
-      return normalized.trim();
-    }
-
-    final endIndex = normalized.indexOf('\n---\n', 4);
-    if (endIndex == -1) {
-      return normalized.trim();
-    }
-    return normalized.substring(endIndex + 5).trim();
-  }
+  String _extractMarkdownBody(String rawContent) =>
+      FormulaContentParser.extractMarkdownBody(rawContent);
 
   /// 解析 markdown 表格数据
   /// [rawContent] 传入的完整 markdown 内容（可能包含多张表格和非表格文字）
   /// 返回解析后的表格行列表；同时通过 [nonTableContent] 输出不在表格内的文字（如 blockquote 等）
   List<List<String>> _parseTable(String rawContent, [List<String>? nonTableContent]) {
-    final rows = <List<String>>[];
-    for (final line in rawContent.split('\n')) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty) continue;
-      // 非表格行（如 blockquote、行首无 | 的内容）
-      if (!trimmed.startsWith('|')) {
-        if (nonTableContent != null && trimmed.isNotEmpty) {
-          nonTableContent.add(trimmed);
-        }
-        continue;
-      }
-      bool isSep = true;
-      for (final cell in trimmed.split('|')) {
-        final t = cell.trim();
-        if (t.isNotEmpty && !RegExp(r'^[-:]+$').hasMatch(t)) {
-          isSep = false;
-          break;
-        }
-      }
-      // 仅跳过表头后的分隔线；如果首行长得像分隔线也先保留，避免误删首行
-      if (isSep && rows.isNotEmpty) continue;
-      // 保留所有单元格（包括尾部空单元格），用 null 占位以保持列对齐
-      // 同时把 Obsidian wiki 链接 [[XXX]] 转换为 XXX
-      final cols = trimmed.split('|').map((s) {
-        var cell = s.trim();
-        cell = cell.replaceAllMapped(RegExp(r'\[\[([^\]]+)\]\]'), (m) => m.group(1) ?? cell);
-        return cell;
-      }).toList();
-      // 去掉首尾空字符串（首尾 | 产生的空列）
-      while (cols.isNotEmpty && cols.first.isEmpty) cols.removeAt(0);
-      while (cols.isNotEmpty && cols.last.isEmpty) cols.removeLast();
-      if (cols.isNotEmpty) rows.add(cols);
-    }
-    return rows;
+    return MarkdownTableParser.parseTable(rawContent, nonTableContent);
   }
 
   /// 用 Canvas 完整渲染表格为 PNG（不依赖截图，保证所有行都渲染）
@@ -573,10 +532,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     if (content.trim().isEmpty) return const SizedBox.shrink();
     final cs = Theme.of(context).colorScheme;
     // 把 Obsidian wiki 链接 [[XXX]] 转换为普通文字 XXX
-    final converted = content.replaceAllMapped(
-      RegExp(r'\[\[([^\]]+)\]\]'),
-      (m) => m.group(1) ?? m.group(0) ?? '',
-    );
+    final converted = MarkdownTableParser.normalizeWikiLinks(content);
     return MarkdownBody(
       data: converted,
       styleSheet: MarkdownStyleSheet(
@@ -884,69 +840,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
   Widget _buildFormulaCard(String title, String rawContent) {
     final cs = Theme.of(context).colorScheme;
-    // 以表格位置为基准提取内容：
-    // - 表格前的内容 → 渲染在表格上方
-    // - 表格后的内容 → 渲染在表格下方
-    // - frontmatter（--- 之间的字段）和 wiki 链接（[[...]]）不显示
-    // - 去掉 markdown 格式符号（如 > 、| 、--- 等）
-    final preTableLines = <String>[];
-    final postTableLines = <String>[];
-    bool foundTable = false;
-    bool inFrontmatter = false;
-    bool frontmatterEnded = false;
-
-    for (final line in rawContent.split('\n')) {
-      final trimmed = line.trim();
-
-      // 跟踪 frontmatter 边界
-      if (trimmed == '---') {
-        if (!inFrontmatter) {
-          inFrontmatter = true;
-        } else {
-          frontmatterEnded = true;
-          inFrontmatter = false;
-        }
-        continue;
-      }
-
-      // frontmatter 内容不显示
-      if (inFrontmatter) continue;
-
-      // wiki 链接不显示
-      if (frontmatterEnded && trimmed.startsWith('[[')) continue;
-
-      // 遇到表格行，切换到 postTable 模式
-      if (trimmed.startsWith('|')) {
-        foundTable = true;
-        continue;
-      }
-
-      // 跳过空行和分隔行（---）
-      if (trimmed.isEmpty) continue;
-
-      // 收集非表格行：去掉 > 前缀（blockquote），同时把 [[wiki链接]] 转换为普通文字
-      var clean = trimmed.startsWith('> ')
-          ? trimmed.substring(2).trim()
-          : trimmed;
-      clean = clean.replaceAllMapped(RegExp(r'\[\[([^\]]+)\]\]'), (m) => m.group(1) ?? clean);
-
-      if (foundTable) {
-        postTableLines.add(clean);
-      } else {
-        preTableLines.add(clean);
-      }
-    }
-
-    final preContent = preTableLines.join('\n');
-    final postContent = postTableLines.join('\n');
-
-    // 去掉 frontmatter，只保留 body（表格和表格外内容）
-    final bodyContent = _extractMarkdownBody(rawContent);
+    // 将复杂文本解析逻辑下沉到独立解析器，UI 层仅做渲染。
+    final displayContent = FormulaContentParser.parse(rawContent);
+    final preContent = displayContent.preTableContent;
+    final postContent = displayContent.postTableContent;
+    final bodyContent = displayContent.tableMarkdownBody;
     final tableBodyRows = _parseTable(bodyContent);
-    final fullExtraContent = [
-      if (preContent.isNotEmpty) preContent,
-      if (postContent.isNotEmpty) postContent,
-    ].join('\n');
+    final fullExtraContent = displayContent.combinedExtraContent;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
