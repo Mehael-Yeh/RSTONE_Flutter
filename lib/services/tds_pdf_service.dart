@@ -68,6 +68,14 @@ class TdsPdfService {
       ),
     );
 
+    final fonts = _PdfFonts(
+      songtiRegular: await PdfGoogleFonts.notoSerifSCRegular(),
+      songtiBold: await PdfGoogleFonts.notoSerifSCBold(),
+      arialRegular: await PdfGoogleFonts.robotoRegular(),
+      yaheiBold: await PdfGoogleFonts.notoSansSCBold(),
+      impactLikeBold: await PdfGoogleFonts.oswaldBold(),
+    );
+
     final doc = pw.Document();
 
     doc.addPage(
@@ -98,6 +106,34 @@ class TdsPdfService {
           ...parsed.sections.map((section) => _buildSection(section, fonts)),
           _buildDisclaimerSection(fonts),
         ],
+      ),
+    );
+
+    doc.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
+        theme: pw.ThemeData.withFont(base: fonts.songtiRegular, bold: fonts.songtiBold),
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _buildHeader(fonts),
+            pw.SizedBox(height: 8),
+            pw.Text('免责声明', style: pw.TextStyle(font: fonts.songtiBold, fontSize: 14)),
+            pw.SizedBox(height: 8),
+            ..._defaultDisclaimer.map(
+              (line) => pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 8),
+                child: pw.Text(
+                  line,
+                  style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 8, lineSpacing: 2),
+                ),
+              ),
+            ),
+            pw.Spacer(),
+            _buildFooter(fonts),
+          ],
+        ),
       ),
     );
 
