@@ -21,7 +21,7 @@ class TdsPdfService {
     ProductItem product, {
     required String tdsMarkdown,
   }) async {
-    final bytes = await _buildPdf(product, tdsMarkdown: tdsMarkdown);
+    final bytes = await generatePdfBytes(product, tdsMarkdown: tdsMarkdown);
     final dir = await getTemporaryDirectory();
     final safeName = product.fileName.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_').trim();
     final fileName = '${safeName.isEmpty ? '产品' : safeName} TDS(CN).pdf';
@@ -36,7 +36,7 @@ class TdsPdfService {
     return file;
   }
 
-  static Future<Uint8List> _buildPdf(
+  static Future<Uint8List> generatePdfBytes(
     ProductItem product, {
     required String tdsMarkdown,
   }) async {
@@ -98,34 +98,6 @@ class TdsPdfService {
           ...parsed.sections.map((section) => _buildSection(section, pdfFonts)),
           _buildDisclaimerSection(pdfFonts),
         ],
-      ),
-    );
-
-    doc.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
-        theme: pw.ThemeData.withFont(base: pdfFonts.songtiRegular, bold: pdfFonts.songtiBold),
-        build: (context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            _buildHeader(pdfFonts),
-            pw.SizedBox(height: 8),
-            pw.Text('免责声明', style: pw.TextStyle(font: pdfFonts.songtiBold, fontSize: 14)),
-            pw.SizedBox(height: 8),
-            ..._defaultDisclaimer.map(
-              (line) => pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 8),
-                child: pw.Text(
-                  line,
-                  style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 8, lineSpacing: 2),
-                ),
-              ),
-            ),
-            pw.Spacer(),
-            _buildFooter(pdfFonts),
-          ],
-        ),
       ),
     );
 
@@ -337,12 +309,13 @@ class TdsPdfService {
   }
 
   static _ParsedTds _parseTdsSections(String markdown) {
-    final lines = markdown.split('\n').map((line) => line.trim()).toList();
+    final lines = markdown.replaceAll('\r\n', '\n').split('\n');
     String? subtitle;
     final sections = <_TdsSection>[];
 
     _TdsSection? current;
     List<List<String>>? collectingTableRows;
+    final paragraphBuffer = <String>[];
     bool skippingMarkdownDisclaimer = false;
 
     void flushTableIfNeeded() {
@@ -353,13 +326,23 @@ class TdsPdfService {
       collectingTableRows = null;
     }
 
-    for (final line in lines) {
+    void flushParagraphIfNeeded() {
+      if (paragraphBuffer.isEmpty) return;
+      current ??= _TdsSection(title: '');
+      current!.blocks.add(_TdsBlock.paragraph(paragraphBuffer.join(' ')));
+      paragraphBuffer.clear();
+    }
+
+    for (final rawLine in lines) {
+      final line = rawLine.trim();
       if (line.isEmpty) {
         flushTableIfNeeded();
+        flushParagraphIfNeeded();
         continue;
       }
       if (line.startsWith('>')) {
         flushTableIfNeeded();
+        flushParagraphIfNeeded();
         current ??= _TdsSection(title: '');
         current!.blocks.add(_TdsBlock.note(line.replaceFirst(RegExp(r'^>\s*'), '').trim()));
         continue;
@@ -368,6 +351,7 @@ class TdsPdfService {
       final headingMatch = _headingReg.firstMatch(line);
       if (headingMatch != null) {
         flushTableIfNeeded();
+        flushParagraphIfNeeded();
         final heading = headingMatch.group(2)!.trim();
         if (heading.contains('免责声明')) {
           if (current != null) sections.add(current!);
@@ -391,6 +375,7 @@ class TdsPdfService {
 
       if (line.startsWith('|')) {
         if (skippingMarkdownDisclaimer) continue;
+        flushParagraphIfNeeded();
         current ??= _TdsSection(title: '');
         collectingTableRows ??= [];
         if (!RegExp(r'^\|?\s*[-:| ]+\|?$').hasMatch(line)) {
@@ -413,11 +398,11 @@ class TdsPdfService {
       if (skippingMarkdownDisclaimer) continue;
 
       flushTableIfNeeded();
-      current ??= _TdsSection(title: '');
-      current!.blocks.add(_TdsBlock.paragraph(line));
+      paragraphBuffer.add(line);
     }
 
     flushTableIfNeeded();
+    flushParagraphIfNeeded();
     if (current != null) sections.add(current!);
 
     return _ParsedTds(subtitle: subtitle, sections: sections);
