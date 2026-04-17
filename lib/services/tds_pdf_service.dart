@@ -294,6 +294,7 @@ class TdsPdfService {
   }
 
   static pw.Widget _buildDisclaimerSection(_PdfFonts fonts) {
+    final hasMultipleParagraphs = _defaultDisclaimer.length >= 2;
     return pw.Padding(
       padding: const pw.EdgeInsets.only(top: 8),
       child: pw.Column(
@@ -305,7 +306,7 @@ class TdsPdfService {
             (line) => pw.Padding(
               padding: const pw.EdgeInsets.only(bottom: 8),
               child: pw.Text(
-                line,
+                hasMultipleParagraphs ? '　　$line' : line,
                 style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 8, lineSpacing: 2),
               ),
             ),
@@ -408,6 +409,7 @@ class TdsPdfService {
     _TdsSection? current;
     List<List<String>>? collectingTableRows;
     final paragraphBuffer = <String>[];
+    final unorderedParagraphsInSection = <_TdsBlock>[];
     bool skippingMarkdownDisclaimer = false;
 
     void flushTableIfNeeded() {
@@ -424,13 +426,20 @@ class TdsPdfService {
       final separator = current!.title.contains('产品特性') ? '\n' : ' ';
       final paragraphText = paragraphBuffer.join(separator);
       final isOrderedParagraph = RegExp(r'^((\d+[\.\)、])|([（(]\d+[）)]))\s*').hasMatch(paragraphBuffer.first.trim());
-      final shouldIndentFirstLine = paragraphBuffer.length >= 2 && !isOrderedParagraph;
-      current!.blocks.add(
-        _TdsBlock.paragraph(
-          paragraphText,
-          shouldIndentFirstLine: shouldIndentFirstLine,
-        ),
+      final shouldIndentByWrap = paragraphBuffer.length >= 2 || _isLikelyWrappedInPdf(paragraphText, fontSize: 10.5);
+      final paragraphBlock = _TdsBlock.paragraph(
+        paragraphText,
+        shouldIndentFirstLine: !isOrderedParagraph && shouldIndentByWrap,
       );
+      if (!isOrderedParagraph) {
+        unorderedParagraphsInSection.add(paragraphBlock);
+        if (unorderedParagraphsInSection.length >= 2) {
+          for (final unorderedParagraph in unorderedParagraphsInSection) {
+            unorderedParagraph.shouldIndentFirstLine = true;
+          }
+        }
+      }
+      current!.blocks.add(paragraphBlock);
       paragraphBuffer.clear();
     }
 
@@ -471,6 +480,7 @@ class TdsPdfService {
 
         if (current != null) sections.add(current!);
         current = _TdsSection(title: heading);
+        unorderedParagraphsInSection.clear();
         continue;
       }
 
@@ -515,6 +525,24 @@ class TdsPdfService {
     normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)[ \t\n]+(\d{2,}[A-Za-z0-9-]*)'), (m) => '${m.group(1)}${m.group(2)}');
     normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)(\d{2,})'), (m) => '${m.group(1)}${m.group(2)}');
     return normalized;
+  }
+
+  static bool _isLikelyWrappedInPdf(String text, {required double fontSize}) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) return false;
+    var visualLength = 0.0;
+    for (final rune in normalized.runes) {
+      final char = String.fromCharCode(rune);
+      if (RegExp(r'\s').hasMatch(char)) {
+        visualLength += 0.3;
+      } else if (RegExp(r'[\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF]').hasMatch(char)) {
+        visualLength += 1.0;
+      } else {
+        visualLength += 0.55;
+      }
+    }
+    final baselineCharsPerLine = fontSize <= 8 ? 60.0 : 50.0;
+    return visualLength > baselineCharsPerLine;
   }
 
   static Future<pw.Font> _loadFirstAvailableFont({
@@ -594,5 +622,5 @@ class _TdsBlock {
   final _TdsBlockType type;
   final String? text;
   final List<List<String>>? tableRows;
-  final bool shouldIndentFirstLine;
+  bool shouldIndentFirstLine;
 }
