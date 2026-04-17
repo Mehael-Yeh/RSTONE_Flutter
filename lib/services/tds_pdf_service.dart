@@ -78,6 +78,7 @@ class TdsPdfService {
             pw.SizedBox(height: 10),
           ],
           ...parsed.sections.map((section) => _buildSection(section, fonts)),
+          _buildDisclaimerSection(fonts),
         ],
       ),
     );
@@ -176,26 +177,71 @@ class TdsPdfService {
             pw.Text(section.title, style: pw.TextStyle(font: fonts.songtiBold, fontSize: 14)),
             pw.SizedBox(height: 5),
           ],
-          if (section.paragraphs.isNotEmpty)
-            ...section.paragraphs.map(
-              (line) => pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 3),
-                child: pw.Text(line, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5, lineSpacing: 2)),
+          ...section.blocks.map((block) => _buildBlock(block, section, fonts)),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildBlock(_TdsBlock block, _TdsSection section, _PdfFonts fonts) {
+    if (block.type == _TdsBlockType.table && block.tableRows != null && block.tableRows!.isNotEmpty) {
+      final isPhysicalTable = section.title.contains('物理性能') && block.tableRows!.first.length >= 3;
+      final table = pw.TableHelper.fromTextArray(
+        headerStyle: pw.TextStyle(font: fonts.songtiBold, fontSize: 10.5),
+        cellStyle: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5),
+        cellAlignment: pw.Alignment.center,
+        border: pw.TableBorder.all(width: 0.8),
+        columnWidths: isPhysicalTable
+            ? <int, pw.TableColumnWidth>{
+                0: const pw.FlexColumnWidth(3),
+                1: const pw.FlexColumnWidth(2.2),
+                2: const pw.FlexColumnWidth(1.2),
+              }
+            : null,
+        headers: block.tableRows!.first,
+        data: block.tableRows!.length > 1 ? block.tableRows!.sublist(1) : const <List<String>>[],
+      );
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 4),
+        child: isPhysicalTable
+            ? pw.Center(child: pw.SizedBox(width: 410, child: table))
+            : table,
+      );
+    }
+
+    if (block.type == _TdsBlockType.note && block.text != null) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 4),
+        child: pw.Text(block.text!, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+      );
+    }
+
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 3),
+      child: pw.Text(
+        block.text ?? '',
+        style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5, lineSpacing: 2),
+      ),
+    );
+  }
+
+  static pw.Widget _buildDisclaimerSection(_PdfFonts fonts) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(top: 8),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text('免责声明', style: pw.TextStyle(font: fonts.songtiBold, fontSize: 14)),
+          pw.SizedBox(height: 8),
+          ..._defaultDisclaimer.map(
+            (line) => pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 8),
+              child: pw.Text(
+                line,
+                style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 8, lineSpacing: 2),
               ),
             ),
-          if (section.tableRows != null && section.tableRows!.isNotEmpty)
-            pw.TableHelper.fromTextArray(
-              headerStyle: pw.TextStyle(font: fonts.songtiBold, fontSize: 10.5),
-              cellStyle: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5),
-              cellAlignment: pw.Alignment.center,
-              border: pw.TableBorder.all(width: 0.8),
-              headers: section.tableRows!.first,
-              data: section.tableRows!.length > 1 ? section.tableRows!.sublist(1) : const <List<String>>[],
-            ),
-          if (section.note != null) ...[
-            pw.SizedBox(height: 4),
-            pw.Text(section.note!, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
-          ],
+          ),
         ],
       ),
     );
@@ -215,15 +261,44 @@ class TdsPdfService {
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text('地址 ADD: 嘉兴市秀洲区油车港镇永越大厦 11 楼 1102', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
-            pw.Text('电话/传真 TEL/FAX: 15067388778 0573-82203606', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+            pw.RichText(
+              text: pw.TextSpan(
+                children: [
+                  pw.TextSpan(text: '地址 ', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+                  pw.TextSpan(text: 'ADD: ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                  pw.TextSpan(text: '嘉兴市秀洲区油车港镇永越大厦 11 楼 1102', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+                ],
+              ),
+            ),
+            pw.RichText(
+              text: pw.TextSpan(
+                children: [
+                  pw.TextSpan(text: '电话/传真 ', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+                  pw.TextSpan(text: 'TEL/FAX: 15067388778 0573-82203606', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                ],
+              ),
+            ),
           ],
         ),
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text('网址 WEBSITE: http://www.rstone-resin.com/', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
-            pw.Text('邮箱 EMAIL: zhoulei22kb@rstone-resin.com', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+            pw.RichText(
+              text: pw.TextSpan(
+                children: [
+                  pw.TextSpan(text: '网址 ', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+                  pw.TextSpan(text: 'WEBSITE: http://www.rstone-resin.com/', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                ],
+              ),
+            ),
+            pw.RichText(
+              text: pw.TextSpan(
+                children: [
+                  pw.TextSpan(text: '邮箱 ', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+                  pw.TextSpan(text: 'EMAIL: zhoulei22kb@rstone-resin.com', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                ],
+              ),
+            ),
           ],
         ),
       ],
@@ -249,17 +324,31 @@ class TdsPdfService {
     final sections = <_TdsSection>[];
 
     _TdsSection? current;
+    List<List<String>>? collectingTableRows;
+
+    void flushTableIfNeeded() {
+      if (collectingTableRows != null && collectingTableRows!.isNotEmpty) {
+        current ??= _TdsSection(title: '');
+        current!.blocks.add(_TdsBlock.table(List<List<String>>.from(collectingTableRows!)));
+      }
+      collectingTableRows = null;
+    }
 
     for (final line in lines) {
-      if (line.isEmpty) continue;
+      if (line.isEmpty) {
+        flushTableIfNeeded();
+        continue;
+      }
       if (line.startsWith('>')) {
-        current ??= _TdsSection(title: '', paragraphs: []);
-        current.note = line.replaceFirst(RegExp(r'^>\s*'), '').trim();
+        flushTableIfNeeded();
+        current ??= _TdsSection(title: '');
+        current.blocks.add(_TdsBlock.note(line.replaceFirst(RegExp(r'^>\s*'), '').trim()));
         continue;
       }
 
       final headingMatch = _headingReg.firstMatch(line);
       if (headingMatch != null) {
+        flushTableIfNeeded();
         final heading = headingMatch.group(2)!.trim();
 
         if (subtitle == null && heading.startsWith('RD')) {
@@ -268,15 +357,15 @@ class TdsPdfService {
         }
 
         if (current != null) sections.add(current);
-        current = _TdsSection(title: heading, paragraphs: []);
+        current = _TdsSection(title: heading);
         continue;
       }
 
       if (line.startsWith('|')) {
-        current ??= _TdsSection(title: '', paragraphs: []);
-        current.tableRows ??= [];
+        current ??= _TdsSection(title: '');
+        collectingTableRows ??= [];
         if (!RegExp(r'^\|?\s*[-:| ]+\|?$').hasMatch(line)) {
-          current.tableRows!.add(
+          collectingTableRows!.add(
             line
                 .split('|')
                 .map((cell) => cell.trim())
@@ -288,14 +377,17 @@ class TdsPdfService {
       }
 
       if (subtitle == null) {
+        flushTableIfNeeded();
         subtitle = line;
         continue;
       }
 
-      current ??= _TdsSection(title: '', paragraphs: []);
-      current.paragraphs.add(line.replaceFirst(RegExp(r'^\d+[.、]\s*'), ''));
+      flushTableIfNeeded();
+      current ??= _TdsSection(title: '');
+      current.blocks.add(_TdsBlock.paragraph(line.replaceFirst(RegExp(r'^\d+[.、]\s*'), '')));
     }
 
+    flushTableIfNeeded();
     if (current != null) sections.add(current);
 
     return _ParsedTds(subtitle: subtitle, sections: sections);
@@ -331,13 +423,26 @@ class _ParsedTds {
 class _TdsSection {
   _TdsSection({
     required this.title,
-    required this.paragraphs,
-    this.tableRows,
-    this.note,
   });
 
   final String title;
-  final List<String> paragraphs;
-  List<List<String>>? tableRows;
-  String? note;
+  final List<_TdsBlock> blocks = <_TdsBlock>[];
+}
+
+enum _TdsBlockType { paragraph, table, note }
+
+class _TdsBlock {
+  const _TdsBlock._({
+    required this.type,
+    this.text,
+    this.tableRows,
+  });
+
+  factory _TdsBlock.paragraph(String text) => _TdsBlock._(type: _TdsBlockType.paragraph, text: text);
+  factory _TdsBlock.note(String text) => _TdsBlock._(type: _TdsBlockType.note, text: text);
+  factory _TdsBlock.table(List<List<String>> rows) => _TdsBlock._(type: _TdsBlockType.table, tableRows: rows);
+
+  final _TdsBlockType type;
+  final String? text;
+  final List<List<String>>? tableRows;
 }
