@@ -73,6 +73,39 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   int _selectedFormulaIndex = 0;
   String? _selectedApplicationFormulaName;
   bool _isGeneratingTds = false;
+  final TransformationController _pdfTransformationController = TransformationController();
+  List<Uint8List> _pdfPageImages = const [];
+  int _currentPdfPageIndex = 0;
+  bool _isRasterizingPdf = false;
+
+  Future<void> _preparePdfPages(Uint8List pdfBytes) async {
+    setState(() {
+      _isRasterizingPdf = true;
+      _pdfPageImages = const [];
+      _currentPdfPageIndex = 0;
+      _pdfTransformationController.value = Matrix4.identity();
+    });
+
+    final pages = <Uint8List>[];
+    await for (final page in Printing.raster(pdfBytes, dpi: 160)) {
+      pages.add(await page.toPng());
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _pdfPageImages = pages;
+      _isRasterizingPdf = false;
+      _currentPdfPageIndex = 0;
+    });
+  }
+
+  void _goToPdfPage(int pageIndex) {
+    if (pageIndex < 0 || pageIndex >= _pdfPageImages.length) return;
+    setState(() {
+      _currentPdfPageIndex = pageIndex;
+      _pdfTransformationController.value = Matrix4.identity();
+    });
+  }
 
   Future<void> _handlePreviewTds() async {
     if (_isGeneratingTds || widget.product.folder != '产品列表' || widget.tdsContent == null) {
@@ -88,24 +121,110 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         widget.product,
         tdsMarkdown: widget.tdsContent!,
       );
+      await _preparePdfPages(pdfBytes);
       if (!mounted) return;
       await showDialog<void>(
         context: context,
-        builder: (dialogContext) => Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          child: SizedBox(
-            width: 900,
-            height: 680,
-            child: PdfPreview(
-              build: (_) async => pdfBytes,
-              allowPrinting: false,
-              allowSharing: false,
-              canChangeOrientation: false,
-              canChangePageFormat: false,
-              canDebug: false,
+        builder: (dialogContext) {
+          final cs = Theme.of(dialogContext).colorScheme;
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            backgroundColor: cs.surfaceContainerHigh,
+            surfaceTintColor: cs.surfaceTint,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
             ),
-          ),
-        ),
+            clipBehavior: Clip.antiAlias,
+            child: SizedBox(
+              width: 900,
+              height: 680,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.picture_as_pdf_rounded, color: cs.primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'TDS PDF 预览',
+                            style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
+                              color: cs.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _pdfPageImages.isEmpty
+                              ? null
+                              : () => _goToPdfPage(_currentPdfPageIndex - 1),
+                          icon: const Icon(Icons.chevron_left_rounded),
+                          tooltip: '上一页',
+                        ),
+                        Text(
+                          _pdfPageImages.isEmpty
+                              ? '0 / 0'
+                              : '${_currentPdfPageIndex + 1} / ${_pdfPageImages.length}',
+                          style: Theme.of(dialogContext).textTheme.labelLarge?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _pdfPageImages.isEmpty
+                              ? null
+                              : () => _goToPdfPage(_currentPdfPageIndex + 1),
+                          icon: const Icon(Icons.chevron_right_rounded),
+                          tooltip: '下一页',
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                          tooltip: '关闭预览',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: Container(
+                      color: cs.surfaceContainerLowest,
+                      padding: const EdgeInsets.all(12),
+                      child: _isRasterizingPdf
+                          ? const Center(child: CircularProgressIndicator())
+                          : _pdfPageImages.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    'PDF 预览加载失败',
+                                    style: Theme.of(dialogContext).textTheme.bodyLarge?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                )
+                              : InteractiveViewer(
+                                  transformationController: _pdfTransformationController,
+                                  minScale: 1,
+                                  maxScale: 4,
+                                  panEnabled: true,
+                                  scaleEnabled: true,
+                                  boundaryMargin: const EdgeInsets.all(32),
+                                  child: Center(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.memory(
+                                        _pdfPageImages[_currentPdfPageIndex],
+                                        filterQuality: FilterQuality.high,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       );
     } catch (e) {
       if (!mounted) return;
@@ -189,6 +308,12 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     if (linked.isNotEmpty) {
       _selectedApplicationFormulaName = linked.first.fileName.replaceAll('.md', '');
     }
+  }
+
+  @override
+  void dispose() {
+    _pdfTransformationController.dispose();
+    super.dispose();
   }
 
   String _extractMarkdownBody(String rawContent) =>
