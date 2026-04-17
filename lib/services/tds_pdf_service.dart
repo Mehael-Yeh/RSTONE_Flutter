@@ -105,25 +105,25 @@ class TdsPdfService {
       pw.Page(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
-        theme: pw.ThemeData.withFont(base: fonts.songtiRegular, bold: fonts.songtiBold),
+        theme: pw.ThemeData.withFont(base: pdfFonts.songtiRegular, bold: pdfFonts.songtiBold),
         build: (context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            _buildHeader(fonts),
+            _buildHeader(pdfFonts),
             pw.SizedBox(height: 8),
-            pw.Text('免责声明', style: pw.TextStyle(font: fonts.songtiBold, fontSize: 14)),
+            pw.Text('免责声明', style: pw.TextStyle(font: pdfFonts.songtiBold, fontSize: 14)),
             pw.SizedBox(height: 8),
             ..._defaultDisclaimer.map(
               (line) => pw.Padding(
                 padding: const pw.EdgeInsets.only(bottom: 8),
                 child: pw.Text(
                   line,
-                  style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 8, lineSpacing: 2),
+                  style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 8, lineSpacing: 2),
                 ),
               ),
             ),
             pw.Spacer(),
-            _buildFooter(fonts),
+            _buildFooter(pdfFonts),
           ],
         ),
       ),
