@@ -204,17 +204,85 @@ class TdsPdfService {
     if (block.type == _TdsBlockType.note && block.text != null) {
       return pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 4),
-        child: pw.Text(_normalizeTextForPdf(block.text!)!, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+        child: _buildMarkdownStyledText(
+          block.text!,
+          fonts: fonts,
+          fontSize: 9,
+        ),
       );
     }
 
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 3),
-      child: pw.Text(
-        _normalizeTextForPdf(block.text) ?? '',
-        style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5, lineSpacing: 2),
+      child: _buildMarkdownStyledText(
+        block.text ?? '',
+        fonts: fonts,
+        fontSize: 10.5,
+        lineSpacing: 2,
       ),
     );
+  }
+
+  static pw.Widget _buildMarkdownStyledText(
+    String text, {
+    required _PdfFonts fonts,
+    required double fontSize,
+    double lineSpacing = 0,
+  }) {
+    final spans = <pw.InlineSpan>[];
+    final pattern = RegExp(r'\*\*(.+?)\*\*');
+    var start = 0;
+    final source = _normalizeTextForPdf(text) ?? '';
+
+    for (final match in pattern.allMatches(source)) {
+      if (match.start > start) {
+        spans.add(
+          pw.TextSpan(
+            text: source.substring(start, match.start),
+            style: pw.TextStyle(
+              font: fonts.songtiRegular,
+              fontSize: fontSize,
+              lineSpacing: lineSpacing,
+            ),
+          ),
+        );
+      }
+      final boldText = match.group(1) ?? '';
+      spans.add(
+        pw.TextSpan(
+          text: boldText,
+          style: pw.TextStyle(
+            font: fonts.songtiBold,
+            fontSize: fontSize,
+            fontWeight: pw.FontWeight.bold,
+            lineSpacing: lineSpacing,
+          ),
+        ),
+      );
+      start = match.end;
+    }
+
+    if (start < source.length) {
+      spans.add(
+        pw.TextSpan(
+          text: source.substring(start),
+          style: pw.TextStyle(
+            font: fonts.songtiRegular,
+            fontSize: fontSize,
+            lineSpacing: lineSpacing,
+          ),
+        ),
+      );
+    }
+
+    if (spans.isEmpty) {
+      return pw.Text(
+        source,
+        style: pw.TextStyle(font: fonts.songtiRegular, fontSize: fontSize, lineSpacing: lineSpacing),
+      );
+    }
+
+    return pw.RichText(text: pw.TextSpan(children: spans));
   }
 
   static pw.Widget _buildDisclaimerSection(_PdfFonts fonts) {
