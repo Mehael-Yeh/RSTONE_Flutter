@@ -11,19 +11,25 @@ import '../models/product_item.dart';
 class TdsPdfService {
   static final RegExp _headingReg = RegExp(r'^(#{1,3})\s*(.+)$');
 
+  static const List<String> _defaultDisclaimer = [
+    '锐石为客户提供物料安全资料表，提供有关本产品的潜在健康影响、安全处理、贮存、使用和弃置的信息。锐石鼓励客户在使用锐石产品和其它原料之前先查阅物料安全资料表，以确保人身和环境安全。为了确保锐石的产品不被滥用于非指定用途或未经测试的用途，锐石的员工可帮助客户处理生态及产品安全方面的问题。您的锐石销售代表可安排适当联络。',
+    '但是关于产品特性、应用、质量、安全性、产品规格、适销性，以及针对特定用途的适用性，本技术数据表中所涉及的内容仅供参考，无论是明示或隐含的信息，我们不提供任何保证。在此提供的任何信息不应被视作实施专利技术的许可，也不应被视作未经专利所有人许可的前提下实施专利技术的诱导。',
+  ];
+
   static Future<File> generateAndShareTds(
     ProductItem product, {
     required String tdsMarkdown,
   }) async {
     final bytes = await _buildPdf(product, tdsMarkdown: tdsMarkdown);
     final dir = await getTemporaryDirectory();
-    final safeName = product.fileName.replaceAll(RegExp(r'[\\/:*?"<>|\s]+'), '_');
-    final file = File('${dir.path}/${safeName}_TDS.pdf');
+    final safeName = product.fileName.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_').trim();
+    final fileName = '${safeName.isEmpty ? '产品' : safeName} TDS(CN).pdf';
+    final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(bytes, flush: true);
 
     await Printing.sharePdf(
       bytes: bytes,
-      filename: '${product.fileName}_TDS.pdf',
+      filename: '${product.fileName} TDS(CN).pdf',
     );
 
     return file;
@@ -36,155 +42,188 @@ class TdsPdfService {
     final body = _extractMarkdownBody(tdsMarkdown);
     final parsed = _parseTdsSections(body);
 
+    final fonts = _PdfFonts(
+      songtiRegular: await PdfGoogleFonts.notoSerifSCRegular(),
+      songtiBold: await PdfGoogleFonts.notoSerifSCBold(),
+      arialRegular: await PdfGoogleFonts.robotoRegular(),
+      yaheiBold: await PdfGoogleFonts.notoSansSCBold(),
+      impactLikeBold: await PdfGoogleFonts.oswaldBold(),
+    );
+
     final doc = pw.Document();
-    final baseFont = await PdfGoogleFonts.notoSansSCRegular();
-    final boldFont = await PdfGoogleFonts.notoSansSCBold();
 
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.fromLTRB(24, 20, 24, 20),
-        theme: pw.ThemeData.withFont(base: baseFont, bold: boldFont),
+        margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
+        theme: pw.ThemeData.withFont(base: fonts.songtiRegular, bold: fonts.songtiBold),
+        header: (context) => _buildHeader(fonts),
+        footer: (context) => _buildFooter(fonts),
         build: (context) => [
-          _buildHeader(product),
-          pw.SizedBox(height: 16),
+          pw.SizedBox(height: 14),
           pw.Center(
             child: pw.Text(
               '产品技术数据表（TDS）',
-              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+              style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 16),
             ),
           ),
-          pw.SizedBox(height: 16),
-          pw.Text(product.fileName, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 10),
-          if (parsed.subtitle != null) ...[
-            pw.Text(parsed.subtitle!, style: const pw.TextStyle(fontSize: 13)),
-            pw.SizedBox(height: 12),
-          ],
-          ...parsed.sections.map(_buildSection),
           pw.SizedBox(height: 14),
-          _buildDisclaimer(parsed.disclaimer),
-          pw.Spacer(),
-          _buildFooter(),
+          pw.Text(
+            product.fileName,
+            style: pw.TextStyle(font: fonts.yaheiBold, fontSize: 14, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 10),
+          if (parsed.subtitle != null && parsed.subtitle!.isNotEmpty) ...[
+            pw.Text(parsed.subtitle!, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5)),
+            pw.SizedBox(height: 10),
+          ],
+          ...parsed.sections.map((section) => _buildSection(section, fonts)),
         ],
+      ),
+    );
+
+    doc.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
+        theme: pw.ThemeData.withFont(base: fonts.songtiRegular, bold: fonts.songtiBold),
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _buildHeader(fonts),
+            pw.SizedBox(height: 8),
+            pw.Text('免责声明', style: pw.TextStyle(font: fonts.songtiBold, fontSize: 14)),
+            pw.SizedBox(height: 8),
+            ..._defaultDisclaimer.map(
+              (line) => pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 8),
+                child: pw.Text(
+                  line,
+                  style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 8, lineSpacing: 2),
+                ),
+              ),
+            ),
+            pw.Spacer(),
+            _buildFooter(fonts),
+          ],
+        ),
       ),
     );
 
     return doc.save();
   }
 
-  static pw.Widget _buildHeader(ProductItem product) {
+  static pw.Widget _buildHeader(_PdfFonts fonts) {
     return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           crossAxisAlignment: pw.CrossAxisAlignment.end,
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text(
-              'RSTONE',
-              style: pw.TextStyle(
-                fontSize: 48,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.red,
+            pw.RichText(
+              text: pw.TextSpan(
+                children: [
+                  pw.TextSpan(
+                    text: 'R',
+                    style: pw.TextStyle(
+                      font: fonts.impactLikeBold,
+                      fontSize: 48,
+                      color: PdfColors.red,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.TextSpan(
+                    text: 'STONE',
+                    style: pw.TextStyle(
+                      font: fonts.impactLikeBold,
+                      fontSize: 28,
+                      color: PdfColors.red,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.end,
               children: [
-                pw.Text('嘉兴锐石化工有限公司', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.Text(
+                  '嘉兴锐石化工有限公司',
+                  style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 22, fontWeight: pw.FontWeight.bold),
+                ),
                 pw.SizedBox(height: 2),
-                pw.Text('RSTONE (Jia Xing) Resins Company', style: const pw.TextStyle(fontSize: 14)),
+                pw.Text(
+                  'RSTONE (Jia Xing) Resins Company',
+                  style: pw.TextStyle(font: fonts.arialRegular, fontSize: 14),
+                ),
               ],
             ),
           ],
         ),
-        pw.Divider(thickness: 2),
+        pw.SizedBox(height: 6),
+        pw.Container(height: 4, color: PdfColors.grey600),
       ],
     );
   }
 
-  static pw.Widget _buildSection(_TdsSection section) {
+  static pw.Widget _buildSection(_TdsSection section, _PdfFonts fonts) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 10),
+      padding: const pw.EdgeInsets.only(bottom: 9),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           if (section.title.isNotEmpty) ...[
-            pw.Text(section.title, style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 6),
+            pw.Text(section.title, style: pw.TextStyle(font: fonts.songtiBold, fontSize: 14)),
+            pw.SizedBox(height: 5),
           ],
           if (section.paragraphs.isNotEmpty)
             ...section.paragraphs.map(
               (line) => pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 4),
-                child: pw.Text(line, style: const pw.TextStyle(fontSize: 12, lineSpacing: 2)),
+                padding: const pw.EdgeInsets.only(bottom: 3),
+                child: pw.Text(line, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5, lineSpacing: 2)),
               ),
             ),
           if (section.tableRows != null && section.tableRows!.isNotEmpty)
             pw.TableHelper.fromTextArray(
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12),
-              cellStyle: const pw.TextStyle(fontSize: 12),
+              headerStyle: pw.TextStyle(font: fonts.songtiBold, fontSize: 10.5),
+              cellStyle: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5),
               cellAlignment: pw.Alignment.center,
-              border: pw.TableBorder(
-                top: const pw.BorderSide(width: 1),
-                bottom: const pw.BorderSide(width: 1),
-                horizontalInside: pw.BorderSide(width: 0.6, color: PdfColors.grey500),
-              ),
+              border: pw.TableBorder.all(width: 0.8),
               headers: section.tableRows!.first,
               data: section.tableRows!.length > 1 ? section.tableRows!.sublist(1) : const <List<String>>[],
             ),
           if (section.note != null) ...[
             pw.SizedBox(height: 4),
-            pw.Text(section.note!, style: pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
+            pw.Text(section.note!, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
           ],
         ],
       ),
     );
   }
 
-  static pw.Widget _buildDisclaimer(List<String> disclaimer) {
-    final lines = disclaimer.isEmpty
-        ? const [
-            '锐石为客户提供材料参考信息。请在使用前进行充分评估，确保产品适用于具体用途。',
-            '本技术数据仅作参考，不应视作任何担保或法律承诺。',
-          ]
-        : disclaimer;
-
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text('免责声明', style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
-        pw.SizedBox(height: 6),
-        ...lines.map((line) => pw.Padding(
-              padding: const pw.EdgeInsets.only(bottom: 3),
-              child: pw.Text(line, style: const pw.TextStyle(fontSize: 11, lineSpacing: 2)),
-            )),
-      ],
-    );
-  }
-
-  static pw.Widget _buildFooter() {
+  static pw.Widget _buildFooter(_PdfFonts fonts) {
     return pw.Column(
       children: [
-        pw.Divider(thickness: 2),
-        pw.SizedBox(height: 6),
-        pw.Text('锐石主要从事紫外光固化（UV）树脂及水性乳液的研发、制造和销售，旨在创造世界级的中国化工品牌',
-            textAlign: pw.TextAlign.center,
-            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-        pw.SizedBox(height: 4),
+        pw.Container(height: 4, color: PdfColors.grey600),
+        pw.SizedBox(height: 7),
+        pw.Text(
+          '锐石主要从事紫外光固化（UV）树脂及水性乳液的研发、制造和销售，\n旨在创造世界级的中国化工品牌',
+          textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(font: fonts.songtiBold, fontSize: 11),
+        ),
+        pw.SizedBox(height: 5),
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text('地址 ADD: 浙江省嘉兴市秀洲区油车港镇永越大厦11楼1102', style: pw.TextStyle(fontSize: 11)),
-            pw.Text('电话/传真 TEL/FAX: 15067388778 0573-82203606', style: pw.TextStyle(fontSize: 11)),
+            pw.Text('地址 ADD: 嘉兴市秀洲区油车港镇永越大厦 11 楼 1102', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+            pw.Text('电话/传真 TEL/FAX: 15067388778 0573-82203606', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
           ],
         ),
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text('网址 WEBSITE: http://www.rstone-resin.com/', style: pw.TextStyle(fontSize: 11)),
-            pw.Text('邮箱 EMAIL: zhoulei22kb@rstone-resin.com', style: pw.TextStyle(fontSize: 11)),
+            pw.Text('网址 WEBSITE: http://www.rstone-resin.com/', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+            pw.Text('邮箱 EMAIL: zhoulei22kb@rstone-resin.com', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
           ],
         ),
       ],
@@ -208,10 +247,8 @@ class TdsPdfService {
     final lines = markdown.split('\n').map((line) => line.trim()).toList();
     String? subtitle;
     final sections = <_TdsSection>[];
-    final disclaimer = <String>[];
 
     _TdsSection? current;
-    bool inDisclaimer = false;
 
     for (final line in lines) {
       if (line.isEmpty) continue;
@@ -232,7 +269,6 @@ class TdsPdfService {
 
         if (current != null) sections.add(current);
         current = _TdsSection(title: heading, paragraphs: []);
-        inDisclaimer = heading.contains('免责声明');
         continue;
       }
 
@@ -256,30 +292,40 @@ class TdsPdfService {
         continue;
       }
 
-      if (inDisclaimer) {
-        disclaimer.add(line.replaceFirst(RegExp(r'^\d+[.、]\s*'), ''));
-      } else {
-        current ??= _TdsSection(title: '', paragraphs: []);
-        current.paragraphs.add(line.replaceFirst(RegExp(r'^\d+[.、]\s*'), ''));
-      }
+      current ??= _TdsSection(title: '', paragraphs: []);
+      current.paragraphs.add(line.replaceFirst(RegExp(r'^\d+[.、]\s*'), ''));
     }
 
     if (current != null) sections.add(current);
 
-    return _ParsedTds(subtitle: subtitle, sections: sections, disclaimer: disclaimer);
+    return _ParsedTds(subtitle: subtitle, sections: sections);
   }
+}
+
+class _PdfFonts {
+  const _PdfFonts({
+    required this.songtiRegular,
+    required this.songtiBold,
+    required this.arialRegular,
+    required this.yaheiBold,
+    required this.impactLikeBold,
+  });
+
+  final pw.Font songtiRegular;
+  final pw.Font songtiBold;
+  final pw.Font arialRegular;
+  final pw.Font yaheiBold;
+  final pw.Font impactLikeBold;
 }
 
 class _ParsedTds {
   const _ParsedTds({
     required this.subtitle,
     required this.sections,
-    required this.disclaimer,
   });
 
   final String? subtitle;
   final List<_TdsSection> sections;
-  final List<String> disclaimer;
 }
 
 class _TdsSection {
