@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/product_item.dart';
 import '../services/tds_pdf_service.dart';
@@ -71,7 +72,53 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   String? _selectedApplicationFormulaName;
   bool _isGeneratingTds = false;
 
-  Future<void> _handleGenerateTds() async {
+  Future<void> _handlePreviewTds() async {
+    if (_isGeneratingTds || widget.product.folder != '产品列表' || widget.tdsContent == null) {
+      return;
+    }
+
+    setState(() {
+      _isGeneratingTds = true;
+    });
+
+    try {
+      final pdfBytes = await TdsPdfService.generatePdfBytes(
+        widget.product,
+        tdsMarkdown: widget.tdsContent!,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          child: SizedBox(
+            width: 900,
+            height: 680,
+            child: PdfPreview(
+              build: (_) async => pdfBytes,
+              allowPrinting: false,
+              allowSharing: false,
+              canChangeOrientation: false,
+              canChangePageFormat: false,
+              canDebug: false,
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('TDS 生成失败：$e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isGeneratingTds = false;
+      });
+    }
+  }
+
+  Future<void> _handleShareTds() async {
     if (_isGeneratingTds || widget.product.folder != '产品列表' || widget.tdsContent == null) {
       return;
     }
@@ -92,7 +139,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('TDS 生成失败：$e')),
+        SnackBar(content: Text('TDS 分享失败：$e')),
       );
     } finally {
       if (!mounted) return;
@@ -1053,7 +1100,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                           padding: const EdgeInsets.only(right: 4),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(8),
-                            onTap: _isGeneratingTds ? null : _handleGenerateTds,
+                            onTap: _isGeneratingTds ? null : _handlePreviewTds,
+                            onLongPress: _isGeneratingTds ? null : _handleShareTds,
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
