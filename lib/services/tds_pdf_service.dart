@@ -57,24 +57,12 @@ class TdsPdfService {
         candidates: const ['assets/fonts/Arial.ttf', 'assets/fonts/arial.ttf'],
         fallback: PdfGoogleFonts.robotoRegular,
       ),
-      yaheiRegular: await _loadFirstAvailableFont(
-        candidates: const [
-          'assets/fonts/msyh.ttf',
-          'assets/fonts/MicrosoftYaHei.ttf',
-          'assets/fonts/Microsoft YaHei.ttf',
-          'assets/fonts/微软雅黑.ttf',
-        ],
+      simheiRegular: await _loadFirstAvailableFont(
+        candidates: const ['assets/fonts/SimHei.ttf', 'assets/fonts/simhei.ttf'],
         fallback: PdfGoogleFonts.notoSansSCRegular,
       ),
-      yaheiBold: await _loadFirstAvailableFont(
-        candidates: const [
-          'assets/fonts/msyhbd.ttf',
-          'assets/fonts/msyh.ttf',
-          'assets/fonts/MicrosoftYaHei-Bold.ttf',
-          'assets/fonts/MicrosoftYaHei.ttf',
-          'assets/fonts/Microsoft YaHei.ttf',
-          'assets/fonts/微软雅黑.ttf',
-        ],
+      simheiBold: await _loadFirstAvailableFont(
+        candidates: const ['assets/fonts/SimHei.ttf', 'assets/fonts/simhei.ttf'],
         fallback: PdfGoogleFonts.notoSansSCBold,
       ),
       impactLikeBold: await _loadFirstAvailableFont(
@@ -103,7 +91,7 @@ class TdsPdfService {
           pw.SizedBox(height: 14),
           pw.Text(
             productGrade,
-            style: pw.TextStyle(font: pdfFonts.yaheiBold, fontSize: 14, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(font: pdfFonts.simheiBold, fontSize: 14, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 10),
           ...parsed.sections.map((section) => _buildSection(section, pdfFonts)),
@@ -151,7 +139,7 @@ class TdsPdfService {
               children: [
                 pw.Text(
                   '嘉兴锐石化工有限公司',
-                  style: pw.TextStyle(font: fonts.yaheiBold, fontSize: 22, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(font: fonts.simheiBold, fontSize: 22, fontWeight: pw.FontWeight.bold),
                 ),
                 pw.SizedBox(height: 2),
                 pw.Text(
@@ -259,7 +247,7 @@ class TdsPdfService {
         pw.Text(
           '锐石主要从事紫外光固化（UV）树脂及水性乳液的研发、制造和销售，\n旨在创造世界级的中国化工品牌',
           textAlign: pw.TextAlign.center,
-          style: pw.TextStyle(font: fonts.yaheiBold, fontSize: 11),
+          style: pw.TextStyle(font: fonts.simheiBold, fontSize: 11),
         ),
         pw.SizedBox(height: 5),
         pw.Row(
@@ -268,16 +256,18 @@ class TdsPdfService {
             pw.RichText(
               text: pw.TextSpan(
                 children: [
-                  pw.TextSpan(text: '地址 ', style: pw.TextStyle(font: fonts.yaheiRegular, fontSize: 9)),
+                  pw.TextSpan(text: '地址', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
+                  pw.TextSpan(text: ' ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                   pw.TextSpan(text: 'ADD: ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
-                  pw.TextSpan(text: '嘉兴市秀洲区油车港镇永越大厦 11 楼 1102', style: pw.TextStyle(font: fonts.yaheiRegular, fontSize: 9)),
+                  pw.TextSpan(text: '嘉兴市秀洲区油车港镇永越大厦11楼1102', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
                 ],
               ),
             ),
             pw.RichText(
               text: pw.TextSpan(
                 children: [
-                  pw.TextSpan(text: '电话/传真 ', style: pw.TextStyle(font: fonts.yaheiRegular, fontSize: 9)),
+                  pw.TextSpan(text: '电话/传真', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
+                  pw.TextSpan(text: ' ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                   pw.TextSpan(text: 'TEL/FAX: 15067388778 0573-82203606', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                 ],
               ),
@@ -289,7 +279,8 @@ class TdsPdfService {
           children: [
             pw.Row(
               children: [
-                pw.Text('网址 ', style: pw.TextStyle(font: fonts.yaheiRegular, fontSize: 9)),
+                pw.Text('网址', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
+                pw.Text(' ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                 pw.Text('WEBSITE: ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                 pw.UrlLink(
                   destination: 'http://www.rstone-resin.com/',
@@ -308,7 +299,8 @@ class TdsPdfService {
             pw.RichText(
               text: pw.TextSpan(
                 children: [
-                  pw.TextSpan(text: '邮箱 ', style: pw.TextStyle(font: fonts.yaheiRegular, fontSize: 9)),
+                  pw.TextSpan(text: '邮箱', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
+                  pw.TextSpan(text: ' ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                   pw.TextSpan(text: 'EMAIL: zhoulei22kb@rstone-resin.com', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                 ],
               ),
@@ -353,7 +345,8 @@ class TdsPdfService {
     void flushParagraphIfNeeded() {
       if (paragraphBuffer.isEmpty) return;
       current ??= _TdsSection(title: '');
-      current!.blocks.add(_TdsBlock.paragraph(paragraphBuffer.join(' ')));
+      final separator = current!.title.contains('产品特性') ? '\n' : ' ';
+      current!.blocks.add(_TdsBlock.paragraph(paragraphBuffer.join(separator)));
       paragraphBuffer.clear();
     }
 
@@ -435,8 +428,8 @@ class TdsPdfService {
   static String? _normalizeTextForPdf(String? text) {
     if (text == null || text.isEmpty) return text;
     var normalized = text;
-    normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)[ \t\n]+(\d{2,}[A-Za-z0-9-]*)'), (m) => '${m.group(1)}\u00A0${m.group(2)}');
-    normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)(\d{2,})'), (m) => '${m.group(1)}\u2060${m.group(2)}');
+    normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)[ \t\n]+(\d{2,}[A-Za-z0-9-]*)'), (m) => '${m.group(1)}${m.group(2)}');
+    normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)(\d{2,})'), (m) => '${m.group(1)}${m.group(2)}');
     return normalized;
   }
 
@@ -461,16 +454,16 @@ class _PdfFonts {
     required this.songtiRegular,
     required this.songtiBold,
     required this.arialRegular,
-    required this.yaheiRegular,
-    required this.yaheiBold,
+    required this.simheiRegular,
+    required this.simheiBold,
     required this.impactLikeBold,
   });
 
   final pw.Font songtiRegular;
   final pw.Font songtiBold;
   final pw.Font arialRegular;
-  final pw.Font yaheiRegular;
-  final pw.Font yaheiBold;
+  final pw.Font simheiRegular;
+  final pw.Font simheiBold;
   final pw.Font impactLikeBold;
 }
 
