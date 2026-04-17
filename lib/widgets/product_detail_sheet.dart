@@ -91,21 +91,75 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       if (!mounted) return;
       await showDialog<void>(
         context: context,
-        builder: (dialogContext) => Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          child: SizedBox(
-            width: 900,
-            height: 680,
-            child: PdfPreview(
-              build: (_) async => pdfBytes,
-              allowPrinting: false,
-              allowSharing: false,
-              canChangeOrientation: false,
-              canChangePageFormat: false,
-              canDebug: false,
+        builder: (dialogContext) {
+          final cs = Theme.of(dialogContext).colorScheme;
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            backgroundColor: cs.surfaceContainerHigh,
+            surfaceTintColor: cs.surfaceTint,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
             ),
-          ),
-        ),
+            clipBehavior: Clip.antiAlias,
+            child: SizedBox(
+              width: 900,
+              height: 680,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.picture_as_pdf_rounded, color: cs.primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'TDS PDF 预览',
+                            style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
+                              color: cs.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Tooltip(
+                          message: '支持双指缩放查看细节',
+                          child: Icon(Icons.pinch_rounded, color: cs.onSurfaceVariant),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                          tooltip: '关闭预览',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: Container(
+                      color: cs.surfaceContainerLowest,
+                      padding: const EdgeInsets.all(12),
+                      child: InteractiveViewer(
+                        minScale: 1,
+                        maxScale: 4,
+                        panEnabled: true,
+                        scaleEnabled: true,
+                        boundaryMargin: const EdgeInsets.all(24),
+                        child: PdfPreview(
+                          build: (_) async => pdfBytes,
+                          allowPrinting: false,
+                          allowSharing: false,
+                          canChangeOrientation: false,
+                          canChangePageFormat: false,
+                          canDebug: false,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       );
     } catch (e) {
       if (!mounted) return;
