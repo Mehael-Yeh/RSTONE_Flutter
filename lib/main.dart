@@ -50,11 +50,13 @@ class RstoneApp extends StatefulWidget {
 
 class _RstoneAppState extends State<RstoneApp> {
   late ThemeMode _themeMode;
+  late Color _themeSeedColor;
 
   @override
   void initState() {
     super.initState();
     _themeMode = _themeModeFromString(widget.preferencesService.getThemeMode());
+    _themeSeedColor = Color(widget.preferencesService.getThemeSeedColorValue());
   }
 
   ThemeMode _themeModeFromString(String mode) {
@@ -84,9 +86,14 @@ class _RstoneAppState extends State<RstoneApp> {
     await widget.preferencesService.saveThemeMode(_themeModeToString(mode));
   }
 
+  Future<void> _updateThemeSeedColor(Color color) async {
+    setState(() => _themeSeedColor = color);
+    await widget.preferencesService.saveThemeSeedColorValue(color.value);
+  }
+
   ThemeData _buildTheme(Brightness brightness) {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFFFF8A00),
+      seedColor: _themeSeedColor,
       brightness: brightness,
     );
     return ThemeData(
@@ -141,6 +148,8 @@ class _RstoneAppState extends State<RstoneApp> {
         dataService: widget.dataService,
         preferencesService: widget.preferencesService,
         onThemeModeChanged: _updateThemeMode,
+        themeSeedColor: _themeSeedColor,
+        onThemeSeedColorChanged: _updateThemeSeedColor,
         themeMode: _themeMode,
       ),
     );
@@ -151,6 +160,8 @@ class MainScreen extends StatefulWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
   final Future<void> Function(ThemeMode) onThemeModeChanged;
+  final Color themeSeedColor;
+  final Future<void> Function(Color) onThemeSeedColorChanged;
   final ThemeMode themeMode;
 
   const MainScreen({
@@ -158,6 +169,8 @@ class MainScreen extends StatefulWidget {
     required this.dataService,
     required this.preferencesService,
     required this.onThemeModeChanged,
+    required this.themeSeedColor,
+    required this.onThemeSeedColorChanged,
     required this.themeMode,
   });
 
@@ -181,6 +194,8 @@ class _MainScreenState extends State<MainScreen> {
             dataService: widget.dataService,
             preferencesService: widget.preferencesService,
             onThemeModeChanged: widget.onThemeModeChanged,
+            themeSeedColor: widget.themeSeedColor,
+            onThemeSeedColorChanged: widget.onThemeSeedColorChanged,
             themeMode: widget.themeMode,
             pageChangeSignal: _pageChangeSignal,
           ),
