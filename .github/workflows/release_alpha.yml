@@ -81,33 +81,37 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
-      - name: Fetch latest data from Rstone
+      - name: Fetch latest data from Rstone and RstoneTDS
         run: |
-          # Clone Rstone repo to temporary directory
+          # Clone source repos to temporary directories
           git clone --depth 1 https://github.com/Mehael-Yeh/Rstone.git ../rstone_data
+          git clone --depth 1 https://github.com/Mehael-Yeh/RstoneTDS.git ../rstone_tds_data
 
-          # Recreate assets directories and copy .md files
-          mkdir -p assets/产品列表 assets/产品应用 assets/产品配方
+          # Recreate assets directories and copy markdown files
+          rm -rf assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
+          mkdir -p assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
           cp ../rstone_data/产品列表/*.md assets/产品列表/
           cp ../rstone_data/产品应用/*.md assets/产品应用/
           cp ../rstone_data/产品配方/*.md assets/产品配方/
+          cp ../rstone_tds_data/*.TDS.md assets/产品TDS/
 
-          # Generate JSON index files (array of .md filenames, one per line format)
+          # Generate JSON index files (array of .md filenames)
           python3 -c "
           import os, json
 
-          for folder, jsonfile in [
-              ('产品列表', 'assets/产品列表.json'),
-              ('产品应用', 'assets/产品应用.json'),
-              ('产品配方', 'assets/产品配方.json'),
+          for folder, jsonfile, suffix in [
+              ('产品列表', 'assets/产品列表.json', '.md'),
+              ('产品应用', 'assets/产品应用.json', '.md'),
+              ('产品配方', 'assets/产品配方.json', '.md'),
+              ('产品TDS', 'assets/产品TDS.json', '.TDS.md'),
           ]:
-              files = sorted([f for f in os.listdir(f'assets/{folder}') if f.endswith('.md')])
-              with open(jsonfile, 'w') as f:
+              files = sorted([f for f in os.listdir(f'assets/{folder}') if f.endswith(suffix)])
+              with open(jsonfile, 'w', encoding='utf-8') as f:
                   json.dump(files, f, ensure_ascii=False, indent=2)
               print(f'{folder}: {len(files)} files')
           "
 
-          echo "Done. Assets updated from Rstone."
+          echo "Done. Assets updated from Rstone and RstoneTDS."
 
       - name: Build Release APK (Android)
         run: |
