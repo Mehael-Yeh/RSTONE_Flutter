@@ -452,17 +452,11 @@ class ObsidianDataService {
       return searchable;
     }
 
-    bool _isExplicitPuFamilyQuery(List<String> segmentedKeywords) {
-      const puFamilyTerms = <String>{'pu', '羟丙', '羟基丙烯酸'};
+    bool _shouldExcludePudResults(List<String> segmentedKeywords) {
+      const puLockedTerms = <String>{'羟丙', '羟基丙烯酸'};
       final compact = normalizedQuery.replaceAll(RegExp(r'\s+'), '');
       if (compact.contains('pud')) return false;
-      if (compact == 'pu') return false;
-      if (!segmentedKeywords.any(puFamilyTerms.contains)) return false;
-      if (segmentedKeywords.length <= 1) return false;
-      if (segmentedKeywords.length == 2 && puFamilyTerms.contains(segmentedKeywords.last)) {
-        return false;
-      }
-      return true;
+      return segmentedKeywords.any(puLockedTerms.contains);
     }
 
     bool _containsAnyTerm(Set<String> searchableTags, Set<String> terms) {
@@ -569,7 +563,7 @@ class ObsidianDataService {
     
     if (keywords.isEmpty) return [];
     
-    final strictPuFamily = _isExplicitPuFamilyQuery(keywords);
+    final excludePudResults = _shouldExcludePudResults(keywords);
     final pudTerms = _expandedKeywords('pud');
     final results = <ProductItem>[];
     
@@ -591,7 +585,7 @@ class ObsidianDataService {
 
     bool containsKeyword(ProductItem item, String keyword) {
       final searchableTags = _buildSearchableTags(item);
-      if (strictPuFamily && _containsAnyTerm(searchableTags, pudTerms)) {
+      if (excludePudResults && _containsAnyTerm(searchableTags, pudTerms)) {
         return false;
       }
       final searchableTagsText = searchableTags.join(' ');
@@ -609,7 +603,7 @@ class ObsidianDataService {
 
     bool matchesMixedKeywordsInTagsOnly(ProductItem item) {
       final searchableTags = _buildSearchableTags(item);
-      if (strictPuFamily && _containsAnyTerm(searchableTags, pudTerms)) {
+      if (excludePudResults && _containsAnyTerm(searchableTags, pudTerms)) {
         return false;
       }
       final tagsText = searchableTags.join(' ').toLowerCase();
