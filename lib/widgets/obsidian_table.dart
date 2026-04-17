@@ -88,7 +88,42 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
   String? _tdsOf(ProductItem item) {
     if (item.folder != '产品列表') return null;
-    return widget.tdsByProduct[item.fileName];
+    final direct = widget.tdsByProduct[item.fileName];
+    if (direct != null) return direct;
+
+    for (final candidate in _tdsLookupCandidates(item.fileName)) {
+      for (final entry in widget.tdsByProduct.entries) {
+        if (_normalizeProductKey(entry.key) == candidate) {
+          return entry.value;
+        }
+      }
+    }
+    return null;
+  }
+
+  Iterable<String> _tdsLookupCandidates(String productName) sync* {
+    final normalized = _normalizeProductKey(productName);
+    if (normalized.isNotEmpty) yield normalized;
+
+    final baseName = productName.split('-').first.trim();
+    final normalizedBase = _normalizeProductKey(baseName);
+    if (normalizedBase.isNotEmpty && normalizedBase != normalized) {
+      yield normalizedBase;
+    }
+
+    if (normalized.startsWith('RS')) {
+      yield 'RD${normalized.substring(2)}';
+    } else if (normalized.startsWith('RD')) {
+      yield 'RS${normalized.substring(2)}';
+    }
+  }
+
+  String _normalizeProductKey(String raw) {
+    return raw
+        .toUpperCase()
+        .replaceAll('.TDS.MD', '')
+        .replaceAll('.MD', '')
+        .replaceAll(RegExp(r'[^A-Z0-9]'), '');
   }
 
   Future<void> _openNoteEditor(ProductItem item) async {

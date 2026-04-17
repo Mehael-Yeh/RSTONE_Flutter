@@ -50,6 +50,13 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final totalProducts = widget.dataService.products.length;
+    final coveredProducts = widget.dataService.products
+        .where((product) => widget.dataService.tdsForProduct(product.fileName) != null)
+        .length;
+    final coveragePercent = totalProducts == 0
+        ? 0
+        : ((coveredProducts / totalProducts) * 100).round();
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
@@ -105,6 +112,12 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 _buildInfoTile(icon: Icons.inventory_2, title: '产品数量', value: '${widget.dataService.products.length}'),
                 _buildInfoTile(icon: Icons.apps, title: '应用数量', value: '${widget.dataService.applications.length}'),
+                _buildInfoTile(icon: Icons.description, title: 'TDS数量', value: '${widget.dataService.tdsByProduct.length}'),
+                _buildInfoTile(
+                  icon: Icons.pie_chart,
+                  title: 'TDS覆盖率',
+                  value: '$coveredProducts/$totalProducts ($coveragePercent%)',
+                ),
                 _buildInfoTile(
                   icon: Icons.check_circle,
                   title: '初始化状态',
