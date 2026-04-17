@@ -37,6 +37,8 @@ class ObsidianDataService {
   String _tagAliasRulesRaw = '';
   /// TDS 文档缓存（key: 产品名称，value: 对应 .TDS.md 文本）
   Map<String, String> _tdsByProduct = {};
+  /// 归一化索引（key: 归一化产品名，value: 对应 .TDS.md 文本）
+  Map<String, String> _tdsByNormalizedProduct = {};
   /// 标签同义词映射（key -> 可匹配词）
   Map<String, Set<String>> _tagAliasRules = {};
   /// 是否已完成初始化
@@ -53,7 +55,41 @@ class ObsidianDataService {
   Map<String, String> get tdsByProduct => Map.unmodifiable(_tdsByProduct);
   bool get isInitialized => _initialized;
   List<String> get logs => List.unmodifiable(_logs);
-  String? tdsForProduct(String productName) => _tdsByProduct[productName];
+  String? tdsForProduct(String productName) {
+    final direct = _tdsByProduct[productName];
+    if (direct != null) return direct;
+
+    for (final candidate in _tdsLookupCandidates(productName)) {
+      final hit = _tdsByNormalizedProduct[candidate];
+      if (hit != null) return hit;
+    }
+    return null;
+  }
+
+  Iterable<String> _tdsLookupCandidates(String productName) sync* {
+    final normalized = _normalizeProductKey(productName);
+    if (normalized.isNotEmpty) yield normalized;
+
+    final baseName = productName.split('-').first.trim();
+    final normalizedBase = _normalizeProductKey(baseName);
+    if (normalizedBase.isNotEmpty && normalizedBase != normalized) {
+      yield normalizedBase;
+    }
+
+    if (normalized.startsWith('RS')) {
+      yield 'RD${normalized.substring(2)}';
+    } else if (normalized.startsWith('RD')) {
+      yield 'RS${normalized.substring(2)}';
+    }
+  }
+
+  String _normalizeProductKey(String raw) {
+    return raw
+        .toUpperCase()
+        .replaceAll('.TDS.MD', '')
+        .replaceAll('.MD', '')
+        .replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  }
 
   void _addLog(String message) {
     final timestamp = DateTime.now().toString().substring(11, 19);
@@ -230,6 +266,10 @@ class ObsidianDataService {
           final content = await rootBundle.loadString('$_tdsAssetPath/$fileName');
           final productName = fileName.replaceAll('.TDS.md', '');
           _tdsByProduct[productName] = content;
+          final normalized = _normalizeProductKey(productName);
+          if (normalized.isNotEmpty) {
+            _tdsByNormalizedProduct[normalized] = content;
+          }
         } catch (e) {
           _addLog('DataService: Error loading TDS $fileName: $e');
         }
