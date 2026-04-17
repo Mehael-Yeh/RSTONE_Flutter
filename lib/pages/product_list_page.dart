@@ -171,6 +171,7 @@ class _ProductListPageState extends State<ProductListPage> {
           : ObsidianTable(
               items: items,
               formulas: widget.dataService.formulas,
+              tdsByProduct: widget.dataService.tdsByProduct,
               defaultColumns: _columns,
               isMobile: isMobile,
               onColumnsChanged: _onColumnsChanged,
