@@ -132,7 +132,7 @@ class TdsPdfService {
     return doc.save();
   }
 
-  static pw.Widget _buildHeader(_PdfFonts pdfFonts) {
+  static pw.Widget _buildHeader(_PdfFonts fonts) {
     return pw.Column(
       children: [
         pw.Row(
@@ -145,7 +145,7 @@ class TdsPdfService {
                   pw.TextSpan(
                     text: 'R',
                     style: pw.TextStyle(
-                      font: pdfFonts.impactLikeBold,
+                      font: fonts.impactLikeBold,
                       fontSize: 48,
                       color: PdfColors.red,
                       fontWeight: pw.FontWeight.bold,
@@ -154,7 +154,7 @@ class TdsPdfService {
                   pw.TextSpan(
                     text: 'STONE',
                     style: pw.TextStyle(
-                      font: pdfFonts.impactLikeBold,
+                      font: fonts.impactLikeBold,
                       fontSize: 28,
                       color: PdfColors.red,
                       fontWeight: pw.FontWeight.bold,
@@ -168,12 +168,12 @@ class TdsPdfService {
               children: [
                 pw.Text(
                   '嘉兴锐石化工有限公司',
-                  style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 22, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 22, fontWeight: pw.FontWeight.bold),
                 ),
                 pw.SizedBox(height: 2),
                 pw.Text(
                   'RSTONE (Jia Xing) Resins Company',
-                  style: pw.TextStyle(font: pdfFonts.arialRegular, fontSize: 14),
+                  style: pw.TextStyle(font: fonts.arialRegular, fontSize: 14),
                 ),
               ],
             ),
@@ -185,28 +185,28 @@ class TdsPdfService {
     );
   }
 
-  static pw.Widget _buildSection(_TdsSection section, _PdfFonts pdfFonts) {
+  static pw.Widget _buildSection(_TdsSection section, _PdfFonts fonts) {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 9),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           if (section.title.isNotEmpty) ...[
-            pw.Text(section.title, style: pw.TextStyle(font: pdfFonts.songtiBold, fontSize: 14)),
+            pw.Text(section.title, style: pw.TextStyle(font: fonts.songtiBold, fontSize: 14)),
             pw.SizedBox(height: 5),
           ],
-          ...section.blocks.map((block) => _buildBlock(block, section, pdfFonts)),
+          ...section.blocks.map((block) => _buildBlock(block, section, fonts)),
         ],
       ),
     );
   }
 
-  static pw.Widget _buildBlock(_TdsBlock block, _TdsSection section, _PdfFonts pdfFonts) {
+  static pw.Widget _buildBlock(_TdsBlock block, _TdsSection section, _PdfFonts fonts) {
     if (block.type == _TdsBlockType.table && block.tableRows != null && block.tableRows!.isNotEmpty) {
       final isPhysicalTable = section.title.contains('物理性能') && block.tableRows!.first.length >= 3;
       final table = pw.TableHelper.fromTextArray(
-        headerStyle: pw.TextStyle(font: pdfFonts.songtiBold, fontSize: 10.5),
-        cellStyle: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 10.5),
+        headerStyle: pw.TextStyle(font: fonts.songtiBold, fontSize: 10.5),
+        cellStyle: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5),
         cellAlignment: pw.Alignment.center,
         border: pw.TableBorder.all(width: 0.8),
         columnWidths: isPhysicalTable
@@ -230,7 +230,7 @@ class TdsPdfService {
     if (block.type == _TdsBlockType.note && block.text != null) {
       return pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 4),
-        child: pw.Text(_normalizeTextForPdf(block.text!)!, style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 9)),
+        child: pw.Text(_normalizeTextForPdf(block.text!)!, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
       );
     }
 
@@ -238,25 +238,25 @@ class TdsPdfService {
       padding: const pw.EdgeInsets.only(bottom: 3),
       child: pw.Text(
         _normalizeTextForPdf(block.text) ?? '',
-        style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 10.5, lineSpacing: 2),
+        style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5, lineSpacing: 2),
       ),
     );
   }
 
-  static pw.Widget _buildDisclaimerSection(_PdfFonts pdfFonts) {
+  static pw.Widget _buildDisclaimerSection(_PdfFonts fonts) {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(top: 8),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text('免责声明', style: pw.TextStyle(font: pdfFonts.songtiBold, fontSize: 14)),
+          pw.Text('免责声明', style: pw.TextStyle(font: fonts.songtiBold, fontSize: 14)),
           pw.SizedBox(height: 8),
           ..._defaultDisclaimer.map(
             (line) => pw.Padding(
               padding: const pw.EdgeInsets.only(bottom: 8),
               child: pw.Text(
                 line,
-                style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 8, lineSpacing: 2),
+                style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 8, lineSpacing: 2),
               ),
             ),
           ),
@@ -265,7 +265,7 @@ class TdsPdfService {
     );
   }
 
-  static pw.Widget _buildFooter(_PdfFonts pdfFonts) {
+  static pw.Widget _buildFooter(_PdfFonts fonts) {
     return pw.Column(
       children: [
         pw.Container(height: 4, color: PdfColors.grey600),
@@ -273,7 +273,7 @@ class TdsPdfService {
         pw.Text(
           '锐石主要从事紫外光固化（UV）树脂及水性乳液的研发、制造和销售，\n旨在创造世界级的中国化工品牌',
           textAlign: pw.TextAlign.center,
-          style: pw.TextStyle(font: pdfFonts.songtiBold, fontSize: 11),
+          style: pw.TextStyle(font: fonts.songtiBold, fontSize: 11),
         ),
         pw.SizedBox(height: 5),
         pw.Row(
@@ -282,17 +282,17 @@ class TdsPdfService {
             pw.RichText(
               text: pw.TextSpan(
                 children: [
-                  pw.TextSpan(text: '地址 ', style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 9)),
-                  pw.TextSpan(text: 'ADD: ', style: pw.TextStyle(font: pdfFonts.arialRegular, fontSize: 9)),
-                  pw.TextSpan(text: '嘉兴市秀洲区油车港镇永越大厦 11 楼 1102', style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 9)),
+                  pw.TextSpan(text: '地址 ', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+                  pw.TextSpan(text: 'ADD: ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                  pw.TextSpan(text: '嘉兴市秀洲区油车港镇永越大厦 11 楼 1102', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
                 ],
               ),
             ),
             pw.RichText(
               text: pw.TextSpan(
                 children: [
-                  pw.TextSpan(text: '电话/传真 ', style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 9)),
-                  pw.TextSpan(text: 'TEL/FAX: 15067388778 0573-82203606', style: pw.TextStyle(font: pdfFonts.arialRegular, fontSize: 9)),
+                  pw.TextSpan(text: '电话/传真 ', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+                  pw.TextSpan(text: 'TEL/FAX: 15067388778 0573-82203606', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                 ],
               ),
             ),
@@ -304,16 +304,16 @@ class TdsPdfService {
             pw.RichText(
               text: pw.TextSpan(
                 children: [
-                  pw.TextSpan(text: '网址 ', style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 9)),
-                  pw.TextSpan(text: 'WEBSITE: http://www.rstone-resin.com/', style: pw.TextStyle(font: pdfFonts.arialRegular, fontSize: 9)),
+                  pw.TextSpan(text: '网址 ', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+                  pw.TextSpan(text: 'WEBSITE: http://www.rstone-resin.com/', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                 ],
               ),
             ),
             pw.RichText(
               text: pw.TextSpan(
                 children: [
-                  pw.TextSpan(text: '邮箱 ', style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 9)),
-                  pw.TextSpan(text: 'EMAIL: zhoulei22kb@rstone-resin.com', style: pw.TextStyle(font: pdfFonts.arialRegular, fontSize: 9)),
+                  pw.TextSpan(text: '邮箱 ', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+                  pw.TextSpan(text: 'EMAIL: zhoulei22kb@rstone-resin.com', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                 ],
               ),
             ),
