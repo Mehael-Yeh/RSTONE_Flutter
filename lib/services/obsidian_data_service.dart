@@ -439,6 +439,7 @@ class ObsidianDataService {
   /// 返回匹配的产品和应用列表
   List<ProductItem> search(String query) {
     if (query.isEmpty) return [];
+    final normalizedQuery = query.toLowerCase().trim();
 
     Set<String> _buildSearchableTags(ProductItem item) {
       final searchable = <String>{};
@@ -449,6 +450,23 @@ class ObsidianDataService {
         searchable.addAll(_tagAliasRules[normalizedTag] ?? {});
       }
       return searchable;
+    }
+
+    bool _isExplicitPuFamilyQuery(List<String> segmentedKeywords) {
+      const puFamilyTerms = <String>{'pu', '羟丙', '羟基丙烯酸'};
+      final compact = normalizedQuery.replaceAll(RegExp(r'\s+'), '');
+      if (compact.contains('pud')) return false;
+      if (compact == 'pu') return false;
+      if (!segmentedKeywords.any(puFamilyTerms.contains)) return false;
+      if (segmentedKeywords.length <= 1) return false;
+      if (segmentedKeywords.length == 2 && puFamilyTerms.contains(segmentedKeywords.last)) {
+        return false;
+      }
+      return true;
+    }
+
+    bool _containsAnyTerm(Set<String> searchableTags, Set<String> terms) {
+      return searchableTags.any((tag) => terms.contains(tag));
     }
 
     Set<String> _buildKnownTagTerms() {
@@ -509,7 +527,6 @@ class ObsidianDataService {
       return <String>[source];
     }
 
-    final normalizedQuery = query.toLowerCase().trim();
     final keywords = normalizedQuery
         .split(RegExp(r'\s+'))
         .where((k) => k.isNotEmpty)
@@ -552,6 +569,8 @@ class ObsidianDataService {
     
     if (keywords.isEmpty) return [];
     
+    final strictPuFamily = _isExplicitPuFamilyQuery(keywords);
+    final pudTerms = _expandedKeywords('pud');
     final results = <ProductItem>[];
     
     _addLog('DataService: Searching for keywords: $keywords');
@@ -571,7 +590,11 @@ class ObsidianDataService {
     }
 
     bool containsKeyword(ProductItem item, String keyword) {
-      final searchableTagsText = _buildSearchableTags(item).join(' ');
+      final searchableTags = _buildSearchableTags(item);
+      if (strictPuFamily && _containsAnyTerm(searchableTags, pudTerms)) {
+        return false;
+      }
+      final searchableTagsText = searchableTags.join(' ');
       final singleKeywordSearchText =
           '${item.fileName} ${item.experimentalCode ?? ''} $searchableTagsText'
               .toLowerCase();
@@ -585,7 +608,11 @@ class ObsidianDataService {
     }
 
     bool matchesMixedKeywordsInTagsOnly(ProductItem item) {
-      final tagsText = _buildSearchableTags(item).join(' ').toLowerCase();
+      final searchableTags = _buildSearchableTags(item);
+      if (strictPuFamily && _containsAnyTerm(searchableTags, pudTerms)) {
+        return false;
+      }
+      final tagsText = searchableTags.join(' ').toLowerCase();
       return keywords.every((keyword) {
         final expanded = _expandedKeywords(keyword);
         return expanded.any(tagsText.contains);
