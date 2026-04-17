@@ -42,8 +42,7 @@ class TdsPdfService {
   }) async {
     final body = _extractMarkdownBody(tdsMarkdown);
     final parsed = _parseTdsSections(body);
-    final subtitle = _normalizeTextForPdf(parsed.subtitle);
-    final shouldShowSubtitle = subtitle != null && !_isDuplicateSubtitle(subtitle, product.fileName);
+    final productGrade = _normalizeTextForPdf(parsed.subtitle) ?? _normalizeTextForPdf(product.fileName) ?? product.fileName;
 
     final pdfFonts = _PdfFonts(
       songtiRegular: await _loadFirstAvailableFont(
@@ -87,14 +86,10 @@ class TdsPdfService {
           ),
           pw.SizedBox(height: 14),
           pw.Text(
-            product.fileName,
+            productGrade,
             style: pw.TextStyle(font: pdfFonts.yaheiBold, fontSize: 14, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 10),
-          if (shouldShowSubtitle) ...[
-            pw.Text(subtitle!, style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 10.5)),
-            pw.SizedBox(height: 10),
-          ],
           ...parsed.sections.map((section) => _buildSection(section, pdfFonts)),
           _buildDisclaimerSection(pdfFonts),
         ],
@@ -176,6 +171,8 @@ class TdsPdfService {
   static pw.Widget _buildBlock(_TdsBlock block, _TdsSection section, _PdfFonts fonts) {
     if (block.type == _TdsBlockType.table && block.tableRows != null && block.tableRows!.isNotEmpty) {
       final isPhysicalTable = section.title.contains('物理性能') && block.tableRows!.first.length >= 3;
+      final isRecommendationTable = section.title.contains('推荐配方');
+      final shouldConstrainTableWidth = isPhysicalTable || isRecommendationTable;
       final table = pw.TableHelper.fromTextArray(
         headerStyle: pw.TextStyle(font: fonts.songtiBold, fontSize: 10.5),
         cellStyle: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5),
@@ -193,7 +190,7 @@ class TdsPdfService {
       );
       return pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 4),
-        child: isPhysicalTable
+        child: shouldConstrainTableWidth
             ? pw.Center(child: pw.SizedBox(width: 410, child: table))
             : table,
       );
@@ -273,13 +270,22 @@ class TdsPdfService {
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.RichText(
-              text: pw.TextSpan(
-                children: [
-                  pw.TextSpan(text: '网址 ', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
-                  pw.TextSpan(text: 'WEBSITE: http://www.rstone-resin.com/', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
-                ],
-              ),
+            pw.Row(
+              children: [
+                pw.Text('网址 ', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+                pw.UrlLink(
+                  destination: 'http://www.rstone-resin.com/',
+                  child: pw.Text(
+                    'WEBSITE: http://www.rstone-resin.com/',
+                    style: pw.TextStyle(
+                      font: fonts.arialRegular,
+                      fontSize: 9,
+                      color: PdfColors.blue700,
+                      decoration: pw.TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
             ),
             pw.RichText(
               text: pw.TextSpan(
@@ -410,13 +416,11 @@ class TdsPdfService {
 
   static String? _normalizeTextForPdf(String? text) {
     if (text == null || text.isEmpty) return text;
-    return text.replaceAllMapped(RegExp(r'([A-Za-z]+)(\d{2,})'), (m) => '${m.group(1)}\u2060${m.group(2)}');
-  }
-
-  static bool _isDuplicateSubtitle(String subtitle, String productName) {
-    final normalizedSubtitle = subtitle.trim().toUpperCase();
-    final normalizedProduct = productName.trim().toUpperCase();
-    return normalizedSubtitle == normalizedProduct || normalizedSubtitle.startsWith('$normalizedProduct ');
+    var normalized = text;
+    normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)\s+(\d{2,}[A-Za-z0-9-]*)'), (m) => '${m.group(1)}\u00A0${m.group(2)}');
+    normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)(\d{2,})'), (m) => '${m.group(1)}\u2060${m.group(2)}');
+    normalized = normalized.replaceAllMapped(RegExp(r'([^\s])([，。；：！？、,.!?;:])'), (m) => '${m.group(1)}\u2060${m.group(2)}');
+    return normalized;
   }
 
   static Future<pw.Font> _loadFirstAvailableFont({
