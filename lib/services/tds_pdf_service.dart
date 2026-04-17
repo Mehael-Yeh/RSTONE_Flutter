@@ -45,7 +45,7 @@ class TdsPdfService {
     final subtitle = _normalizeTextForPdf(parsed.subtitle);
     final shouldShowSubtitle = subtitle != null && !_isDuplicateSubtitle(subtitle, product.fileName);
 
-    final fonts = _PdfFonts(
+    final pdfFonts = _PdfFonts(
       songtiRegular: await _loadFirstAvailableFont(
         candidates: const ['assets/fonts/SimSun.ttf', 'assets/fonts/simsun.ttf', 'assets/fonts/STSong.ttf'],
         fallback: PdfGoogleFonts.notoSerifSCRegular,
@@ -68,43 +68,35 @@ class TdsPdfService {
       ),
     );
 
-    final fonts = _PdfFonts(
-      songtiRegular: await PdfGoogleFonts.notoSerifSCRegular(),
-      songtiBold: await PdfGoogleFonts.notoSerifSCBold(),
-      arialRegular: await PdfGoogleFonts.robotoRegular(),
-      yaheiBold: await PdfGoogleFonts.notoSansSCBold(),
-      impactLikeBold: await PdfGoogleFonts.oswaldBold(),
-    );
-
     final doc = pw.Document();
 
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
-        theme: pw.ThemeData.withFont(base: fonts.songtiRegular, bold: fonts.songtiBold),
-        header: (context) => _buildHeader(fonts),
-        footer: (context) => _buildFooter(fonts),
+        theme: pw.ThemeData.withFont(base: pdfFonts.songtiRegular, bold: pdfFonts.songtiBold),
+        header: (context) => _buildHeader(pdfFonts),
+        footer: (context) => _buildFooter(pdfFonts),
         build: (context) => [
           pw.SizedBox(height: 14),
           pw.Center(
             child: pw.Text(
               '产品技术数据表（TDS）',
-              style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 16),
+              style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 16),
             ),
           ),
           pw.SizedBox(height: 14),
           pw.Text(
             product.fileName,
-            style: pw.TextStyle(font: fonts.yaheiBold, fontSize: 14, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(font: pdfFonts.yaheiBold, fontSize: 14, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 10),
           if (shouldShowSubtitle) ...[
-            pw.Text(subtitle!, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5)),
+            pw.Text(subtitle!, style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 10.5)),
             pw.SizedBox(height: 10),
           ],
-          ...parsed.sections.map((section) => _buildSection(section, fonts)),
-          _buildDisclaimerSection(fonts),
+          ...parsed.sections.map((section) => _buildSection(section, pdfFonts)),
+          _buildDisclaimerSection(pdfFonts),
         ],
       ),
     );
