@@ -39,6 +39,7 @@ flutter:
     - assets/产品配方.json
     - assets/产品TDS.json
     - assets/tag_alias_rules.txt
+    - assets/fonts/
 
 flutter_launcher_icons:
   android: true
