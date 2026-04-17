@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -41,6 +42,31 @@ class TdsPdfService {
   }) async {
     final body = _extractMarkdownBody(tdsMarkdown);
     final parsed = _parseTdsSections(body);
+    final subtitle = _normalizeTextForPdf(parsed.subtitle);
+    final shouldShowSubtitle = subtitle != null && !_isDuplicateSubtitle(subtitle, product.fileName);
+
+    final fonts = _PdfFonts(
+      songtiRegular: await _loadFirstAvailableFont(
+        candidates: const ['assets/fonts/SimSun.ttf', 'assets/fonts/simsun.ttf', 'assets/fonts/STSong.ttf'],
+        fallback: PdfGoogleFonts.notoSerifSCRegular,
+      ),
+      songtiBold: await _loadFirstAvailableFont(
+        candidates: const ['assets/fonts/SimSun-Bold.ttf', 'assets/fonts/simsunb.ttf'],
+        fallback: PdfGoogleFonts.notoSerifSCBold,
+      ),
+      arialRegular: await _loadFirstAvailableFont(
+        candidates: const ['assets/fonts/Arial.ttf', 'assets/fonts/arial.ttf'],
+        fallback: PdfGoogleFonts.robotoRegular,
+      ),
+      yaheiBold: await _loadFirstAvailableFont(
+        candidates: const ['assets/fonts/msyh.ttf', 'assets/fonts/MicrosoftYaHei.ttf', 'assets/fonts/微软雅黑.ttf'],
+        fallback: PdfGoogleFonts.notoSansSCBold,
+      ),
+      impactLikeBold: await _loadFirstAvailableFont(
+        candidates: const ['assets/fonts/Impact.ttf', 'assets/fonts/impact.ttf'],
+        fallback: PdfGoogleFonts.oswaldBold,
+      ),
+    );
 
     final fonts = _PdfFonts(
       songtiRegular: await PdfGoogleFonts.notoSerifSCRegular(),
@@ -73,8 +99,8 @@ class TdsPdfService {
             style: pw.TextStyle(font: fonts.yaheiBold, fontSize: 14, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 10),
-          if (parsed.subtitle != null && parsed.subtitle!.isNotEmpty) ...[
-            pw.Text(parsed.subtitle!, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5)),
+          if (shouldShowSubtitle) ...[
+            pw.Text(subtitle!, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5)),
             pw.SizedBox(height: 10),
           ],
           ...parsed.sections.map((section) => _buildSection(section, fonts)),
@@ -212,14 +238,14 @@ class TdsPdfService {
     if (block.type == _TdsBlockType.note && block.text != null) {
       return pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 4),
-        child: pw.Text(block.text!, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+        child: pw.Text(_normalizeTextForPdf(block.text!)!, style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
       );
     }
 
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 3),
       child: pw.Text(
-        block.text ?? '',
+        _normalizeTextForPdf(block.text) ?? '',
         style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5, lineSpacing: 2),
       ),
     );
@@ -325,6 +351,7 @@ class TdsPdfService {
 
     _TdsSection? current;
     List<List<String>>? collectingTableRows;
+    bool skippingMarkdownDisclaimer = false;
 
     void flushTableIfNeeded() {
       if (collectingTableRows != null && collectingTableRows!.isNotEmpty) {
@@ -350,6 +377,15 @@ class TdsPdfService {
       if (headingMatch != null) {
         flushTableIfNeeded();
         final heading = headingMatch.group(2)!.trim();
+        if (heading.contains('免责声明')) {
+          if (current != null) sections.add(current!);
+          current = null;
+          skippingMarkdownDisclaimer = true;
+          continue;
+        }
+        if (skippingMarkdownDisclaimer) {
+          skippingMarkdownDisclaimer = false;
+        }
 
         if (subtitle == null && heading.startsWith('RD')) {
           subtitle = heading;
@@ -362,6 +398,7 @@ class TdsPdfService {
       }
 
       if (line.startsWith('|')) {
+        if (skippingMarkdownDisclaimer) continue;
         current ??= _TdsSection(title: '');
         collectingTableRows ??= [];
         if (!RegExp(r'^\|?\s*[-:| ]+\|?$').hasMatch(line)) {
@@ -381,16 +418,43 @@ class TdsPdfService {
         subtitle = line;
         continue;
       }
+      if (skippingMarkdownDisclaimer) continue;
 
       flushTableIfNeeded();
       current ??= _TdsSection(title: '');
-      current!.blocks.add(_TdsBlock.paragraph(line.replaceFirst(RegExp(r'^\d+[.、]\s*'), '')));
+      current!.blocks.add(_TdsBlock.paragraph(line));
     }
 
     flushTableIfNeeded();
     if (current != null) sections.add(current!);
 
     return _ParsedTds(subtitle: subtitle, sections: sections);
+  }
+
+  static String? _normalizeTextForPdf(String? text) {
+    if (text == null || text.isEmpty) return text;
+    return text.replaceAllMapped(RegExp(r'([A-Za-z]+)(\d{2,})'), (m) => '${m.group(1)}\u2060${m.group(2)}');
+  }
+
+  static bool _isDuplicateSubtitle(String subtitle, String productName) {
+    final normalizedSubtitle = subtitle.trim().toUpperCase();
+    final normalizedProduct = productName.trim().toUpperCase();
+    return normalizedSubtitle == normalizedProduct || normalizedSubtitle.startsWith('$normalizedProduct ');
+  }
+
+  static Future<pw.Font> _loadFirstAvailableFont({
+    required List<String> candidates,
+    required Future<pw.Font> Function() fallback,
+  }) async {
+    for (final path in candidates) {
+      try {
+        final data = await rootBundle.load(path);
+        return pw.Font.ttf(data);
+      } catch (_) {
+        // continue try next candidate
+      }
+    }
+    return fallback();
   }
 }
 
