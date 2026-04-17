@@ -215,12 +215,20 @@ class TdsPdfService {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 3),
       child: _buildMarkdownStyledText(
-        block.text ?? '',
+        _formatParagraphText(block),
         fonts: fonts,
         fontSize: 10.5,
         lineSpacing: 2,
       ),
     );
+  }
+
+  static String _formatParagraphText(_TdsBlock block) {
+    final source = block.text ?? '';
+    if (source.isEmpty) return source;
+    if (block.type != _TdsBlockType.paragraph) return source;
+    if (!block.shouldIndentFirstLine) return source;
+    return '　　$source';
   }
 
   static pw.Widget _buildMarkdownStyledText(
@@ -414,7 +422,15 @@ class TdsPdfService {
       if (paragraphBuffer.isEmpty) return;
       current ??= _TdsSection(title: '');
       final separator = current!.title.contains('产品特性') ? '\n' : ' ';
-      current!.blocks.add(_TdsBlock.paragraph(paragraphBuffer.join(separator)));
+      final paragraphText = paragraphBuffer.join(separator);
+      final isOrderedParagraph = RegExp(r'^((\d+[\.\)、])|([（(]\d+[）)]))\s*').hasMatch(paragraphBuffer.first.trim());
+      final shouldIndentFirstLine = paragraphBuffer.length >= 2 && !isOrderedParagraph;
+      current!.blocks.add(
+        _TdsBlock.paragraph(
+          paragraphText,
+          shouldIndentFirstLine: shouldIndentFirstLine,
+        ),
+      );
       paragraphBuffer.clear();
     }
 
@@ -561,13 +577,22 @@ class _TdsBlock {
     required this.type,
     this.text,
     this.tableRows,
+    this.shouldIndentFirstLine = false,
   });
 
-  factory _TdsBlock.paragraph(String text) => _TdsBlock._(type: _TdsBlockType.paragraph, text: text);
+  factory _TdsBlock.paragraph(
+    String text, {
+    bool shouldIndentFirstLine = false,
+  }) => _TdsBlock._(
+    type: _TdsBlockType.paragraph,
+    text: text,
+    shouldIndentFirstLine: shouldIndentFirstLine,
+  );
   factory _TdsBlock.note(String text) => _TdsBlock._(type: _TdsBlockType.note, text: text);
   factory _TdsBlock.table(List<List<String>> rows) => _TdsBlock._(type: _TdsBlockType.table, tableRows: rows);
 
   final _TdsBlockType type;
   final String? text;
   final List<List<String>>? tableRows;
+  final bool shouldIndentFirstLine;
 }
