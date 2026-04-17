@@ -342,7 +342,7 @@ class TdsPdfService {
       if (line.startsWith('>')) {
         flushTableIfNeeded();
         current ??= _TdsSection(title: '');
-        current.blocks.add(_TdsBlock.note(line.replaceFirst(RegExp(r'^>\s*'), '').trim()));
+        current!.blocks.add(_TdsBlock.note(line.replaceFirst(RegExp(r'^>\s*'), '').trim()));
         continue;
       }
 
@@ -356,7 +356,7 @@ class TdsPdfService {
           continue;
         }
 
-        if (current != null) sections.add(current);
+        if (current != null) sections.add(current!);
         current = _TdsSection(title: heading);
         continue;
       }
@@ -384,11 +384,11 @@ class TdsPdfService {
 
       flushTableIfNeeded();
       current ??= _TdsSection(title: '');
-      current.blocks.add(_TdsBlock.paragraph(line.replaceFirst(RegExp(r'^\d+[.、]\s*'), '')));
+      current!.blocks.add(_TdsBlock.paragraph(line.replaceFirst(RegExp(r'^\d+[.、]\s*'), '')));
     }
 
     flushTableIfNeeded();
-    if (current != null) sections.add(current);
+    if (current != null) sections.add(current!);
 
     return _ParsedTds(subtitle: subtitle, sections: sections);
   }
