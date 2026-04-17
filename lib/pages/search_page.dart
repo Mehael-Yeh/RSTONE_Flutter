@@ -10,6 +10,8 @@ class SearchPage extends StatefulWidget {
   final ObsidianDataService dataService;
   final PreferencesService preferencesService;
   final Future<void> Function(ThemeMode) onThemeModeChanged;
+  final Color themeSeedColor;
+  final Future<void> Function(Color) onThemeSeedColorChanged;
   final ThemeMode themeMode;
   final int pageChangeSignal;
 
@@ -18,6 +20,8 @@ class SearchPage extends StatefulWidget {
     required this.dataService,
     required this.preferencesService,
     required this.onThemeModeChanged,
+    required this.themeSeedColor,
+    required this.onThemeSeedColorChanged,
     required this.themeMode,
     this.pageChangeSignal = 0,
   });
@@ -144,6 +148,8 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                             preferencesService: widget.preferencesService,
                             themeMode: widget.themeMode,
                             onThemeModeChanged: widget.onThemeModeChanged,
+                            themeSeedColor: widget.themeSeedColor,
+                            onThemeSeedColorChanged: widget.onThemeSeedColorChanged,
                           ),
                         ),
                       );

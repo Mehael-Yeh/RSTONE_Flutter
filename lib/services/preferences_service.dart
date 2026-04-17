@@ -24,6 +24,8 @@ class PreferencesService {
   static const String _applicationSortDescKey = 'application_sort_desc';
   /// 主题模式存储键（system/light/dark）
   static const String _themeModeKey = 'theme_mode';
+  /// 主题色种子值存储键（Color.value）
+  static const String _themeSeedColorValueKey = 'theme_seed_color_value';
   /// 产品笔记存储键（Map<项目名称, 笔记内容>）
   static const String _productNotesKey = 'product_notes';
 
@@ -124,6 +126,16 @@ class PreferencesService {
   /// 保存主题模式（system/light/dark）。
   Future<void> saveThemeMode(String mode) async {
     await _prefs?.setString(_themeModeKey, mode);
+  }
+
+  /// 获取主题色种子值，默认使用品牌橙色。
+  int getThemeSeedColorValue() {
+    return _prefs?.getInt(_themeSeedColorValueKey) ?? 0xFFFF8A00;
+  }
+
+  /// 保存主题色种子值（Color.value）。
+  Future<void> saveThemeSeedColorValue(int colorValue) async {
+    await _prefs?.setInt(_themeSeedColorValueKey, colorValue);
   }
 
   /// 获取全部产品笔记。

@@ -13,6 +13,8 @@ class SettingsPage extends StatefulWidget {
   final PreferencesService preferencesService;
   final ThemeMode themeMode;
   final Future<void> Function(ThemeMode) onThemeModeChanged;
+  final Color themeSeedColor;
+  final Future<void> Function(Color) onThemeSeedColorChanged;
 
   const SettingsPage({
     super.key,
@@ -20,6 +22,8 @@ class SettingsPage extends StatefulWidget {
     required this.preferencesService,
     required this.themeMode,
     required this.onThemeModeChanged,
+    required this.themeSeedColor,
+    required this.onThemeSeedColorChanged,
   });
 
   @override
@@ -29,11 +33,21 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   String _appVersion = '...';
   late ThemeMode _selectedThemeMode;
+  late Color _selectedThemeSeedColor;
+  static const List<Color> _presetThemeColors = <Color>[
+    Color(0xFFFF8A00),
+    Color(0xFFE53935),
+    Color(0xFF8E24AA),
+    Color(0xFF3949AB),
+    Color(0xFF00897B),
+    Color(0xFF43A047),
+  ];
 
   @override
   void initState() {
     super.initState();
     _selectedThemeMode = widget.themeMode;
+    _selectedThemeSeedColor = widget.themeSeedColor;
     _loadVersion();
   }
 
@@ -45,6 +59,54 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _onThemeChanged(ThemeMode mode) async {
     setState(() => _selectedThemeMode = mode);
     await widget.onThemeModeChanged(mode);
+  }
+
+  Future<void> _onThemeSeedColorChanged(Color color) async {
+    setState(() => _selectedThemeSeedColor = color);
+    await widget.onThemeSeedColorChanged(color);
+  }
+
+  Future<void> _pickCustomThemeColor() async {
+    final initialHex = _selectedThemeSeedColor.value.toRadixString(16).toUpperCase().padLeft(8, '0');
+    final controller = TextEditingController(text: '#${initialHex.substring(2)}');
+    final picked = await showDialog<Color>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('自定义主题色'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'HEX 颜色值',
+            hintText: '#FF8A00',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final raw = controller.text.trim().replaceAll('#', '');
+              final normalized = raw.length == 6 ? 'FF$raw' : raw;
+              if (!RegExp(r'^[0-9a-fA-F]{8}$').hasMatch(normalized)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请输入 6 位或 8 位十六进制颜色值')),
+                );
+                return;
+              }
+              Navigator.pop(context, Color(int.parse(normalized, radix: 16)));
+            },
+            child: const Text('应用'),
+          ),
+        ],
+      ),
+    );
+    if (picked != null) {
+      await _onThemeSeedColorChanged(picked);
+    }
   }
 
   @override
@@ -102,6 +164,33 @@ class _SettingsPageState extends State<SettingsPage> {
                   },
                   showSelectedIcon: false,
                 ),
+                const SizedBox(height: 18),
+                Text(
+                  '主题色',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    ..._presetThemeColors.map(
+                      (color) => _buildColorSwatch(
+                        color: color,
+                        selected: _selectedThemeSeedColor.value == color.value,
+                        onTap: () => _onThemeSeedColorChanged(color),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _pickCustomThemeColor,
+                      icon: const Icon(Icons.palette_outlined),
+                      label: const Text('自定义'),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -117,11 +206,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   icon: Icons.pie_chart,
                   title: 'TDS覆盖率',
                   value: '$coveredProducts/$totalProducts ($coveragePercent%)',
-                ),
-                _buildInfoTile(
-                  icon: Icons.check_circle,
-                  title: '初始化状态',
-                  value: widget.dataService.isInitialized ? '已完成' : '未完成',
                 ),
               ],
             ),
@@ -217,6 +301,33 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildColorSwatch({
+    required Color color,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: selected ? cs.onSurface : cs.outlineVariant,
+            width: selected ? 2.2 : 1.1,
+          ),
+        ),
+        child: selected
+            ? const Icon(Icons.check, size: 18, color: Colors.white)
+            : null,
       ),
     );
   }
