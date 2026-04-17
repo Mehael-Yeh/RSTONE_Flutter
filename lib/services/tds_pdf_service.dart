@@ -171,8 +171,6 @@ class TdsPdfService {
   static pw.Widget _buildBlock(_TdsBlock block, _TdsSection section, _PdfFonts fonts) {
     if (block.type == _TdsBlockType.table && block.tableRows != null && block.tableRows!.isNotEmpty) {
       final isPhysicalTable = section.title.contains('物理性能') && block.tableRows!.first.length >= 3;
-      final isRecommendationTable = section.title.contains('推荐配方');
-      final shouldConstrainTableWidth = isPhysicalTable || isRecommendationTable;
       final table = pw.TableHelper.fromTextArray(
         headerStyle: pw.TextStyle(font: fonts.songtiBold, fontSize: 10.5),
         cellStyle: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5),
@@ -190,9 +188,12 @@ class TdsPdfService {
       );
       return pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 4),
-        child: shouldConstrainTableWidth
-            ? pw.Center(child: pw.SizedBox(width: 410, child: table))
-            : table,
+        child: pw.Center(
+          child: pw.ConstrainedBox(
+            constraints: const pw.BoxConstraints(maxWidth: 460),
+            child: table,
+          ),
+        ),
       );
     }
 
@@ -273,10 +274,11 @@ class TdsPdfService {
             pw.Row(
               children: [
                 pw.Text('网址 ', style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9)),
+                pw.Text('WEBSITE: ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                 pw.UrlLink(
                   destination: 'http://www.rstone-resin.com/',
                   child: pw.Text(
-                    'WEBSITE: http://www.rstone-resin.com/',
+                    'http://www.rstone-resin.com/',
                     style: pw.TextStyle(
                       font: fonts.arialRegular,
                       fontSize: 9,
@@ -335,7 +337,7 @@ class TdsPdfService {
     void flushParagraphIfNeeded() {
       if (paragraphBuffer.isEmpty) return;
       current ??= _TdsSection(title: '');
-      current!.blocks.add(_TdsBlock.paragraph(paragraphBuffer.join(' ')));
+      current!.blocks.add(_TdsBlock.paragraph(paragraphBuffer.join('\n')));
       paragraphBuffer.clear();
     }
 
@@ -419,7 +421,6 @@ class TdsPdfService {
     var normalized = text;
     normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)\s+(\d{2,}[A-Za-z0-9-]*)'), (m) => '${m.group(1)}\u00A0${m.group(2)}');
     normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)(\d{2,})'), (m) => '${m.group(1)}\u2060${m.group(2)}');
-    normalized = normalized.replaceAllMapped(RegExp(r'([^\s])([，。；：！？、,.!?;:])'), (m) => '${m.group(1)}\u2060${m.group(2)}');
     return normalized;
   }
 
