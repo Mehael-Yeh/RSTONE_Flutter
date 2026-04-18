@@ -82,10 +82,12 @@ jobs:
         run: flutter pub get
 
       - name: Fetch latest data from Rstone and RstoneTDS
+        env:
+          PRIVATE_REPO_READ_TOKEN: ${{ secrets.PRIVATE_REPO_READ_TOKEN }}
         run: |
           # Clone source repos to temporary directories
-          git clone --depth 1 https://github.com/Mehael-Yeh/Rstone.git ../rstone_data
-          git clone --depth 1 https://github.com/Mehael-Yeh/RstoneTDS.git ../rstone_tds_data
+          git clone --depth 1 https://x-access-token:${PRIVATE_REPO_READ_TOKEN}@github.com/Mehael-Yeh/Rstone.git ../rstone_data
+          git clone --depth 1 https://x-access-token:${PRIVATE_REPO_READ_TOKEN}@github.com/Mehael-Yeh/RstoneTDS.git ../rstone_tds_data
 
           # Recreate assets directories and copy markdown files
           rm -rf assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
