@@ -611,15 +611,18 @@ class ObsidianDataService {
       if (excludePudResults && _containsAnyTerm(searchableTags, pudTerms)) {
         return false;
       }
+      final linkedRefText = item.linkedWikiReferences.join(' ');
       final searchableTagsText = searchableTags.join(' ');
       final singleKeywordSearchText =
-          '${item.fileName} ${item.experimentalCode ?? ''} $searchableTagsText'
+          '${item.fileName} ${item.experimentalCode ?? ''} $searchableTagsText $linkedRefText'
               .toLowerCase();
       final expanded = _expandedKeywords(keyword);
       if (isDigitsOnly(keyword)) {
         final numericKeyword = keyword.toLowerCase();
         return startsWithNumericBody(item.fileName, numericKeyword) ||
-            startsWithNumericBody(item.experimentalCode, numericKeyword);
+            startsWithNumericBody(item.experimentalCode, numericKeyword) ||
+            item.linkedWikiReferences
+                .any((ref) => startsWithNumericBody(ref, numericKeyword));
       }
       return expanded.any(singleKeywordSearchText.contains);
     }

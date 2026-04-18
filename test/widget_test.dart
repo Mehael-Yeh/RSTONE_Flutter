@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:rst_flutter/models/product_item.dart';
+import 'package:rst_flutter/widgets/product_detail/formula_content_parser.dart';
 
 void main() {
   group('ProductItem.fromMdContent', () {
@@ -78,6 +79,37 @@ tags:
       expect(item.midCoat, 'RD1160-黑');
       expect(item.topCoat, 'RD1010-4-亮');
       expect(item.baseMaterial, '');
+    });
+
+    test('collects wiki references from markdown body for searching', () {
+      const content = '''
+---
+tags:
+  - 水性
+---
+[[RS8214-银]] [[RS8214-黑]]
+''';
+
+      final item = ProductItem.fromMdContent('assets/产品应用/水性PU2涂哑光-1.md', content);
+
+      expect(item.linkedWikiReferences, ['RS8214-银', 'RS8214-黑']);
+      expect(item.searchText, contains('rs8214-黑'.toLowerCase()));
+    });
+  });
+
+  group('FormulaContentParser', () {
+    test('ignores standalone multi wiki-link lines after frontmatter', () {
+      const content = '''
+---
+工程师: 孙燕娜
+---
+[[RS8214-银]] [[RS8214-黑]]
+''';
+
+      final parsed = FormulaContentParser.parse(content);
+
+      expect(parsed.preTableContent, isEmpty);
+      expect(parsed.postTableContent, isEmpty);
     });
   });
 }
