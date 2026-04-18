@@ -29,7 +29,8 @@ jobs:
       - name: Build metadata
         id: build_meta
         run: |
-          echo "build_date=$(date -u +%Y%m%d)" >> $GITHUB_OUTPUT
+          BUILD_DATE=$(python3 -c 'from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime("%Y%m%d"))')
+          echo "build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
 
       - name: Get latest alpha version
         id: version
