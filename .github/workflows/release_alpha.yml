@@ -81,21 +81,35 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
+      - name: Checkout private repo Rstone
+        uses: actions/checkout@v4
+        with:
+          repository: Mehael-Yeh/Rstone
+          token: ${{ secrets.PRIVATE_REPO_READ_TOKEN }}
+          path: external/rstone_data
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout private repo RstoneTDS
+        uses: actions/checkout@v4
+        with:
+          repository: Mehael-Yeh/RstoneTDS
+          token: ${{ secrets.PRIVATE_REPO_READ_TOKEN }}
+          path: external/rstone_tds_data
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Fetch latest data from Rstone and RstoneTDS
-        env:
-          PRIVATE_REPO_READ_TOKEN: ${{ secrets.PRIVATE_REPO_READ_TOKEN }}
         run: |
-          # Clone source repos to temporary directories
-          git clone --depth 1 https://x-access-token:${PRIVATE_REPO_READ_TOKEN}@github.com/Mehael-Yeh/Rstone.git ../rstone_data
-          git clone --depth 1 https://x-access-token:${PRIVATE_REPO_READ_TOKEN}@github.com/Mehael-Yeh/RstoneTDS.git ../rstone_tds_data
+          test -n "${{ secrets.PRIVATE_REPO_READ_TOKEN }}"
 
           # Recreate assets directories and copy markdown files
           rm -rf assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
           mkdir -p assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
-          cp ../rstone_data/产品列表/*.md assets/产品列表/
-          cp ../rstone_data/产品应用/*.md assets/产品应用/
-          cp ../rstone_data/产品配方/*.md assets/产品配方/
-          cp ../rstone_tds_data/*.TDS.md assets/产品TDS/
+          cp external/rstone_data/产品列表/*.md assets/产品列表/
+          cp external/rstone_data/产品应用/*.md assets/产品应用/
+          cp external/rstone_data/产品配方/*.md assets/产品配方/
+          cp external/rstone_tds_data/*.TDS.md assets/产品TDS/
 
           # Generate JSON index files (array of .md filenames)
           python3 -c "
