@@ -74,25 +74,96 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   int _selectedFormulaIndex = 0;
   String? _selectedApplicationFormulaName;
   bool _isGeneratingTds = false;
-  List<Uint8List> _pdfPageImages = const [];
+  Uint8List? _pdfLongImage;
   bool _isRasterizingPdf = false;
+  final TransformationController _pdfTransformationController = TransformationController();
+  double _pdfScale = 1;
 
   Future<void> _preparePdfPreview(Uint8List pdfBytes) async {
     setState(() {
       _isRasterizingPdf = true;
-      _pdfPageImages = const [];
+      _pdfLongImage = null;
+      _pdfTransformationController.value = Matrix4.identity();
+      _pdfScale = 1;
     });
 
     final pages = <Uint8List>[];
     await for (final page in Printing.raster(pdfBytes, dpi: 160)) {
       pages.add(await page.toPng());
     }
+    final longImage = await _composeLongPdfImage(pages);
 
     if (!mounted) return;
     setState(() {
-      _pdfPageImages = pages;
+      _pdfLongImage = longImage;
       _isRasterizingPdf = false;
     });
+  }
+
+  void _handlePdfTransformChanged() {
+    final scale = _pdfTransformationController.value.getMaxScaleOnAxis();
+    if ((scale - _pdfScale).abs() < 0.001 || !mounted) return;
+    setState(() {
+      _pdfScale = scale;
+    });
+  }
+
+  Future<ui.Image> _decodeImage(Uint8List bytes) async {
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    return frame.image;
+  }
+
+  Future<Uint8List?> _composeLongPdfImage(List<Uint8List> pageImages) async {
+    if (pageImages.isEmpty) return null;
+    final decodedPages = <ui.Image>[];
+    try {
+      for (final bytes in pageImages) {
+        decodedPages.add(await _decodeImage(bytes));
+      }
+      if (decodedPages.isEmpty) return null;
+
+      const gap = 16.0;
+      final maxWidth = decodedPages
+          .map((img) => img.width.toDouble())
+          .reduce((a, b) => a > b ? a : b);
+      final scaledHeights = decodedPages
+          .map((img) => img.height * (maxWidth / img.width))
+          .toList();
+      final totalHeight =
+          scaledHeights.fold<double>(0, (sum, h) => sum + h) +
+              gap * (decodedPages.length - 1);
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, maxWidth, totalHeight),
+        Paint()..color = Colors.white,
+      );
+
+      var dy = 0.0;
+      for (var i = 0; i < decodedPages.length; i++) {
+        final page = decodedPages[i];
+        final targetHeight = scaledHeights[i];
+        canvas.drawImageRect(
+          page,
+          Rect.fromLTWH(0, 0, page.width.toDouble(), page.height.toDouble()),
+          Rect.fromLTWH(0, dy, maxWidth, targetHeight),
+          Paint(),
+        );
+        dy += targetHeight + gap;
+      }
+
+      final picture = recorder.endRecording();
+      final longImage = await picture.toImage(maxWidth.ceil(), totalHeight.ceil());
+      final byteData = await longImage.toByteData(format: ui.ImageByteFormat.png);
+      longImage.dispose();
+      return byteData?.buffer.asUint8List();
+    } finally {
+      for (final image in decodedPages) {
+        image.dispose();
+      }
+    }
   }
 
   Future<void> _handlePreviewTds() async {
@@ -158,7 +229,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                       padding: const EdgeInsets.all(12),
                       child: _isRasterizingPdf
                           ? const Center(child: CircularProgressIndicator())
-                          : _pdfPageImages.isEmpty
+                          : _pdfLongImage == null
                               ? Center(
                                   child: Text(
                                     'PDF 预览加载失败',
@@ -167,21 +238,24 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                                     ),
                                   ),
                                 )
-                              : ListView.separated(
-                                  itemCount: _pdfPageImages.length,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  separatorBuilder: (_, __) => const SizedBox(height: 16),
-                                  itemBuilder: (listContext, index) => InteractiveViewer(
-                                    minScale: 1,
-                                    maxScale: 3.5,
-                                    panEnabled: true,
-                                    scaleEnabled: true,
-                                    boundaryMargin: const EdgeInsets.all(24),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.memory(
-                                        _pdfPageImages[index],
-                                        filterQuality: FilterQuality.high,
+                              : InteractiveViewer(
+                                  transformationController: _pdfTransformationController,
+                                  minScale: 1,
+                                  maxScale: 3.5,
+                                  panEnabled: _pdfScale > 1.01,
+                                  scaleEnabled: true,
+                                  boundaryMargin: const EdgeInsets.all(24),
+                                  child: SingleChildScrollView(
+                                    physics: _pdfScale > 1.01
+                                        ? const NeverScrollableScrollPhysics()
+                                        : const BouncingScrollPhysics(),
+                                    child: Center(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.memory(
+                                          _pdfLongImage!,
+                                          filterQuality: FilterQuality.high,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -272,10 +346,19 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   @override
   void initState() {
     super.initState();
+    _pdfTransformationController.addListener(_handlePdfTransformChanged);
     final linked = _getApplicationLinkedFormulas();
     if (linked.isNotEmpty) {
       _selectedApplicationFormulaName = linked.first.fileName.replaceAll('.md', '');
     }
+  }
+
+  @override
+  void dispose() {
+    _pdfTransformationController
+      ..removeListener(_handlePdfTransformChanged)
+      ..dispose();
+    super.dispose();
   }
 
   String _extractMarkdownBody(String rawContent) =>

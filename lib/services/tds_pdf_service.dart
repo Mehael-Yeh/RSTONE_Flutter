@@ -11,7 +11,9 @@ import '../models/product_item.dart';
 
 class TdsPdfService {
   static final RegExp _headingReg = RegExp(r'^(#{1,3})\s*(.+)$');
-  static final RegExp _leadingPunctuationReg = RegExp(r'^[，。！？；：、）》】』’”,.!?;:\)\]}>]');
+  static final RegExp _leadingPunctuationReg = RegExp(
+    r'^[，。！？；：、）》】』’”,.!?;:\)\]}>]',
+  );
 
   static const List<String> _defaultDisclaimer = [
     '锐石为客户提供物料安全资料表，提供有关本产品的潜在健康影响、安全处理、贮存、使用和弃置的信息。锐石鼓励客户在使用锐石产品和其它原料之前先查阅物料安全资料表，以确保人身和环境安全。为了确保锐石的产品不被滥用于非指定用途或未经测试的用途，锐石的员工可帮助客户处理生态及产品安全方面的问题。您的锐石销售代表可安排适当联络。',
@@ -521,19 +523,20 @@ class TdsPdfService {
 
   static String _mergeWrappedParagraphLines(List<String> lines) {
     if (lines.isEmpty) return '';
-    final cleanedLines = lines.map((line) => line.trim()).where((line) => line.isNotEmpty).toList();
+    final cleanedLines = lines
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
     if (cleanedLines.isEmpty) return '';
 
     final buffer = StringBuffer(cleanedLines.first);
     for (var i = 1; i < cleanedLines.length; i++) {
       final currentLine = cleanedLines[i];
-      if (currentLine.isEmpty) continue;
-      final previousText = buffer.toString();
-      final needsDirectMerge = _leadingPunctuationReg.hasMatch(currentLine);
-      if (needsDirectMerge) {
+      if (_leadingPunctuationReg.hasMatch(currentLine)) {
         buffer.write(currentLine);
         continue;
       }
+      final previousText = buffer.toString();
       if (_shouldInsertSpace(previousText, currentLine)) {
         buffer.write(' ');
       }
@@ -546,8 +549,8 @@ class TdsPdfService {
     if (leftText.isEmpty || rightText.isEmpty) return false;
     final leftChar = leftText.substring(leftText.length - 1);
     final rightChar = rightText.substring(0, 1);
-    final isAsciiWord = RegExp(r'[A-Za-z0-9]').hasMatch(leftChar) && RegExp(r'[A-Za-z0-9]').hasMatch(rightChar);
-    return isAsciiWord;
+    return RegExp(r'[A-Za-z0-9]').hasMatch(leftChar) &&
+        RegExp(r'[A-Za-z0-9]').hasMatch(rightChar);
   }
 
   static String? _normalizeTextForPdf(String? text) {
