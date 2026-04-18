@@ -601,7 +601,7 @@ class _TdsSection {
 enum _TdsBlockType { paragraph, table, note }
 
 class _TdsBlock {
-  const _TdsBlock._({
+  _TdsBlock._({
     required this.type,
     this.text,
     this.tableRows,
