@@ -77,12 +77,20 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   Uint8List? _pdfLongImage;
   bool _isRasterizingPdf = false;
   final TransformationController _pdfTransformationController = TransformationController();
+  bool _isSyncingPdfTransform = false;
+
+  void _resetPdfPreviewTransform() {
+    if (_isSyncingPdfTransform) return;
+    _isSyncingPdfTransform = true;
+    _pdfTransformationController.value = Matrix4.identity();
+    _isSyncingPdfTransform = false;
+  }
 
   Future<void> _preparePdfPreview(Uint8List pdfBytes) async {
     setState(() {
       _isRasterizingPdf = true;
       _pdfLongImage = null;
-      _pdfTransformationController.value = Matrix4.identity();
+      _resetPdfPreviewTransform();
     });
 
     final pages = <Uint8List>[];
@@ -156,7 +164,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     }
   }
 
-  void _handlePdfTransformChanged() {}
+  void _handlePdfTransformChanged() {
+    if (_isSyncingPdfTransform) return;
+    final matrix = _pdfTransformationController.value;
+    final scale = matrix.getMaxScaleOnAxis();
+    if (scale <= 1.01) {
+      _resetPdfPreviewTransform();
+    }
+  }
 
   Future<void> _handlePreviewTds() async {
     if (_isGeneratingTds || widget.product.folder != '产品列表' || widget.tdsContent == null) {
@@ -232,7 +247,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                                 )
                               : LayoutBuilder(
                                   builder: (context, constraints) {
-                                    final targetWidth = constraints.maxWidth.clamp(320.0, 860.0).toDouble();
                                     return InteractiveViewer(
                                       transformationController: _pdfTransformationController,
                                       constrained: false,
@@ -240,17 +254,17 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                                       maxScale: 3.5,
                                       panEnabled: true,
                                       scaleEnabled: true,
-                                      boundaryMargin: const EdgeInsets.all(24),
-                                      child: Center(
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(12),
-                                          child: SizedBox(
-                                            width: targetWidth,
-                                            child: Image.memory(
-                                              _pdfLongImage!,
-                                              fit: BoxFit.fitWidth,
-                                              filterQuality: FilterQuality.high,
-                                            ),
+                                      boundaryMargin: EdgeInsets.zero,
+                                      clipBehavior: Clip.none,
+                                      onInteractionEnd: (_) => _handlePdfTransformChanged(),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: SizedBox(
+                                          width: constraints.maxWidth,
+                                          child: Image.memory(
+                                            _pdfLongImage!,
+                                            fit: BoxFit.fitWidth,
+                                            filterQuality: FilterQuality.high,
                                           ),
                                         ),
                                       ),
