@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -215,28 +216,37 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
   Widget _buildSinglePagePdfPreviewViewer(BoxConstraints constraints) {
     final pageHeightRatio = _singlePageHeightRatio ?? 1.4142;
-    final pageHeight = constraints.maxWidth * pageHeightRatio;
-    return InteractiveViewer(
-      transformationController: _pdfTransformationController,
-      constrained: false,
-      minScale: 1,
-      maxScale: 3.5,
-      panEnabled: true,
-      scaleEnabled: true,
-      boundaryMargin: EdgeInsets.zero,
-      clipBehavior: Clip.none,
-      onInteractionEnd: (_) => _handlePdfTransformChanged(),
-      child: Align(
-        alignment: Alignment.topCenter,
+    final pageWidth = constraints.maxWidth;
+    final pageHeight = pageWidth * pageHeightRatio;
+    final widthScale = constraints.maxWidth / pageWidth;
+    final heightScale = constraints.maxHeight / pageHeight;
+    final fittedScale = widthScale < heightScale ? widthScale : heightScale;
+    final viewerWidth = pageWidth * fittedScale;
+    final viewerHeight = pageHeight * fittedScale;
+
+    return ColoredBox(
+      color: Colors.white,
+      child: Center(
         child: SizedBox(
-          width: constraints.maxWidth,
-          height: pageHeight,
-          child: ColoredBox(
-            color: Colors.white,
-            child: Image.memory(
-              _pdfLongImage!,
-              fit: BoxFit.fill,
-              filterQuality: FilterQuality.high,
+          width: viewerWidth,
+          height: viewerHeight,
+          child: InteractiveViewer(
+            transformationController: _pdfTransformationController,
+            minScale: 1,
+            maxScale: 3.5,
+            panEnabled: true,
+            scaleEnabled: true,
+            boundaryMargin: EdgeInsets.zero,
+            clipBehavior: Clip.hardEdge,
+            onInteractionEnd: (_) => _handlePdfTransformChanged(),
+            child: SizedBox(
+              width: viewerWidth,
+              height: viewerHeight,
+              child: Image.memory(
+                _pdfLongImage!,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.high,
+              ),
             ),
           ),
         ),
@@ -258,15 +268,12 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       onInteractionEnd: (_) => _handlePdfTransformChanged(),
       child: ColoredBox(
         color: Colors.white,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            width: constraints.maxWidth,
-            child: Image.memory(
-              _pdfLongImage!,
-              fit: BoxFit.fitWidth,
-              filterQuality: FilterQuality.high,
-            ),
+        child: SizedBox(
+          width: constraints.maxWidth,
+          child: Image.memory(
+            _pdfLongImage!,
+            fit: BoxFit.fitWidth,
+            filterQuality: FilterQuality.high,
           ),
         ),
       ),
@@ -293,6 +300,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         context: context,
         builder: (dialogContext) {
           final cs = Theme.of(dialogContext).colorScheme;
+          final mediaSize = MediaQuery.sizeOf(dialogContext);
+          const defaultPageHeightRatio = 1.4142;
+          final pageHeightRatio = _singlePageHeightRatio ?? defaultPageHeightRatio;
+          final maxDialogWidth = mediaSize.width - 24;
+          final maxDialogHeight = mediaSize.height - 32;
+          final dialogWidth = math.min(maxDialogWidth, maxDialogHeight / pageHeightRatio);
+          final dialogHeight = dialogWidth * pageHeightRatio;
+
           return Dialog(
             insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             backgroundColor: cs.surfaceContainerHigh,
@@ -302,11 +317,11 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
             ),
             clipBehavior: Clip.antiAlias,
             child: SizedBox(
-              width: 900,
-              height: 680,
+              width: dialogWidth,
+              height: dialogHeight,
               child: Container(
-                color: cs.surfaceContainerLowest,
-                padding: const EdgeInsets.all(12),
+                color: Colors.white,
+                padding: EdgeInsets.zero,
                 child: _isRasterizingPdf
                     ? const Center(child: CircularProgressIndicator())
                     : _pdfLongImage == null
