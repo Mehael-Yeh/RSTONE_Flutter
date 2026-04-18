@@ -168,9 +168,17 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     if (_isSyncingPdfTransform) return;
     final matrix = _pdfTransformationController.value;
     final scale = matrix.getMaxScaleOnAxis();
-    if (scale <= 1.01) {
-      _resetPdfPreviewTransform();
-    }
+    if (scale > 1.01) return;
+
+    final yOffset = matrix.storage[13];
+    final hasHorizontalOffset = matrix.storage[12].abs() > 0.5;
+    final hasScaleOffset = (scale - 1).abs() > 0.01;
+    if (!hasHorizontalOffset && !hasScaleOffset) return;
+
+    _isSyncingPdfTransform = true;
+    _pdfTransformationController.value = Matrix4.identity()
+      ..setTranslationRaw(0, yOffset, 0);
+    _isSyncingPdfTransform = false;
   }
 
   Future<void> _handlePreviewTds() async {
@@ -204,76 +212,47 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
             child: SizedBox(
               width: 900,
               height: 680,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.picture_as_pdf_rounded, color: cs.primary),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'TDS PDF 预览',
-                            style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
-                              color: cs.onSurface,
-                              fontWeight: FontWeight.w600,
+              child: Container(
+                color: cs.surfaceContainerLowest,
+                padding: const EdgeInsets.all(12),
+                child: _isRasterizingPdf
+                    ? const Center(child: CircularProgressIndicator())
+                    : _pdfLongImage == null
+                        ? Center(
+                            child: Text(
+                              'PDF 预览加载失败',
+                              style: Theme.of(dialogContext).textTheme.bodyLarge?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.of(dialogContext).pop(),
-                          icon: const Icon(Icons.close_rounded),
-                          tooltip: '关闭预览',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: Container(
-                      color: cs.surfaceContainerLowest,
-                      padding: const EdgeInsets.all(12),
-                      child: _isRasterizingPdf
-                          ? const Center(child: CircularProgressIndicator())
-                          : _pdfLongImage == null
-                              ? Center(
-                                  child: Text(
-                                    'PDF 预览加载失败',
-                                    style: Theme.of(dialogContext).textTheme.bodyLarge?.copyWith(
-                                      color: cs.onSurfaceVariant,
+                          )
+                        : LayoutBuilder(
+                            builder: (context, constraints) {
+                              return InteractiveViewer(
+                                transformationController: _pdfTransformationController,
+                                constrained: false,
+                                minScale: 1,
+                                maxScale: 3.5,
+                                panEnabled: true,
+                                scaleEnabled: true,
+                                boundaryMargin: EdgeInsets.zero,
+                                clipBehavior: Clip.none,
+                                onInteractionUpdate: (_) => _handlePdfTransformChanged(),
+                                onInteractionEnd: (_) => _handlePdfTransformChanged(),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: SizedBox(
+                                    width: constraints.maxWidth,
+                                    child: Image.memory(
+                                      _pdfLongImage!,
+                                      fit: BoxFit.fitWidth,
+                                      filterQuality: FilterQuality.high,
                                     ),
                                   ),
-                                )
-                              : LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    return InteractiveViewer(
-                                      transformationController: _pdfTransformationController,
-                                      constrained: false,
-                                      minScale: 1,
-                                      maxScale: 3.5,
-                                      panEnabled: true,
-                                      scaleEnabled: true,
-                                      boundaryMargin: EdgeInsets.zero,
-                                      clipBehavior: Clip.none,
-                                      onInteractionEnd: (_) => _handlePdfTransformChanged(),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: SizedBox(
-                                          width: constraints.maxWidth,
-                                          child: Image.memory(
-                                            _pdfLongImage!,
-                                            fit: BoxFit.fitWidth,
-                                            filterQuality: FilterQuality.high,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
                                 ),
-                    ),
-                  ),
-                ],
+                              );
+                            },
+                          ),
               ),
             ),
           );
