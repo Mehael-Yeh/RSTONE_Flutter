@@ -81,18 +81,6 @@ class _SettingsPageState extends State<SettingsPage> {
         // Ignore and continue to legacy parsing.
       }
     }
-
-    // 兼容历史简写：418 / 0418（表示 4 月 18 日）。
-    if (RegExp(r'^\d{3,4}$').hasMatch(value)) {
-      final padded = value.padLeft(4, '0');
-      final month = int.tryParse(padded.substring(0, 2));
-      final day = int.tryParse(padded.substring(2, 4));
-      if (month != null && day != null && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-        final year = DateTime.now().toUtc().add(const Duration(hours: 8)).year.toString();
-        return '$year${month.toString().padLeft(2, '0')}${day.toString().padLeft(2, '0')}';
-      }
-    }
-
     return value;
   }
 
