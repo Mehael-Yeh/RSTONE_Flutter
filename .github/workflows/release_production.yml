@@ -26,7 +26,7 @@ jobs:
       - name: Build metadata
         id: build_meta
         run: |
-          BUILD_DATE=$(python3 -c 'from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime("%Y%m%d"))')
+          BUILD_DATE=$(python3 scripts/generate_build_date.py)
           echo "build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
 
       - name: Get latest production version
