@@ -328,6 +328,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   @override
   void initState() {
     super.initState();
+    _pdfTransformationController.addListener(_handlePdfTransformChanged);
     final linked = _getApplicationLinkedFormulas();
     if (linked.isNotEmpty) {
       _selectedApplicationFormulaName = linked.first.fileName.replaceAll('.md', '');
