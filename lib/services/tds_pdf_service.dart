@@ -11,6 +11,9 @@ import '../models/product_item.dart';
 
 class TdsPdfService {
   static final RegExp _headingReg = RegExp(r'^(#{1,3})\s*(.+)$');
+  static final RegExp _leadingPunctuationReg = RegExp(
+    r'^[，。！？；：、）》】』’”,.!?;:\)\]}>]',
+  );
 
   static const List<String> _defaultDisclaimer = [
     '锐石为客户提供物料安全资料表，提供有关本产品的潜在健康影响、安全处理、贮存、使用和弃置的信息。锐石鼓励客户在使用锐石产品和其它原料之前先查阅物料安全资料表，以确保人身和环境安全。为了确保锐石的产品不被滥用于非指定用途或未经测试的用途，锐石的员工可帮助客户处理生态及产品安全方面的问题。您的锐石销售代表可安排适当联络。',
@@ -228,7 +231,7 @@ class TdsPdfService {
     if (source.isEmpty) return source;
     if (block.type != _TdsBlockType.paragraph) return source;
     if (!block.shouldIndentFirstLine) return source;
-    return '　　$source';
+    return '\u00A0\u00A0\u00A0\u00A0$source';
   }
 
   static pw.Widget _buildMarkdownStyledText(
@@ -423,8 +426,7 @@ class TdsPdfService {
     void flushParagraphIfNeeded() {
       if (paragraphBuffer.isEmpty) return;
       current ??= _TdsSection(title: '');
-      final separator = current!.title.contains('产品特性') ? '\n' : ' ';
-      final paragraphText = paragraphBuffer.join(separator);
+      final paragraphText = _mergeWrappedParagraphLines(paragraphBuffer);
       final isOrderedParagraph = RegExp(r'^((\d+[\.\)、])|([（(]\d+[）)]))\s*').hasMatch(paragraphBuffer.first.trim());
       final shouldIndentByWrap = paragraphBuffer.length >= 2 || _isLikelyWrappedInPdf(paragraphText, fontSize: 10.5);
       final paragraphBlock = _TdsBlock.paragraph(
@@ -517,6 +519,68 @@ class TdsPdfService {
     if (current != null) sections.add(current!);
 
     return _ParsedTds(subtitle: subtitle, sections: sections);
+  }
+
+  static String _mergeWrappedParagraphLines(List<String> lines) {
+    if (lines.isEmpty) return '';
+    final cleanedLines = lines
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+    if (cleanedLines.isEmpty) return '';
+
+    final buffer = StringBuffer(cleanedLines.first);
+    for (var i = 1; i < cleanedLines.length; i++) {
+      final currentLine = cleanedLines[i];
+      if (_leadingPunctuationReg.hasMatch(currentLine)) {
+        buffer.write(currentLine);
+        continue;
+      }
+      final previousText = buffer.toString();
+      if (_shouldInsertSpace(previousText, currentLine)) {
+        buffer.write(' ');
+      }
+      buffer.write(currentLine);
+    }
+    return _normalizeParagraphSpacing(buffer.toString());
+  }
+
+  static bool _shouldInsertSpace(String leftText, String rightText) {
+    if (leftText.isEmpty || rightText.isEmpty) return false;
+    final leftChar = leftText.substring(leftText.length - 1);
+    final rightChar = rightText.substring(0, 1);
+    return RegExp(r'[A-Za-z0-9]').hasMatch(leftChar) &&
+        RegExp(r'[A-Za-z0-9]').hasMatch(rightChar);
+  }
+
+  static String _normalizeParagraphSpacing(String text) {
+    var normalized = text
+        .replaceAll(RegExp(r'[\t\r\n]+'), ' ')
+        .replaceAll(RegExp(r' {2,}'), ' ')
+        .trim();
+
+    normalized = normalized
+        // 中文/全角字符之间不应出现额外空格
+        .replaceAll(
+          RegExp(
+            r'([\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF])\s+([\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF])',
+          ),
+          r'$1$2',
+        )
+        // 中文后接标点前不应保留空格
+        .replaceAll(
+          RegExp(
+            r'([\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF])\s+([，。！？；：、）》】』’”,.!?;:\)\]}>])',
+          ),
+          r'$1$2',
+        )
+        // 左侧括号后不应有空格
+        .replaceAll(
+          RegExp(r'([（《【『“‘(<\[])\s+'),
+          r'$1',
+        );
+
+    return normalized;
   }
 
   static String? _normalizeTextForPdf(String? text) {
