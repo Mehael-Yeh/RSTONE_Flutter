@@ -171,6 +171,7 @@ flutter build apk --release --split-per-abi
 - `v1.0.0 (20260418)`
 
 > 其中日期为构建当天（UTC）`YYYYMMDD`。
+> 同时该日期会写入应用构建号（`pubspec.yaml` 的 `+build`），因此 App 内「设置-版本」也会显示为 `vX.Y.Z (YYYYMMDD)`。
 
 ---
 

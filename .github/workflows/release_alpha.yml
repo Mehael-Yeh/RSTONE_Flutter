@@ -49,10 +49,7 @@ jobs:
             new_ver="${major}.${minor}.${patch}"
           fi
 
-          major=$(echo "$new_ver" | cut -d. -f1)
-          minor=$(echo "$new_ver" | cut -d. -f2)
-          patch=$(echo "$new_ver" | cut -d. -f3)
-          build_number=$((major * 10000 + minor * 100 + patch))
+          build_number=${{ steps.build_meta.outputs.build_date }}
 
           echo "version=${new_ver}+${build_number}" >> $GITHUB_OUTPUT
           echo "tag=v${new_ver}-alpha" >> $GITHUB_OUTPUT
