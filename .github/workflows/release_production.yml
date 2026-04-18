@@ -1,9 +1,6 @@
-name: Release Alpha APK
+name: Release Production APK
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
@@ -31,17 +28,14 @@ jobs:
         run: |
           echo "build_date=$(date -u +%Y%m%d)" >> $GITHUB_OUTPUT
 
-      - name: Get latest alpha version
+      - name: Get latest production version
         id: version
         run: |
-          LATEST=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-alpha$' | head -1)
+          LATEST=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
           if [ -z "$LATEST" ]; then
-            CURRENT=$(grep '^version:' pubspec.yaml | awk '{print $2}')
-            BASE=${CURRENT%%+*}
-            new_ver="$BASE"
+            new_ver="1.0.0"
           else
             BASE=${LATEST#v}
-            BASE=${BASE%-alpha}
             major=$(echo "$BASE" | cut -d. -f1)
             minor=$(echo "$BASE" | cut -d. -f2)
             patch=$(echo "$BASE" | cut -d. -f3)
@@ -55,7 +49,7 @@ jobs:
           build_number=$((major * 10000 + minor * 100 + patch))
 
           echo "version=${new_ver}+${build_number}" >> $GITHUB_OUTPUT
-          echo "tag=v${new_ver}-alpha" >> $GITHUB_OUTPUT
+          echo "tag=v${new_ver}" >> $GITHUB_OUTPUT
           echo "display=v${new_ver} (${{ steps.build_meta.outputs.build_date }})" >> $GITHUB_OUTPUT
 
       - name: Update version in pubspec.yaml
@@ -153,9 +147,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Alpha ${{ steps.version.outputs.display }}
+          name: Release ${{ steps.version.outputs.display }}
           body: |
-            ## Alpha Pre-release
+            ## Production Release
             自动构建版本: `${{ steps.version.outputs.display }}`
             - 标签: `${{ steps.version.outputs.tag }}`
             - 提交: `${{ github.sha }}`
@@ -164,7 +158,7 @@ jobs:
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-armeabi-v7a-release.apk
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-arm64-v8a-release.apk
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-x86_64-release.apk
-          prerelease: true
+          prerelease: false
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
