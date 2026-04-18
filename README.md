@@ -1,137 +1,180 @@
-# 锐石 RSTONE
+# 锐石 RSTONE（Flutter）
 
-一款基于 Flutter 开发的多平台应用，用于浏览和管理锐石（RSTONE）产品数据库。采用 Obsidian 风格的深色主题界面，支持产品搜索、列表展示、详情查看等功能。
-
-## 📱 支持平台
-
-- ✅ Android
-- ✅ iOS
-- ✅ Windows
-
-## ✨ 功能特点
-
-### 搜索页面（主界面）
-- 居中圆角矩形搜索框，交互动画效果
-- 实时搜索，搜索时搜索框上移并缩小
-- 支持关键词和产品标签（tags）搜索
-- 搜索范围覆盖产品列表和产品应用两大类数据
-
-### 产品列表页面
-- Obsidian 风格的表格/列表展示
-- 支持自定义显示列的左右拖拽排序
-- 支持升序/降序排序
-- 手机端默认显示：牌号、标签
-- 桌面端默认显示：牌号、标签、实验牌号、工程师、固含、羟值、水接触角、技术源、对标、粘度
-
-### 产品应用页面
-- 与产品列表类似的 Obsidian 风格展示
-- 支持自定义列排序和拖拽重排
-- 手机端默认显示：名称、基材、底漆、中漆、面漆
-- 桌面端默认显示：名称、基材、底漆、中漆、面漆、标签
-
-### 产品详情弹窗
-- 从下往上滑出的半屏弹窗
-- 支持向上拖拽展开、向下滑动收起
-- Markdown 内容渲染
-- 产品配方表格展示（Canvas 绘制，支持分享为图片）
-- 配方信息结构化展示（底漆、中漆、面漆、基材）
-
-### 设置页面
-- 数据统计（产品数量、应用数量、初始化状态）
-- 日志查看、复制、清除
-- 重新加载数据功能
-- 版本信息
-
-## 🗂 数据结构
-
-应用数据来自 Obsidian 数据库，分三类：
-
-| 类型 | 说明 |
-|------|------|
-| **产品列表** | 存储产品基础信息（牌号、实验牌号、工程师等） |
-| **产品应用** | 存储产品应用信息（基材、底漆、中漆、面漆等） |
-| **产品配方** | 存储产品配方表（Markdown 表格格式） |
-
-数据通过 AssetBundle 内置在应用中，启动时自动加载。
-
-## 🛠 技术栈
-
-| 技术 | 用途 |
-|------|------|
-| Flutter 3.24 | 跨平台 UI 框架 |
-| Dart 3.5 | 编程语言 |
-| flutter_markdown | Markdown 内容渲染 |
-| shared_preferences | 本地用户偏好设置持久化 |
-| reorderables | 列拖拽排序组件 |
-| share_plus | 分享功能 |
-| path_provider | 文件路径访问 |
-
-## 📦 项目结构
-
-```
-lib/
-├── main.dart                      # 应用入口、根组件、底部导航
-├── models/
-│   └── product_item.dart         # 产品/应用数据模型
-├── pages/
-│   ├── search_page.dart           # 搜索页面（首页）
-│   ├── product_list_page.dart     # 产品列表页面
-│   ├── product_applications_page.dart  # 产品应用页面
-│   └── settings_page.dart         # 设置页面（含日志查看）
-├── services/
-│   ├── obsidian_data_service.dart # Obsidian 数据加载与管理
-│   └── preferences_service.dart   # 用户偏好设置持久化
-└── widgets/
-    ├── obsidian_table.dart        # Obsidian 风格表格组件
-    └── product_detail_sheet.dart  # 产品详情弹窗组件
-```
-
-## 🔧 构建说明
-
-### 环境要求
-
-- Flutter SDK 3.24.0+
-- Android SDK 34+
-- JDK 17+
-
-### 构建 Debug APK
-
-```bash
-cd RSTONE_Flutter
-flutter pub get
-flutter build apk --debug
-```
-
-构建产物位于: `build/app/outputs/flutter-apk/app-debug.apk`
-
-### 构建 Release APK
-
-```bash
-flutter build apk --release
-```
-
-### 热重载开发
-
-```bash
-flutter run
-```
-
-## 🎨 界面主题
-
-| 元素 | 颜色 |
-|------|------|
-| 背景色 | `#1A1A1A` |
-| 卡片/表面 | `#2D2D2D` |
-| 主色调 | 橙色 `#FF9800` |
-| 文字色 | 白色/灰白色 |
-| 产品列表标签 | 蓝色 |
-| 产品应用标签 | 绿色 |
-
-## 📄 许可证
-
-私有项目，仅供锐石内部使用。
+锐石内部使用的产品资料检索 App，基于 Flutter 开发，支持 **搜索、列表浏览、应用场景查看、TDS/配方详情查看、标签同义词规则维护、产品笔记记录与导出**。
 
 ---
 
-**版本**: v0.0.66-alpha<br/>
-**最后更新**: 2026-04-14
+## 1. 项目定位
+
+RSTONE 用于把分散的 Obsidian Markdown 数据（产品列表 / 产品应用 / 产品配方 / TDS）统一打包到移动端与桌面端，提供更高效的检索与现场提报能力。
+
+核心目标：
+- 在一个入口检索产品与应用信息。
+- 统一展示 Markdown 内容与配方表。
+- 支持业务同事在现场记录产品笔记并导出。
+- 支持标签同义词规则（如 `PA6 -> 尼龙`）提升搜索召回。
+
+---
+
+## 2. 平台与技术栈
+
+### 支持平台
+- Android
+- iOS
+- Windows
+
+### 主要技术
+- Flutter 3.24（Material 3）
+- Dart 3.5
+- `flutter_markdown`：Markdown 渲染
+- `shared_preferences`：本地偏好与笔记存储
+- `reorderables`：列拖拽重排
+- `share_plus`：导出分享
+- `package_info_plus`：版本信息
+- `path_provider`：应用目录读写
+
+---
+
+## 3. 功能总览
+
+### 3.1 搜索页（首页）
+- 搜索产品与应用（统一入口）
+- 支持关键词 + 标签搜索
+- 搜索结果点击可打开详情抽屉
+- 支持对单条结果快速记录笔记（侧滑入口）
+
+### 3.2 产品列表页
+- 表格化展示产品数据
+- 移动端/桌面端默认列不同
+- 支持列拖拽重排
+- 支持按列排序（A-Z / Z-A）
+
+### 3.3 产品应用页
+- 与产品列表页一致的交互能力
+- 默认字段聚焦“基材、底漆、中漆、面漆”等应用维度
+
+### 3.4 产品详情
+- 底部弹出详情面板
+- 支持 Markdown 内容渲染
+- 支持产品配方表解析展示
+- 支持 TDS 内容按产品名匹配读取（含归一化匹配策略）
+
+### 3.5 设置页
+- 主题模式（系统/浅色/深色）
+- 主题色切换（预设 + 自定义 HEX）
+- 数据统计（产品数、应用数、TDS 覆盖率）
+- 标签同义词规则查看/编辑
+- 日志查看、复制、清空
+- 产品笔记导出（Markdown）与一键清空
+- 版本信息展示
+
+---
+
+## 4. 数据来源与加载机制
+
+### 4.1 资源结构
+应用打包以下资源：
+- `assets/产品列表/` + `assets/产品列表.json`
+- `assets/产品应用/` + `assets/产品应用.json`
+- `assets/产品配方/` + `assets/产品配方.json`
+- `assets/产品TDS/` + `assets/产品TDS.json`
+- `assets/tag_alias_rules.txt`
+
+### 4.2 初始化流程（DataService）
+1. 优先从 assets 索引 + Markdown 文件加载。
+2. 若 assets 异常且数据为空，尝试从应用私有目录读取。
+3. 成功加载后将资源复制到私有目录，供后续规则编辑等场景使用。
+
+### 4.3 标签同义词规则
+- 默认内置：`assets/tag_alias_rules.txt`
+- 用户可在设置页编辑并保存到私有目录，后续优先读取私有版本。
+
+---
+
+## 5. 本地持久化（Preferences）
+
+通过 `shared_preferences` 保存：
+- 产品列表列配置与排序
+- 产品应用列配置与排序
+- 主题模式与主题色
+- 产品笔记（JSON Map）
+
+> 注：卸载应用后，以上本地数据会被系统清除。
+
+---
+
+## 6. 目录结构（核心）
+
+```text
+lib/
+├── main.dart                              # 入口、主题、底部导航
+├── models/
+│   └── product_item.dart                  # 产品/应用实体与 Markdown 解析
+├── pages/
+│   ├── search_page.dart                   # 搜索页
+│   ├── product_list_page.dart             # 产品列表页
+│   ├── product_applications_page.dart     # 产品应用页
+│   └── settings_page.dart                 # 设置页
+├── services/
+│   ├── obsidian_data_service.dart         # 数据加载/搜索/日志/规则
+│   ├── preferences_service.dart           # 用户偏好与笔记
+│   └── tds_pdf_service.dart               # TDS 导出相关
+└── widgets/
+    ├── obsidian_table.dart                # 表格主组件
+    ├── product_detail_sheet.dart          # 详情抽屉
+    └── product_detail/                    # 配方/Markdown 解析子模块
+```
+
+---
+
+## 7. 本地开发
+
+### 环境要求
+- Flutter SDK >= 3.24.0
+- Dart SDK >= 3.5.0
+- Android SDK（如需构建 Android）
+- Xcode（如需构建 iOS）
+
+### 常用命令
+```bash
+flutter pub get
+flutter run
+```
+
+### 构建 APK
+```bash
+# Debug
+flutter build apk --debug
+
+# Release
+flutter build apk --release --split-per-abi
+```
+
+---
+
+## 8. CI/CD（GitHub Actions）
+
+### 8.1 Alpha 流程（`release_alpha.yml`）
+- 触发：`push main` 或手动触发
+- 自动递增 Alpha 标签：`vX.Y.Z-alpha`
+- 写回 `pubspec.yaml` 版本
+- 构建并上传多 ABI APK 到 GitHub Release（pre-release）
+
+### 8.2 正式版流程（`release_production.yml`）
+- 触发：仅手动触发
+- 版本从 `v1.0.0` 起步并递增补丁号
+- 构建并上传多 ABI APK 到正式 Release
+
+### 8.3 版本展示格式
+发布界面中会展示带日期的版本文案，例如：
+- `v0.0.149 (20260418)`
+- `v1.0.0 (20260418)`
+
+> 其中日期为构建当天（UTC）`YYYYMMDD`。
+> 同时该日期会写入应用构建号（`pubspec.yaml` 的 `+build`），因此 App 内「设置-版本」也会显示为 `vX.Y.Z (YYYYMMDD)`。
+
+---
+
+## 9. 许可与用途
+
+本项目为锐石内部私有项目，仅限内部业务使用。
