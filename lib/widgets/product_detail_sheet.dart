@@ -230,22 +230,32 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                                     ),
                                   ),
                                 )
-                              : InteractiveViewer(
-                                  transformationController: _pdfTransformationController,
-                                  minScale: 1,
-                                  maxScale: 3.5,
-                                  panEnabled: true,
-                                  scaleEnabled: true,
-                                  boundaryMargin: const EdgeInsets.all(24),
-                                  child: Center(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.memory(
-                                        _pdfLongImage!,
-                                        filterQuality: FilterQuality.high,
+                              : LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final targetWidth = constraints.maxWidth.clamp(320.0, 860.0).toDouble();
+                                    return InteractiveViewer(
+                                      transformationController: _pdfTransformationController,
+                                      constrained: false,
+                                      minScale: 1,
+                                      maxScale: 3.5,
+                                      panEnabled: true,
+                                      scaleEnabled: true,
+                                      boundaryMargin: const EdgeInsets.all(24),
+                                      child: Center(
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: SizedBox(
+                                            width: targetWidth,
+                                            child: Image.memory(
+                                              _pdfLongImage!,
+                                              fit: BoxFit.fitWidth,
+                                              filterQuality: FilterQuality.high,
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
+                                    );
+                                  },
                                 ),
                     ),
                   ),
