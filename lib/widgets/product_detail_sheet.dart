@@ -74,19 +74,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   int _selectedFormulaIndex = 0;
   String? _selectedApplicationFormulaName;
   bool _isGeneratingTds = false;
-  final TransformationController _pdfTransformationController = TransformationController();
   List<Uint8List> _pdfPageImages = const [];
-  int _zoomPageIndex = 0;
   bool _isRasterizingPdf = false;
-  bool _isPdfZoomMode = false;
 
   Future<void> _preparePdfPreview(Uint8List pdfBytes) async {
     setState(() {
       _isRasterizingPdf = true;
       _pdfPageImages = const [];
-      _zoomPageIndex = 0;
-      _isPdfZoomMode = false;
-      _pdfTransformationController.value = Matrix4.identity();
     });
 
     final pages = <Uint8List>[];
@@ -98,17 +92,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     setState(() {
       _pdfPageImages = pages;
       _isRasterizingPdf = false;
-      _isPdfZoomMode = false;
-      _zoomPageIndex = 0;
-    });
-  }
-
-  void _enterPdfZoomMode(int pageIndex) {
-    if (pageIndex < 0 || pageIndex >= _pdfPageImages.length) return;
-    setState(() {
-      _isPdfZoomMode = true;
-      _zoomPageIndex = pageIndex;
-      _pdfTransformationController.value = Matrix4.identity();
     });
   }
 
@@ -168,30 +151,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                       ],
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                    child: Row(
-                      children: [
-                        Text(
-                          _isPdfZoomMode ? '缩放模式：双指可缩放/拖动' : '双击进入单页可缩放',
-                          style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                        const Spacer(),
-                        if (_isPdfZoomMode)
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _isPdfZoomMode = false;
-                                _pdfTransformationController.value = Matrix4.identity();
-                              });
-                            },
-                            child: const Text('退出缩放'),
-                          ),
-                      ],
-                    ),
-                  ),
                   const Divider(height: 1),
                   Expanded(
                     child: Container(
@@ -208,39 +167,25 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                                     ),
                                   ),
                                 )
-                              : _isPdfZoomMode
-                                  ? InteractiveViewer(
-                                      transformationController: _pdfTransformationController,
-                                      minScale: 1,
-                                      maxScale: 4,
-                                      panEnabled: true,
-                                      scaleEnabled: true,
-                                      boundaryMargin: const EdgeInsets.all(32),
-                                      child: Center(
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(12),
-                                          child: Image.memory(
-                                            _pdfPageImages[_zoomPageIndex],
-                                            filterQuality: FilterQuality.high,
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                  : ListView.separated(
-                                      itemCount: _pdfPageImages.length,
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
-                                      separatorBuilder: (_, __) => const SizedBox(height: 16),
-                                      itemBuilder: (listContext, index) => GestureDetector(
-                                        onDoubleTap: () => _enterPdfZoomMode(index),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(12),
-                                          child: Image.memory(
-                                            _pdfPageImages[index],
-                                            filterQuality: FilterQuality.high,
-                                          ),
-                                        ),
+                              : ListView.separated(
+                                  itemCount: _pdfPageImages.length,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                                  itemBuilder: (listContext, index) => InteractiveViewer(
+                                    minScale: 1,
+                                    maxScale: 3.5,
+                                    panEnabled: true,
+                                    scaleEnabled: true,
+                                    boundaryMargin: const EdgeInsets.all(24),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.memory(
+                                        _pdfPageImages[index],
+                                        filterQuality: FilterQuality.high,
                                       ),
                                     ),
+                                  ),
+                                ),
                     ),
                   ),
                 ],
@@ -331,12 +276,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     if (linked.isNotEmpty) {
       _selectedApplicationFormulaName = linked.first.fileName.replaceAll('.md', '');
     }
-  }
-
-  @override
-  void dispose() {
-    _pdfTransformationController.dispose();
-    super.dispose();
   }
 
   String _extractMarkdownBody(String rawContent) =>
