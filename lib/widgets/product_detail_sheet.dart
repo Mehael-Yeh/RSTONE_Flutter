@@ -70,12 +70,14 @@ class ProductDetailSheet extends StatefulWidget {
 }
 
 class _ProductDetailSheetState extends State<ProductDetailSheet> {
+  static const double _kPdfMinScaleSnapThreshold = 1.05;
   /// 多配方时下拉选择的索引
   int _selectedFormulaIndex = 0;
   String? _selectedApplicationFormulaName;
   bool _isGeneratingTds = false;
   Uint8List? _pdfLongImage;
   int _pdfPageCount = 0;
+  double? _singlePageHeightRatio;
   bool _isRasterizingPdf = false;
   final TransformationController _pdfTransformationController = TransformationController();
   bool _isSyncingPdfTransform = false;
@@ -92,6 +94,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       _isRasterizingPdf = true;
       _pdfLongImage = null;
       _pdfPageCount = 0;
+      _singlePageHeightRatio = null;
       _resetPdfPreviewTransform();
     });
 
@@ -99,6 +102,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     await for (final page in Printing.raster(pdfBytes, dpi: 160)) {
       pages.add(await page.toPng());
     }
+
+    double? singlePageHeightRatio;
+    if (pages.length == 1) {
+      final singlePageImage = await _decodeImage(pages.first);
+      singlePageHeightRatio = singlePageImage.height / singlePageImage.width;
+      singlePageImage.dispose();
+    }
+
     final previewImage = pages.length <= 1
         ? (pages.isEmpty ? null : pages.first)
         : await _composeLongPdfImage(pages);
@@ -107,6 +118,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     setState(() {
       _pdfLongImage = previewImage;
       _pdfPageCount = pages.length;
+      _singlePageHeightRatio = singlePageHeightRatio;
       _isRasterizingPdf = false;
     });
   }
@@ -173,7 +185,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     if (_isSyncingPdfTransform) return;
     final matrix = _pdfTransformationController.value;
     final scale = matrix.getMaxScaleOnAxis();
-    if (scale > 1.01) return;
+    if (scale > _kPdfMinScaleSnapThreshold) return;
 
     final isSinglePage = _pdfPageCount <= 1;
     final yOffset = matrix.storage[13];
@@ -195,7 +207,15 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   Widget _buildPdfPreviewViewer(BoxConstraints constraints) {
-    final isSinglePage = _pdfPageCount <= 1;
+    if (_pdfPageCount <= 1) {
+      return _buildSinglePagePdfPreviewViewer(constraints);
+    }
+    return _buildMultiPagePdfPreviewViewer(constraints);
+  }
+
+  Widget _buildSinglePagePdfPreviewViewer(BoxConstraints constraints) {
+    final pageHeightRatio = _singlePageHeightRatio ?? 1.4142;
+    final pageHeight = constraints.maxWidth * pageHeightRatio;
     return InteractiveViewer(
       transformationController: _pdfTransformationController,
       constrained: false,
@@ -205,16 +225,48 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       scaleEnabled: true,
       boundaryMargin: EdgeInsets.zero,
       clipBehavior: Clip.none,
-      onInteractionUpdate: isSinglePage ? null : (_) => _handlePdfTransformChanged(),
       onInteractionEnd: (_) => _handlePdfTransformChanged(),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+      child: Align(
+        alignment: Alignment.topCenter,
         child: SizedBox(
           width: constraints.maxWidth,
-          child: Image.memory(
-            _pdfLongImage!,
-            fit: BoxFit.fitWidth,
-            filterQuality: FilterQuality.high,
+          height: pageHeight,
+          child: ColoredBox(
+            color: Colors.white,
+            child: Image.memory(
+              _pdfLongImage!,
+              fit: BoxFit.fill,
+              filterQuality: FilterQuality.high,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMultiPagePdfPreviewViewer(BoxConstraints constraints) {
+    return InteractiveViewer(
+      transformationController: _pdfTransformationController,
+      constrained: false,
+      minScale: 1,
+      maxScale: 3.5,
+      panEnabled: true,
+      scaleEnabled: true,
+      boundaryMargin: EdgeInsets.zero,
+      clipBehavior: Clip.none,
+      onInteractionUpdate: (_) => _handlePdfTransformChanged(),
+      onInteractionEnd: (_) => _handlePdfTransformChanged(),
+      child: ColoredBox(
+        color: Colors.white,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: constraints.maxWidth,
+            child: Image.memory(
+              _pdfLongImage!,
+              fit: BoxFit.fitWidth,
+              filterQuality: FilterQuality.high,
+            ),
           ),
         ),
       ),
