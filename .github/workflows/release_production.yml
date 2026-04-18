@@ -26,7 +26,7 @@ jobs:
       - name: Build metadata
         id: build_meta
         run: |
-          echo "build_date=$(date -u +%Y%m%d)" >> $GITHUB_OUTPUT
+          python3 scripts/generate_build_date.py >> "$GITHUB_OUTPUT"
 
       - name: Get latest production version
         id: version
@@ -43,11 +43,11 @@ jobs:
             new_ver="${major}.${minor}.${patch}"
           fi
 
-          build_number=${{ steps.build_meta.outputs.build_date }}
+          build_number=${{ steps.build_meta.outputs.build_code }}
 
           echo "version=${new_ver}+${build_number}" >> $GITHUB_OUTPUT
           echo "tag=v${new_ver}" >> $GITHUB_OUTPUT
-          echo "display=v${new_ver} (${{ steps.build_meta.outputs.build_date }})" >> $GITHUB_OUTPUT
+          echo "display=v${new_ver} (${{ steps.build_meta.outputs.build_time }})" >> $GITHUB_OUTPUT
 
       - name: Update version in pubspec.yaml
         run: |
@@ -128,7 +128,7 @@ jobs:
 
       - name: Build Release APK (Android)
         run: |
-          flutter build apk --release --split-per-abi
+          flutter build apk --release --split-per-abi --dart-define=APP_BUILD_TIME=${{ steps.build_meta.outputs.build_time }}
           cd build/app/outputs/flutter-apk
           for apk in app-*-release.apk; do
             case "$apk" in
@@ -150,7 +150,7 @@ jobs:
             自动构建版本: `${{ steps.version.outputs.display }}`
             - 标签: `${{ steps.version.outputs.tag }}`
             - 提交: `${{ github.sha }}`
-            - 构建日期: `${{ steps.build_meta.outputs.build_date }}`
+            - 构建日期: `${{ steps.build_meta.outputs.build_time }}`
           files: |
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-armeabi-v7a-release.apk
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-arm64-v8a-release.apk
