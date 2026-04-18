@@ -80,7 +80,7 @@ class TdsPdfService {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
-        theme: pw.ThemeData.withFont(base: pdfFonts.songtiRegular, bold: pdfFonts.songtiBold),
+        theme: pw.ThemeData.withFont(base: pdfFonts.simheiRegular, bold: pdfFonts.simheiBold),
         header: (context) => _buildHeader(pdfFonts),
         footer: (context) => _buildFooter(pdfFonts),
         build: (context) => [
@@ -166,7 +166,7 @@ class TdsPdfService {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           if (section.title.isNotEmpty) ...[
-            pw.Text(section.title, style: pw.TextStyle(font: fonts.songtiBold, fontSize: 14)),
+            pw.Text(section.title, style: pw.TextStyle(font: fonts.simheiBold, fontSize: 14)),
             pw.SizedBox(height: 5),
           ],
           ...section.blocks.map((block) => _buildBlock(block, section, fonts)),
@@ -179,8 +179,8 @@ class TdsPdfService {
     if (block.type == _TdsBlockType.table && block.tableRows != null && block.tableRows!.isNotEmpty) {
       final isPhysicalTable = section.title.contains('物理性能') && block.tableRows!.first.length >= 3;
       final table = pw.TableHelper.fromTextArray(
-        headerStyle: pw.TextStyle(font: fonts.songtiBold, fontSize: 10.5),
-        cellStyle: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5),
+        headerStyle: pw.TextStyle(font: fonts.simheiBold, fontSize: 10.5),
+        cellStyle: pw.TextStyle(font: fonts.simheiRegular, fontSize: 10.5),
         cellAlignment: pw.Alignment.center,
         border: pw.TableBorder.all(width: 0.8),
         columnWidths: isPhysicalTable
@@ -251,7 +251,7 @@ class TdsPdfService {
           pw.TextSpan(
             text: source.substring(start, match.start),
             style: pw.TextStyle(
-              font: fonts.songtiRegular,
+              font: fonts.simheiRegular,
               fontSize: fontSize,
               lineSpacing: lineSpacing,
             ),
@@ -263,7 +263,7 @@ class TdsPdfService {
         pw.TextSpan(
           text: boldText,
           style: pw.TextStyle(
-            font: fonts.songtiBold,
+            font: fonts.simheiBold,
             fontSize: fontSize,
             fontWeight: pw.FontWeight.bold,
             lineSpacing: lineSpacing,
@@ -278,7 +278,7 @@ class TdsPdfService {
         pw.TextSpan(
           text: source.substring(start),
           style: pw.TextStyle(
-            font: fonts.songtiRegular,
+            font: fonts.simheiRegular,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
           ),
@@ -290,7 +290,7 @@ class TdsPdfService {
       return pw.Text(
         source,
         textAlign: textAlign,
-        style: pw.TextStyle(font: fonts.songtiRegular, fontSize: fontSize, lineSpacing: lineSpacing),
+        style: pw.TextStyle(font: fonts.simheiRegular, fontSize: fontSize, lineSpacing: lineSpacing),
       );
     }
 
@@ -306,7 +306,7 @@ class TdsPdfService {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text('免责声明', style: pw.TextStyle(font: fonts.songtiBold, fontSize: 14)),
+          pw.Text('免责声明', style: pw.TextStyle(font: fonts.simheiBold, fontSize: 14)),
           pw.SizedBox(height: 8),
           ..._defaultDisclaimer.map(
             (line) => pw.Padding(
