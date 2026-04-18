@@ -53,7 +53,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _loadVersion() async {
     final pkg = await PackageInfo.fromPlatform();
-    if (mounted) setState(() => _appVersion = 'v${pkg.version}');
+    final buildDate = pkg.buildNumber.trim();
+    final displayVersion = buildDate.isNotEmpty
+        ? 'v${pkg.version} ($buildDate)'
+        : 'v${pkg.version}';
+    if (mounted) setState(() => _appVersion = displayVersion);
   }
 
   Future<void> _onThemeChanged(ThemeMode mode) async {
