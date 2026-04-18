@@ -76,11 +76,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   bool _isGeneratingTds = false;
   Uint8List? _pdfLongImage;
   bool _isRasterizingPdf = false;
+  final TransformationController _pdfTransformationController = TransformationController();
 
   Future<void> _preparePdfPreview(Uint8List pdfBytes) async {
     setState(() {
       _isRasterizingPdf = true;
       _pdfLongImage = null;
+      _pdfTransformationController.value = Matrix4.identity();
     });
 
     final pages = <Uint8List>[];
@@ -153,6 +155,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       }
     }
   }
+
+  void _handlePdfTransformChanged() {}
 
   Future<void> _handlePreviewTds() async {
     if (_isGeneratingTds || widget.product.folder != '产品列表' || widget.tdsContent == null) {
@@ -227,6 +231,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                                   ),
                                 )
                               : InteractiveViewer(
+                                  transformationController: _pdfTransformationController,
                                   minScale: 1,
                                   maxScale: 3.5,
                                   panEnabled: true,
@@ -333,6 +338,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     if (linked.isNotEmpty) {
       _selectedApplicationFormulaName = linked.first.fileName.replaceAll('.md', '');
     }
+  }
+
+  @override
+  void dispose() {
+    _pdfTransformationController
+      ..removeListener(_handlePdfTransformChanged)
+      ..dispose();
+    super.dispose();
   }
 
   String _extractMarkdownBody(String rawContent) =>
