@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""Generate UTC build metadata for CI workflows.
+"""Generate UTC+08 build metadata for CI workflows.
 
 Outputs key-value lines suitable for appending to $GITHUB_OUTPUT:
-- build_date: YYYYMMDD
-- build_time: YYYYMMDDHHMM
+- build_date: YYYYMMDD (UTC+08)
+- build_time: YYYYMMDDHHMM (UTC+08)
 - build_code: epoch minutes (monotonic integer, Android-safe)
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-now = datetime.now(timezone.utc)
-build_date = now.strftime("%Y%m%d")
-build_time = now.strftime("%Y%m%d%H%M")
-build_code = int(now.timestamp() // 60)
+tz_cst = timezone(timedelta(hours=8))
+now_cst = datetime.now(tz_cst)
+build_date = now_cst.strftime("%Y%m%d")
+build_time = now_cst.strftime("%Y%m%d%H%M")
+build_code = int(now_cst.timestamp() // 60)
 
 # Validate date/time payload shape.
 datetime.strptime(build_date, "%Y%m%d")

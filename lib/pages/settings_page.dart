@@ -56,7 +56,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     // CI 注入的标准格式：YYYYMMDDHHMM
     if (RegExp(r'^\d{12}$').hasMatch(value)) {
-      return '${value.substring(0, 8)} ${value.substring(8, 10)}:${value.substring(10, 12)} UTC';
+      return '${value.substring(0, 8)} ${value.substring(8, 10)}:${value.substring(10, 12)} UTC+08';
     }
 
     // 兼容纯日期：YYYYMMDD
@@ -68,31 +68,19 @@ class _SettingsPageState extends State<SettingsPage> {
     final asInt = int.tryParse(value);
     if (asInt != null && asInt > 0) {
       try {
-        final maybeEpochMinutes = DateTime.fromMillisecondsSinceEpoch(asInt * 60 * 1000, isUtc: true);
+        final maybeEpochMinutes = DateTime.fromMillisecondsSinceEpoch(asInt * 60 * 1000, isUtc: true).add(const Duration(hours: 8));
         if (maybeEpochMinutes.year >= 2020 && maybeEpochMinutes.year <= 2100) {
           final y = maybeEpochMinutes.year.toString().padLeft(4, '0');
           final m = maybeEpochMinutes.month.toString().padLeft(2, '0');
           final d = maybeEpochMinutes.day.toString().padLeft(2, '0');
           final hh = maybeEpochMinutes.hour.toString().padLeft(2, '0');
           final mm = maybeEpochMinutes.minute.toString().padLeft(2, '0');
-          return '$y$m$d $hh:$mm UTC';
+          return '$y$m$d $hh:$mm UTC+08';
         }
       } catch (_) {
         // Ignore and continue to legacy parsing.
       }
     }
-
-    // 兼容历史简写：418 / 0418（表示 4 月 18 日）。
-    if (RegExp(r'^\d{3,4}$').hasMatch(value)) {
-      final padded = value.padLeft(4, '0');
-      final month = int.tryParse(padded.substring(0, 2));
-      final day = int.tryParse(padded.substring(2, 4));
-      if (month != null && day != null && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-        final year = DateTime.now().toUtc().year.toString();
-        return '$year${month.toString().padLeft(2, '0')}${day.toString().padLeft(2, '0')}';
-      }
-    }
-
     return value;
   }
 
