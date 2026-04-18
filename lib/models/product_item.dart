@@ -193,6 +193,20 @@ class ProductItem {
     }
   }
 
+  List<String> get linkedWikiReferences {
+    final refs = <String>[];
+    final seen = <String>{};
+    for (final match in RegExp(r'\[\[([^\]]+)\]\]').allMatches(rawContent)) {
+      final normalized = _normalizeMdLinkValue(match.group(1) ?? '');
+      if (normalized.isEmpty) continue;
+      final lower = normalized.toLowerCase();
+      if (seen.add(lower)) {
+        refs.add(normalized);
+      }
+    }
+    return refs;
+  }
+
   /// 用于搜索的所有文本
   String get searchText {
     final parts = <String>[
@@ -205,6 +219,7 @@ class ProductItem {
       if (primer != null) primer!,
       if (midCoat != null) midCoat!,
       if (topCoat != null) topCoat!,
+      ...linkedWikiReferences,
     ];
     return parts.join(' ').toLowerCase();
   }
