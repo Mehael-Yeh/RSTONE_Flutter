@@ -99,12 +99,9 @@ class TdsPdfService {
           ),
           if (productSubtitle != null && productSubtitle.isNotEmpty) ...[
             pw.SizedBox(height: 8),
-            pw.Padding(
-              padding: const pw.EdgeInsets.only(left: 3),
-              child: pw.Text(
-                productSubtitle,
-                style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 12),
-              ),
+            pw.Text(
+              productSubtitle,
+              style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 10.5),
             ),
           ],
           pw.SizedBox(height: 10),
@@ -132,7 +129,7 @@ class TdsPdfService {
                     style: pw.TextStyle(
                       font: fonts.impactLikeBold,
                       fontSize: 48,
-                      color: PdfColors.red,
+                      color: const PdfColor.fromInt(0xFFFF0000),
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
@@ -141,7 +138,7 @@ class TdsPdfService {
                     style: pw.TextStyle(
                       font: fonts.impactLikeBold,
                       fontSize: 28,
-                      color: PdfColors.red,
+                      color: const PdfColor.fromInt(0xFFFF0000),
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
