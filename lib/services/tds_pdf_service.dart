@@ -231,7 +231,7 @@ class TdsPdfService {
     if (source.isEmpty) return source;
     if (block.type != _TdsBlockType.paragraph) return source;
     if (!block.shouldIndentFirstLine) return source;
-    return '\u3000\u3000$source';
+    return '\u00A0\u00A0\u00A0\u00A0$source';
   }
 
   static pw.Widget _buildMarkdownStyledText(
@@ -542,7 +542,7 @@ class TdsPdfService {
       }
       buffer.write(currentLine);
     }
-    return buffer.toString();
+    return _normalizeParagraphSpacing(buffer.toString());
   }
 
   static bool _shouldInsertSpace(String leftText, String rightText) {
@@ -551,6 +551,36 @@ class TdsPdfService {
     final rightChar = rightText.substring(0, 1);
     return RegExp(r'[A-Za-z0-9]').hasMatch(leftChar) &&
         RegExp(r'[A-Za-z0-9]').hasMatch(rightChar);
+  }
+
+  static String _normalizeParagraphSpacing(String text) {
+    var normalized = text
+        .replaceAll(RegExp(r'[\t\r\n]+'), ' ')
+        .replaceAll(RegExp(r' {2,}'), ' ')
+        .trim();
+
+    normalized = normalized
+        // 中文/全角字符之间不应出现额外空格
+        .replaceAll(
+          RegExp(
+            r'([\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF])\s+([\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF])',
+          ),
+          r'$1$2',
+        )
+        // 中文后接标点前不应保留空格
+        .replaceAll(
+          RegExp(
+            r'([\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF])\s+([，。！？；：、）》】』’”,.!?;:\)\]}>])',
+          ),
+          r'$1$2',
+        )
+        // 左侧括号后不应有空格
+        .replaceAll(
+          RegExp(r'([（《【『“‘(<\[])\s+'),
+          r'$1',
+        );
+
+    return normalized;
   }
 
   static String? _normalizeTextForPdf(String? text) {
