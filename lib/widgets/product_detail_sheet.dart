@@ -215,26 +215,38 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
   Widget _buildSinglePagePdfPreviewViewer(BoxConstraints constraints) {
     final pageHeightRatio = _singlePageHeightRatio ?? 1.4142;
-    final pageHeight = constraints.maxWidth * pageHeightRatio;
+    final pageWidth = constraints.maxWidth;
+    final pageHeight = pageWidth * pageHeightRatio;
+    final widthScale = constraints.maxWidth / pageWidth;
+    final heightScale = constraints.maxHeight / pageHeight;
+    final fittedScale = widthScale < heightScale ? widthScale : heightScale;
+    final viewerWidth = pageWidth * fittedScale;
+    final viewerHeight = pageHeight * fittedScale;
+
     return ColoredBox(
       color: Colors.white,
-      child: InteractiveViewer(
-        transformationController: _pdfTransformationController,
-        constrained: false,
-        minScale: 1,
-        maxScale: 3.5,
-        panEnabled: true,
-        scaleEnabled: true,
-        boundaryMargin: EdgeInsets.zero,
-        clipBehavior: Clip.none,
-        onInteractionEnd: (_) => _handlePdfTransformChanged(),
+      child: Center(
         child: SizedBox(
-          width: constraints.maxWidth,
-          height: pageHeight,
-          child: Image.memory(
-            _pdfLongImage!,
-            fit: BoxFit.fill,
-            filterQuality: FilterQuality.high,
+          width: viewerWidth,
+          height: viewerHeight,
+          child: InteractiveViewer(
+            transformationController: _pdfTransformationController,
+            minScale: 1,
+            maxScale: 3.5,
+            panEnabled: true,
+            scaleEnabled: true,
+            boundaryMargin: EdgeInsets.zero,
+            clipBehavior: Clip.hardEdge,
+            onInteractionEnd: (_) => _handlePdfTransformChanged(),
+            child: SizedBox(
+              width: viewerWidth,
+              height: viewerHeight,
+              child: Image.memory(
+                _pdfLongImage!,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
           ),
         ),
       ),
