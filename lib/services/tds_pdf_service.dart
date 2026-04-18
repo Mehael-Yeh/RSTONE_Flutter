@@ -45,7 +45,8 @@ class TdsPdfService {
   }) async {
     final body = _extractMarkdownBody(tdsMarkdown);
     final parsed = _parseTdsSections(body);
-    final productGrade = _normalizeTextForPdf(parsed.subtitle) ?? _normalizeTextForPdf(product.fileName) ?? product.fileName;
+    final productGrade = _normalizeTextForPdf(parsed.productCode) ?? _normalizeTextForPdf(product.fileName) ?? product.fileName;
+    final productSubtitle = _normalizeTextForPdf(parsed.productSubtitle);
 
     final pdfFonts = _PdfFonts(
       songtiRegular: await _loadFirstAvailableFont(
@@ -80,22 +81,29 @@ class TdsPdfService {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
-        theme: pw.ThemeData.withFont(base: pdfFonts.simheiRegular, bold: pdfFonts.simheiBold),
+        theme: pw.ThemeData.withFont(base: pdfFonts.songtiRegular, bold: pdfFonts.songtiBold),
         header: (context) => _buildHeader(pdfFonts),
         footer: (context) => _buildFooter(pdfFonts),
         build: (context) => [
-          pw.SizedBox(height: 14),
+          pw.SizedBox(height: 16),
           pw.Center(
             child: pw.Text(
               '产品技术数据表（TDS）',
               style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 16),
             ),
           ),
-          pw.SizedBox(height: 14),
+          pw.SizedBox(height: 16),
           pw.Text(
             productGrade,
             style: pw.TextStyle(font: pdfFonts.simheiBold, fontSize: 14, fontWeight: pw.FontWeight.bold),
           ),
+          if (productSubtitle != null && productSubtitle.isNotEmpty) ...[
+            pw.SizedBox(height: 8),
+            pw.Text(
+              productSubtitle,
+              style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 10.5),
+            ),
+          ],
           pw.SizedBox(height: 10),
           ...parsed.sections.map((section) => _buildSection(section, pdfFonts)),
           _buildDisclaimerSection(pdfFonts),
@@ -121,7 +129,7 @@ class TdsPdfService {
                     style: pw.TextStyle(
                       font: fonts.impactLikeBold,
                       fontSize: 48,
-                      color: PdfColors.red,
+                      color: const PdfColor.fromInt(0xFFFF0000),
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
@@ -130,7 +138,7 @@ class TdsPdfService {
                     style: pw.TextStyle(
                       font: fonts.impactLikeBold,
                       fontSize: 28,
-                      color: PdfColors.red,
+                      color: const PdfColor.fromInt(0xFFFF0000),
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
@@ -180,7 +188,7 @@ class TdsPdfService {
       final isPhysicalTable = section.title.contains('物理性能') && block.tableRows!.first.length >= 3;
       final table = pw.TableHelper.fromTextArray(
         headerStyle: pw.TextStyle(font: fonts.simheiBold, fontSize: 10.5),
-        cellStyle: pw.TextStyle(font: fonts.simheiRegular, fontSize: 10.5),
+        cellStyle: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5),
         cellAlignment: pw.Alignment.center,
         border: pw.TableBorder.all(width: 0.8),
         columnWidths: isPhysicalTable
@@ -239,6 +247,7 @@ class TdsPdfService {
     required double fontSize,
     double lineSpacing = 0,
     pw.TextAlign textAlign = pw.TextAlign.left,
+    bool useSongti = true,
   }) {
     final spans = <pw.InlineSpan>[];
     final pattern = RegExp(r'\*\*(.+?)\*\*');
@@ -249,9 +258,9 @@ class TdsPdfService {
       if (match.start > start) {
         spans.add(
           pw.TextSpan(
-            text: source.substring(start, match.start),
-            style: pw.TextStyle(
-              font: fonts.simheiRegular,
+              text: source.substring(start, match.start),
+              style: pw.TextStyle(
+              font: useSongti ? fonts.songtiRegular : fonts.simheiRegular,
               fontSize: fontSize,
               lineSpacing: lineSpacing,
             ),
@@ -263,7 +272,7 @@ class TdsPdfService {
         pw.TextSpan(
           text: boldText,
           style: pw.TextStyle(
-            font: fonts.simheiBold,
+            font: useSongti ? fonts.songtiBold : fonts.simheiBold,
             fontSize: fontSize,
             fontWeight: pw.FontWeight.bold,
             lineSpacing: lineSpacing,
@@ -278,7 +287,7 @@ class TdsPdfService {
         pw.TextSpan(
           text: source.substring(start),
           style: pw.TextStyle(
-            font: fonts.simheiRegular,
+            font: useSongti ? fonts.songtiRegular : fonts.simheiRegular,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
           ),
@@ -290,7 +299,11 @@ class TdsPdfService {
       return pw.Text(
         source,
         textAlign: textAlign,
-        style: pw.TextStyle(font: fonts.simheiRegular, fontSize: fontSize, lineSpacing: lineSpacing),
+        style: pw.TextStyle(
+          font: useSongti ? fonts.songtiRegular : fonts.simheiRegular,
+          fontSize: fontSize,
+          lineSpacing: lineSpacing,
+        ),
       );
     }
 
@@ -317,6 +330,7 @@ class TdsPdfService {
                 fontSize: 8,
                 lineSpacing: 2,
                 textAlign: pw.TextAlign.left,
+                useSongti: false,
               ),
             ),
           ),
@@ -412,7 +426,8 @@ class TdsPdfService {
 
   static _ParsedTds _parseTdsSections(String markdown) {
     final lines = markdown.replaceAll('\r\n', '\n').split('\n');
-    String? subtitle;
+    String? productCode;
+    String? productSubtitle;
     final sections = <_TdsSection>[];
 
     _TdsSection? current;
@@ -466,8 +481,9 @@ class TdsPdfService {
           skippingMarkdownDisclaimer = false;
         }
 
-        if (subtitle == null && heading.startsWith('RD')) {
-          subtitle = heading;
+        final headingLevel = headingMatch.group(1) ?? '#';
+        if (productCode == null && headingLevel == '#') {
+          productCode = heading;
           continue;
         }
 
@@ -493,9 +509,15 @@ class TdsPdfService {
         continue;
       }
 
-      if (subtitle == null) {
+      if (productCode == null) {
         flushTableIfNeeded();
-        subtitle = line;
+        productCode = line;
+        continue;
+      }
+
+      if (current == null && productSubtitle == null) {
+        flushTableIfNeeded();
+        productSubtitle = line;
         continue;
       }
       if (skippingMarkdownDisclaimer) continue;
@@ -517,7 +539,11 @@ class TdsPdfService {
     flushParagraphIfNeeded();
     if (current != null) sections.add(current!);
 
-    return _ParsedTds(subtitle: subtitle, sections: sections);
+    return _ParsedTds(
+      productCode: productCode,
+      productSubtitle: productSubtitle,
+      sections: sections,
+    );
   }
 
   static String _mergeWrappedParagraphLines(List<String> lines) {
@@ -626,11 +652,13 @@ class _PdfFonts {
 
 class _ParsedTds {
   const _ParsedTds({
-    required this.subtitle,
+    required this.productCode,
+    required this.productSubtitle,
     required this.sections,
   });
 
-  final String? subtitle;
+  final String? productCode;
+  final String? productSubtitle;
   final List<_TdsSection> sections;
 }
 
