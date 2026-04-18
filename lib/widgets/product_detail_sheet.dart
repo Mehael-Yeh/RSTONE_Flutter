@@ -75,6 +75,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   String? _selectedApplicationFormulaName;
   bool _isGeneratingTds = false;
   Uint8List? _pdfLongImage;
+  int _pdfPageCount = 0;
   bool _isRasterizingPdf = false;
   final TransformationController _pdfTransformationController = TransformationController();
   bool _isSyncingPdfTransform = false;
@@ -90,6 +91,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     setState(() {
       _isRasterizingPdf = true;
       _pdfLongImage = null;
+      _pdfPageCount = 0;
       _resetPdfPreviewTransform();
     });
 
@@ -97,11 +99,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     await for (final page in Printing.raster(pdfBytes, dpi: 160)) {
       pages.add(await page.toPng());
     }
-    final longImage = await _composeLongPdfImage(pages);
+    final previewImage = pages.length <= 1
+        ? (pages.isEmpty ? null : pages.first)
+        : await _composeLongPdfImage(pages);
 
     if (!mounted) return;
     setState(() {
-      _pdfLongImage = longImage;
+      _pdfLongImage = previewImage;
+      _pdfPageCount = pages.length;
       _isRasterizingPdf = false;
     });
   }
@@ -170,15 +175,50 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final scale = matrix.getMaxScaleOnAxis();
     if (scale > 1.01) return;
 
+    final isSinglePage = _pdfPageCount <= 1;
     final yOffset = matrix.storage[13];
     final hasHorizontalOffset = matrix.storage[12].abs() > 0.5;
     final hasScaleOffset = (scale - 1).abs() > 0.01;
-    if (!hasHorizontalOffset && !hasScaleOffset) return;
+    final hasVerticalOffset = matrix.storage[13].abs() > 0.5;
 
+    if (isSinglePage) {
+      if (!hasHorizontalOffset && !hasScaleOffset && !hasVerticalOffset) return;
+      _resetPdfPreviewTransform();
+      return;
+    }
+
+    if (!hasHorizontalOffset && !hasScaleOffset) return;
     _isSyncingPdfTransform = true;
     _pdfTransformationController.value = Matrix4.identity()
       ..setTranslationRaw(0, yOffset, 0);
     _isSyncingPdfTransform = false;
+  }
+
+  Widget _buildPdfPreviewViewer(BoxConstraints constraints) {
+    final isSinglePage = _pdfPageCount <= 1;
+    return InteractiveViewer(
+      transformationController: _pdfTransformationController,
+      constrained: false,
+      minScale: 1,
+      maxScale: 3.5,
+      panEnabled: true,
+      scaleEnabled: true,
+      boundaryMargin: EdgeInsets.zero,
+      clipBehavior: Clip.none,
+      onInteractionUpdate: isSinglePage ? null : (_) => _handlePdfTransformChanged(),
+      onInteractionEnd: (_) => _handlePdfTransformChanged(),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: constraints.maxWidth,
+          child: Image.memory(
+            _pdfLongImage!,
+            fit: BoxFit.fitWidth,
+            filterQuality: FilterQuality.high,
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _handlePreviewTds() async {
@@ -228,29 +268,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                           )
                         : LayoutBuilder(
                             builder: (context, constraints) {
-                              return InteractiveViewer(
-                                transformationController: _pdfTransformationController,
-                                constrained: false,
-                                minScale: 1,
-                                maxScale: 3.5,
-                                panEnabled: true,
-                                scaleEnabled: true,
-                                boundaryMargin: EdgeInsets.zero,
-                                clipBehavior: Clip.none,
-                                onInteractionUpdate: (_) => _handlePdfTransformChanged(),
-                                onInteractionEnd: (_) => _handlePdfTransformChanged(),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: SizedBox(
-                                    width: constraints.maxWidth,
-                                    child: Image.memory(
-                                      _pdfLongImage!,
-                                      fit: BoxFit.fitWidth,
-                                      filterQuality: FilterQuality.high,
-                                    ),
-                                  ),
-                                ),
-                              );
+                              return _buildPdfPreviewViewer(constraints);
                             },
                           ),
               ),
@@ -336,7 +354,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   @override
   void initState() {
     super.initState();
-    _pdfTransformationController.addListener(_handlePdfTransformChanged);
     final linked = _getApplicationLinkedFormulas();
     if (linked.isNotEmpty) {
       _selectedApplicationFormulaName = linked.first.fileName.replaceAll('.md', '');
@@ -345,9 +362,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
   @override
   void dispose() {
-    _pdfTransformationController
-      ..removeListener(_handlePdfTransformChanged)
-      ..dispose();
+    _pdfTransformationController.dispose();
     super.dispose();
   }
 
