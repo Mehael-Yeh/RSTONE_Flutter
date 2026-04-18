@@ -215,28 +215,37 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
   Widget _buildSinglePagePdfPreviewViewer(BoxConstraints constraints) {
     final pageHeightRatio = _singlePageHeightRatio ?? 1.4142;
-    final pageHeight = constraints.maxWidth * pageHeightRatio;
-    return InteractiveViewer(
-      transformationController: _pdfTransformationController,
-      constrained: false,
-      minScale: 1,
-      maxScale: 3.5,
-      panEnabled: true,
-      scaleEnabled: true,
-      boundaryMargin: EdgeInsets.zero,
-      clipBehavior: Clip.none,
-      onInteractionEnd: (_) => _handlePdfTransformChanged(),
-      child: Align(
-        alignment: Alignment.topCenter,
+    final pageWidth = constraints.maxWidth;
+    final pageHeight = pageWidth * pageHeightRatio;
+    final widthScale = constraints.maxWidth / pageWidth;
+    final heightScale = constraints.maxHeight / pageHeight;
+    final fittedScale = widthScale < heightScale ? widthScale : heightScale;
+    final viewerWidth = pageWidth * fittedScale;
+    final viewerHeight = pageHeight * fittedScale;
+
+    return ColoredBox(
+      color: Colors.white,
+      child: Center(
         child: SizedBox(
-          width: constraints.maxWidth,
-          height: pageHeight,
-          child: ColoredBox(
-            color: Colors.white,
-            child: Image.memory(
-              _pdfLongImage!,
-              fit: BoxFit.fill,
-              filterQuality: FilterQuality.high,
+          width: viewerWidth,
+          height: viewerHeight,
+          child: InteractiveViewer(
+            transformationController: _pdfTransformationController,
+            minScale: 1,
+            maxScale: 3.5,
+            panEnabled: true,
+            scaleEnabled: true,
+            boundaryMargin: EdgeInsets.zero,
+            clipBehavior: Clip.hardEdge,
+            onInteractionEnd: (_) => _handlePdfTransformChanged(),
+            child: SizedBox(
+              width: viewerWidth,
+              height: viewerHeight,
+              child: Image.memory(
+                _pdfLongImage!,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.high,
+              ),
             ),
           ),
         ),
@@ -258,15 +267,12 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       onInteractionEnd: (_) => _handlePdfTransformChanged(),
       child: ColoredBox(
         color: Colors.white,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            width: constraints.maxWidth,
-            child: Image.memory(
-              _pdfLongImage!,
-              fit: BoxFit.fitWidth,
-              filterQuality: FilterQuality.high,
-            ),
+        child: SizedBox(
+          width: constraints.maxWidth,
+          child: Image.memory(
+            _pdfLongImage!,
+            fit: BoxFit.fitWidth,
+            filterQuality: FilterQuality.high,
           ),
         ),
       ),
@@ -305,7 +311,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               width: 900,
               height: 680,
               child: Container(
-                color: cs.surfaceContainerLowest,
+                color: Colors.white,
                 padding: const EdgeInsets.all(12),
                 child: _isRasterizingPdf
                     ? const Center(child: CircularProgressIndicator())
