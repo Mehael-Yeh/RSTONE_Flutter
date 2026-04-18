@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -299,6 +300,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         context: context,
         builder: (dialogContext) {
           final cs = Theme.of(dialogContext).colorScheme;
+          final mediaSize = MediaQuery.sizeOf(dialogContext);
+          const defaultPageHeightRatio = 1.4142;
+          final pageHeightRatio = _singlePageHeightRatio ?? defaultPageHeightRatio;
+          final maxDialogWidth = mediaSize.width - 24;
+          final maxDialogHeight = mediaSize.height - 32;
+          final dialogWidth = math.min(maxDialogWidth, maxDialogHeight / pageHeightRatio);
+          final dialogHeight = dialogWidth * pageHeightRatio;
+
           return Dialog(
             insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             backgroundColor: cs.surfaceContainerHigh,
@@ -308,11 +317,11 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
             ),
             clipBehavior: Clip.antiAlias,
             child: SizedBox(
-              width: 900,
-              height: 680,
+              width: dialogWidth,
+              height: dialogHeight,
               child: Container(
                 color: Colors.white,
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.zero,
                 child: _isRasterizingPdf
                     ? const Center(child: CircularProgressIndicator())
                     : _pdfLongImage == null
