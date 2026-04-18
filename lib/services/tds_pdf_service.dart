@@ -239,6 +239,7 @@ class TdsPdfService {
     required _PdfFonts fonts,
     required double fontSize,
     double lineSpacing = 0,
+    pw.TextAlign textAlign = pw.TextAlign.left,
   }) {
     final spans = <pw.InlineSpan>[];
     final pattern = RegExp(r'\*\*(.+?)\*\*');
@@ -289,11 +290,15 @@ class TdsPdfService {
     if (spans.isEmpty) {
       return pw.Text(
         source,
+        textAlign: textAlign,
         style: pw.TextStyle(font: fonts.songtiRegular, fontSize: fontSize, lineSpacing: lineSpacing),
       );
     }
 
-    return pw.RichText(text: pw.TextSpan(children: spans));
+    return pw.RichText(
+      textAlign: textAlign,
+      text: pw.TextSpan(children: spans),
+    );
   }
 
   static pw.Widget _buildDisclaimerSection(_PdfFonts fonts) {
@@ -308,9 +313,12 @@ class TdsPdfService {
           ..._defaultDisclaimer.map(
             (line) => pw.Padding(
               padding: const pw.EdgeInsets.only(bottom: 8),
-              child: pw.Text(
+              child: _buildMarkdownStyledText(
                 hasMultipleParagraphs ? '　　$line' : line,
-                style: pw.TextStyle(font: fonts.songtiRegular, fontSize: 8, lineSpacing: 2),
+                fonts: fonts,
+                fontSize: 8,
+                lineSpacing: 2,
+                textAlign: pw.TextAlign.left,
               ),
             ),
           ),
@@ -511,6 +519,18 @@ class TdsPdfService {
       if (skippingMarkdownDisclaimer) continue;
 
       flushTableIfNeeded();
+      final isOrderedLine = RegExp(r'^((\d+[\.\)、])|([（(]\d+[）)]))\s+').hasMatch(line);
+      if (isOrderedLine) {
+        flushParagraphIfNeeded();
+        current ??= _TdsSection(title: '');
+        current!.blocks.add(
+          _TdsBlock.paragraph(
+            _normalizeParagraphSpacing(line),
+            shouldIndentFirstLine: false,
+          ),
+        );
+        continue;
+      }
       paragraphBuffer.add(line);
     }
 
