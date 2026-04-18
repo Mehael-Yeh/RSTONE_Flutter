@@ -230,8 +230,7 @@ class TdsPdfService {
     final source = block.text ?? '';
     if (source.isEmpty) return source;
     if (block.type != _TdsBlockType.paragraph) return source;
-    if (!block.shouldIndentFirstLine) return source;
-    return '\u00A0\u00A0\u00A0\u00A0$source';
+    return source;
   }
 
   static pw.Widget _buildMarkdownStyledText(
@@ -302,7 +301,6 @@ class TdsPdfService {
   }
 
   static pw.Widget _buildDisclaimerSection(_PdfFonts fonts) {
-    final hasMultipleParagraphs = _defaultDisclaimer.length >= 2;
     return pw.Padding(
       padding: const pw.EdgeInsets.only(top: 8),
       child: pw.Column(
@@ -314,7 +312,7 @@ class TdsPdfService {
             (line) => pw.Padding(
               padding: const pw.EdgeInsets.only(bottom: 8),
               child: _buildMarkdownStyledText(
-                hasMultipleParagraphs ? '　　$line' : line,
+                line,
                 fonts: fonts,
                 fontSize: 8,
                 lineSpacing: 2,
@@ -420,7 +418,6 @@ class TdsPdfService {
     _TdsSection? current;
     List<List<String>>? collectingTableRows;
     final paragraphBuffer = <String>[];
-    final unorderedParagraphsInSection = <_TdsBlock>[];
     bool skippingMarkdownDisclaimer = false;
 
     void flushTableIfNeeded() {
@@ -435,21 +432,7 @@ class TdsPdfService {
       if (paragraphBuffer.isEmpty) return;
       current ??= _TdsSection(title: '');
       final paragraphText = _mergeWrappedParagraphLines(paragraphBuffer);
-      final isOrderedParagraph = RegExp(r'^((\d+[\.\)、])|([（(]\d+[）)]))\s*').hasMatch(paragraphBuffer.first.trim());
-      final shouldIndentByWrap = paragraphBuffer.length >= 2 || _isLikelyWrappedInPdf(paragraphText, fontSize: 10.5);
-      final paragraphBlock = _TdsBlock.paragraph(
-        paragraphText,
-        shouldIndentFirstLine: !isOrderedParagraph && shouldIndentByWrap,
-      );
-      if (!isOrderedParagraph) {
-        unorderedParagraphsInSection.add(paragraphBlock);
-        if (unorderedParagraphsInSection.length >= 2) {
-          for (final unorderedParagraph in unorderedParagraphsInSection) {
-            unorderedParagraph.shouldIndentFirstLine = true;
-          }
-        }
-      }
-      current!.blocks.add(paragraphBlock);
+      current!.blocks.add(_TdsBlock.paragraph(paragraphText));
       paragraphBuffer.clear();
     }
 
@@ -490,7 +473,6 @@ class TdsPdfService {
 
         if (current != null) sections.add(current!);
         current = _TdsSection(title: heading);
-        unorderedParagraphsInSection.clear();
         continue;
       }
 
@@ -524,10 +506,7 @@ class TdsPdfService {
         flushParagraphIfNeeded();
         current ??= _TdsSection(title: '');
         current!.blocks.add(
-          _TdsBlock.paragraph(
-            _normalizeParagraphSpacing(line),
-            shouldIndentFirstLine: false,
-          ),
+          _TdsBlock.paragraph(_normalizeParagraphSpacing(line)),
         );
         continue;
       }
@@ -611,24 +590,6 @@ class TdsPdfService {
     return normalized;
   }
 
-  static bool _isLikelyWrappedInPdf(String text, {required double fontSize}) {
-    final normalized = text.trim();
-    if (normalized.isEmpty) return false;
-    var visualLength = 0.0;
-    for (final rune in normalized.runes) {
-      final char = String.fromCharCode(rune);
-      if (RegExp(r'\s').hasMatch(char)) {
-        visualLength += 0.3;
-      } else if (RegExp(r'[\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF]').hasMatch(char)) {
-        visualLength += 1.0;
-      } else {
-        visualLength += 0.55;
-      }
-    }
-    final baselineCharsPerLine = fontSize <= 8 ? 60.0 : 50.0;
-    return visualLength > baselineCharsPerLine;
-  }
-
   static Future<pw.Font> _loadFirstAvailableFont({
     required List<String> candidates,
     required Future<pw.Font> Function() fallback,
@@ -689,16 +650,11 @@ class _TdsBlock {
     required this.type,
     this.text,
     this.tableRows,
-    this.shouldIndentFirstLine = false,
   });
 
-  factory _TdsBlock.paragraph(
-    String text, {
-    bool shouldIndentFirstLine = false,
-  }) => _TdsBlock._(
+  factory _TdsBlock.paragraph(String text) => _TdsBlock._(
     type: _TdsBlockType.paragraph,
     text: text,
-    shouldIndentFirstLine: shouldIndentFirstLine,
   );
   factory _TdsBlock.note(String text) => _TdsBlock._(type: _TdsBlockType.note, text: text);
   factory _TdsBlock.table(List<List<String>> rows) => _TdsBlock._(type: _TdsBlockType.table, tableRows: rows);
@@ -706,5 +662,4 @@ class _TdsBlock {
   final _TdsBlockType type;
   final String? text;
   final List<List<String>>? tableRows;
-  bool shouldIndentFirstLine;
 }
