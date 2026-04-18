@@ -68,7 +68,7 @@ class FormulaContentParser {
       if (inFrontmatter || trimmed.isEmpty) continue;
 
       // frontmatter 结束后，单独成行的 wiki 链接通常是跳转辅助信息，不在详情中展示。
-      if (frontmatterEnded && RegExp(r'^\s*\[\[[^\]]+\]\]\s*$').hasMatch(trimmed)) {
+      if (frontmatterEnded && RegExp(r'^\s*(\[\[[^\]]+\]\]\s*)+$').hasMatch(trimmed)) {
         continue;
       }
 

@@ -1076,7 +1076,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   String _removeStandaloneWikiLines(String content) {
     return content
         .split('\n')
-        .where((line) => !RegExp(r'^\s*\[\[[^\]]+\]\]\s*$').hasMatch(line))
+        .where((line) => !RegExp(r'^\s*(\[\[[^\]]+\]\]\s*)+$').hasMatch(line))
         .join('\n');
   }
 
