@@ -453,9 +453,32 @@ class ObsidianDataService {
     }
 
     bool _shouldExcludePudResults(List<String> segmentedKeywords) {
-      const puLockedTerms = <String>{'羟丙', '羟基丙烯酸'};
+      final rawLowerQuery = query.toLowerCase();
       final compact = normalizedQuery.replaceAll(RegExp(r'\s+'), '');
       if (compact.contains('pud')) return false;
+
+      // 仅在“PU 后续已明确不是 D”时排除 PUD：
+      // 1) PU 后还有其他字符（如“pu油性”“pu面漆”）；
+      // 2) 输入以“pu + 空白”结束（如“底漆 pu ”）。
+      final puRegex = RegExp(r'pu');
+      for (final match in puRegex.allMatches(rawLowerQuery)) {
+        final nextIndex = match.end;
+        if (nextIndex < rawLowerQuery.length) {
+          final nextChar = rawLowerQuery[nextIndex];
+          if (nextChar != 'd') {
+            return true;
+          }
+          continue;
+        }
+        if (RegExp(r'pu\s+$').hasMatch(rawLowerQuery)) {
+          return true;
+        }
+      }
+
+      // 兼容历史“PU 同义词”分段（羟丙 / 羟基丙烯酸）的兜底逻辑，
+      // 但仅在原始输入中确实出现 PU 时才生效，避免误伤纯中文检索。
+      if (!rawLowerQuery.contains('pu')) return false;
+      const puLockedTerms = <String>{'羟丙', '羟基丙烯酸'};
       return segmentedKeywords.any(puLockedTerms.contains);
     }
 
