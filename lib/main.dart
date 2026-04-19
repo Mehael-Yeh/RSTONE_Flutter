@@ -216,6 +216,7 @@ class _MainScreenState extends State<MainScreen> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
           if (index == _currentIndex) return;
+          FocusManager.instance.primaryFocus?.unfocus();
           setState(() {
             _currentIndex = index;
             _pageChangeSignal++;
