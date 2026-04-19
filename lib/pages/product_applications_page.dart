@@ -24,15 +24,14 @@ class ProductApplicationsPage extends StatefulWidget {
 
 class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   // 默认列（移动端）
-  static const List<String> _mobileDefaultColumns = ['名称', '基材', '底漆', '中漆', '面漆'];
+  static const List<String> _mobileDefaultColumns = ['名称'， '标签'， '底漆'， '中漆'， '面漆'];
   // 默认列（桌面端）
   static const List<String> _desktopDefaultColumns = [
-    '名称',
-    '基材',
-    '底漆',
-    '中漆',
-    '面漆',
-    '标签',
+    '名称'，
+    '标签'，
+    '底漆'，
+    '中漆'，
+    '面漆'，
   ];
 
   List<String> _columns = [];
@@ -53,7 +52,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   }
 
   void _initColumns() {
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = MediaQuery./(context).size.width < 600;
     final defaults = isMobile ? _mobileDefaultColumns : _desktopDefaultColumns;
     _columns = widget.preferencesService.getApplicationColumns(defaults);
     _sortColumn = widget.preferencesService.getApplicationSort();
