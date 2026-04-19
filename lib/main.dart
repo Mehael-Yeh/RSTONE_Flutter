@@ -106,8 +106,14 @@ class _RstoneAppState extends State<RstoneApp> {
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
+        toolbarHeight: 48,
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: colorScheme.onSurface,
+        ),
       ),
       // Flutter 3.24 使用 CardTheme（而非 CardThemeData）。
       cardTheme: CardTheme(
@@ -121,6 +127,8 @@ class _RstoneAppState extends State<RstoneApp> {
         // 底部导航使用低层级容器色，保证与内容区域层级分离。
         backgroundColor: colorScheme.surfaceContainerLow,
         indicatorColor: colorScheme.secondaryContainer,
+        height: 56,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return TextStyle(
