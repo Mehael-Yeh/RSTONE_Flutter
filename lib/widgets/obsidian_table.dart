@@ -168,6 +168,10 @@ class _ObsidianTableState extends State<ObsidianTable> {
   }
 
   List<String> _buildMobileSubtitleTokens(ProductItem item, Map<String, String> fields) {
+    if (item.folder == '产品列表') {
+      return item.tags;
+    }
+
     if (item.folder == '产品应用') {
       return <String>[
         if ((item.primer ?? '').isNotEmpty) '底: ${item.primer}',
