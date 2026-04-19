@@ -400,7 +400,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ListTile(
                   leading: const Icon(Icons.rule_folder_outlined),
                   title: const Text('查看/编辑规则文档'),
-                  subtitle: const Text('用于搜索同义词扩展，例如 PA6 → 尼龙'),
+                  subtitle: const Text('用于搜索同义词扩展'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _openTagAliasRuleEditor,
                 ),
