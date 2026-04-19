@@ -166,22 +166,55 @@ class _ObsidianTableState extends State<ObsidianTable> {
     return item.tags.any((t) => t.contains('水性'));
   }
 
-  String _buildMobileSubtitle(ProductItem item, Map<String, String> fields) {
+  List<String> _buildMobileSubtitleTokens(ProductItem item, Map<String, String> fields) {
     if (item.folder == '产品应用') {
-      final paints = <String>[
+      return <String>[
         if ((item.primer ?? '').isNotEmpty) '底: ${item.primer}',
         if ((item.midCoat ?? '').isNotEmpty) '中: ${item.midCoat}',
         if ((item.topCoat ?? '').isNotEmpty) '面: ${item.topCoat}',
       ];
-      return paints.join(' ');
     }
 
-    final values = _columns.skip(1).take(4).map((col) {
+    return _columns.skip(1).take(4).map((col) {
       final val = fields[col];
       if (val == null || val.isEmpty) return '';
       return col == '标签' ? val : '$col: $val';
     }).where((text) => text.isNotEmpty);
-    return values.join('  ');
+  }
+
+  Widget _buildMobileSubtitleChips(ProductItem item, Map<String, String> fields) {
+    final parts = _buildMobileSubtitleTokens(item, fields).toList();
+    if (parts.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 22,
+      child: Row(
+        children: [
+          for (int index = 0; index < parts.take(3).length; index++) ...[
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                ),
+                child: Text(
+                  parts[index],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+            if (index < parts.take(3).length - 1) const SizedBox(width: 6),
+          ],
+        ],
+      ),
+    );
   }
 
   String? _tdsOf(ProductItem item) {
@@ -386,15 +419,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                             ),
                             if (_columns.length > 1) ...[
                               const SizedBox(height: 4),
-                              Text(
-                                _buildMobileSubtitle(item, fields),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: cs.onSurfaceVariant,
-                                  fontSize: 12,
-                                ),
-                              ),
+                              _buildMobileSubtitleChips(item, fields),
                             ],
                           ],
                         ),

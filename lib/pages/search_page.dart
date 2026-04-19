@@ -262,8 +262,8 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
         left: Radius.circular(16),
       ),
       child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        margin: const EdgeInsets.only(bottom: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: InkWell(
           onTap: () {
             _searchFocusNode.unfocus();
@@ -274,19 +274,21 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
               tdsContent: widget.dataService.tdsForProduct(item.fileName),
             );
           },
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Container(
-                  // 左侧竖条作为信息类型视觉锚点（产品/应用）。
-                  width: 4,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: tagColor,
-                    borderRadius: BorderRadius.circular(12),
+                Center(
+                  child: Container(
+                    // 左侧竖条作为信息类型视觉锚点（产品/应用）。
+                    width: 4,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: tagColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -317,26 +319,9 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                           ),
                         ],
                       ),
-                      if (item.tags.isNotEmpty) ...[
+                      if (_buildSubtitleParts(item).isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 2,
-                          children: item.tags.take(4).map((tag) {
-                            return Chip(
-                              visualDensity: VisualDensity.compact,
-                              label: Text(tag),
-                              labelStyle: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(color: cs.onSecondaryContainer),
-                              backgroundColor: cs.secondaryContainer,
-                              side: BorderSide(
-                                color: cs.outlineVariant,
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                        _buildSubtitleChips(item),
                       ],
                     ],
                   ),
@@ -349,6 +334,51 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  List<String> _buildSubtitleParts(ProductItem item) {
+    if (item.folder == '产品应用') {
+      return <String>[
+        if ((item.primer ?? '').isNotEmpty) '底: ${item.primer}',
+        if ((item.midCoat ?? '').isNotEmpty) '中: ${item.midCoat}',
+        if ((item.topCoat ?? '').isNotEmpty) '面: ${item.topCoat}',
+      ];
+    }
+    return item.tags.take(4).toList();
+  }
+
+  Widget _buildSubtitleChips(ProductItem item) {
+    final parts = _buildSubtitleParts(item);
+    final cs = Theme.of(context).colorScheme;
+
+    return SizedBox(
+      height: 22,
+      child: Row(
+        children: [
+          for (int index = 0; index < parts.take(3).length; index++) ...[
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: cs.outlineVariant),
+                ),
+                child: Text(
+                  parts[index],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                ),
+              ),
+            ),
+            if (index < parts.take(3).length - 1) const SizedBox(width: 6),
+          ],
+        ],
       ),
     );
   }
