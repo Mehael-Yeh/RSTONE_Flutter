@@ -373,7 +373,8 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _openTagAliasRuleEditor() async {
-    final controller = TextEditingController(text: widget.dataService.tagAliasRulesRaw);
+    final builtInRules = widget.dataService.builtInTagAliasRulesRaw;
+    final controller = TextEditingController(text: widget.dataService.customTagAliasRulesRaw);
     final saved = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -385,8 +386,31 @@ class _SettingsPageState extends State<SettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '每行一条规则：左侧是可匹配标签（可用“、”分隔多个），右侧是扩展词。\n格式示例：PA、PA6、PA66 -> 尼龙',
+                '内置规则已写入应用，不再接受软件外部文件修改。\n你可以在这里新增规则（会持久化保存）。\n每行一条规则：左侧是可匹配标签（可用“、”分隔多个），右侧是扩展词。\n格式示例：PA、PA6、PA66 -> 尼龙',
                 style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: EdgeInsets.zero,
+                title: const Text('查看内置规则（只读）'),
+                children: [
+                  Container(
+                    width: double.infinity,
+                    constraints: const BoxConstraints(maxHeight: 180),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: SingleChildScrollView(
+                      child: SelectableText(
+                        builtInRules.trim().isEmpty ? '（暂无内置规则）' : builtInRules,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               TextField(
@@ -395,6 +419,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 minLines: 12,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
+                  labelText: '新增自定义规则',
                   hintText: '# 支持注释行\nPA、PA6、PA66 -> 尼龙',
                 ),
               ),
@@ -418,7 +443,7 @@ class _SettingsPageState extends State<SettingsPage> {
     await widget.dataService.saveTagAliasRules(controller.text);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('标签规则已保存，搜索将立即生效')),
+      const SnackBar(content: Text('新增标签规则已保存，搜索将立即生效')),
     );
   }
 
