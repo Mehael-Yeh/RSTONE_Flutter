@@ -1,3 +1,5 @@
+/// 全局搜索页面，支持产品、应用和标签联动检索。
+
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';

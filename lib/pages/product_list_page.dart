@@ -1,3 +1,5 @@
+/// 产品列表主页，支持筛选、收藏与详情入口。
+
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
