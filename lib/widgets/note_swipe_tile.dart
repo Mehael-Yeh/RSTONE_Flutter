@@ -1,3 +1,5 @@
+/// 可侧滑的笔记条目组件，支持编辑与删除动作。
+
 import 'package:flutter/material.dart';
 
 typedef NoteTapCallback = Future<void> Function();

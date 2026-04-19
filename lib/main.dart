@@ -1,3 +1,5 @@
+/// 应用入口与全局主题/数据服务初始化。
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'services/obsidian_data_service.dart';

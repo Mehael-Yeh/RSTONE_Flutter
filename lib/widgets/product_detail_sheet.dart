@@ -1,3 +1,5 @@
+/// 产品详情底部弹层，整合 Markdown、配方表与 TDS 预览。
+
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -82,6 +84,14 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   bool _isRasterizingPdf = false;
   final TransformationController _pdfTransformationController = TransformationController();
   bool _isSyncingPdfTransform = false;
+  final ValueNotifier<int> _pdfPreviewVersion = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    _pdfTransformationController.dispose();
+    _pdfPreviewVersion.dispose();
+    super.dispose();
+  }
 
   void _resetPdfPreviewTransform() {
     if (_isSyncingPdfTransform) return;
@@ -98,10 +108,28 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       _singlePageHeightRatio = null;
       _resetPdfPreviewTransform();
     });
+    _pdfPreviewVersion.value++;
 
     final pages = <Uint8List>[];
     await for (final page in Printing.raster(pdfBytes, dpi: 160)) {
-      pages.add(await page.toPng());
+      final pageBytes = await page.toPng();
+      pages.add(pageBytes);
+
+      // 首屏优先：先展示第一页，减少用户感知等待时间。
+      if (pages.length == 1) {
+        final firstPageImage = await _decodeImage(pageBytes);
+        final firstPageHeightRatio = firstPageImage.height / firstPageImage.width;
+        firstPageImage.dispose();
+
+        if (!mounted) return;
+        setState(() {
+          _pdfLongImage = pageBytes;
+          _pdfPageCount = 1;
+          _singlePageHeightRatio = firstPageHeightRatio;
+          _isRasterizingPdf = false;
+        });
+        _pdfPreviewVersion.value++;
+      }
     }
 
     double? singlePageHeightRatio;
@@ -122,6 +150,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       _singlePageHeightRatio = singlePageHeightRatio;
       _isRasterizingPdf = false;
     });
+    _pdfPreviewVersion.value++;
   }
 
   Future<ui.Image> _decodeImage(Uint8List bytes) async {
@@ -294,8 +323,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         widget.product,
         tdsMarkdown: widget.tdsContent!,
       );
-      await _preparePdfPreview(pdfBytes);
       if (!mounted) return;
+      final previewTask = _preparePdfPreview(pdfBytes);
       await showDialog<void>(
         context: context,
         builder: (dialogContext) {
@@ -322,27 +351,35 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               child: Container(
                 color: Colors.white,
                 padding: EdgeInsets.zero,
-                child: _isRasterizingPdf
-                    ? const Center(child: CircularProgressIndicator())
-                    : _pdfLongImage == null
-                        ? Center(
-                            child: Text(
-                              'PDF 预览加载失败',
-                              style: Theme.of(dialogContext).textTheme.bodyLarge?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                          )
-                        : LayoutBuilder(
-                            builder: (context, constraints) {
-                              return _buildPdfPreviewViewer(constraints);
-                            },
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _pdfPreviewVersion,
+                  builder: (context, _, __) {
+                    if (_isRasterizingPdf && _pdfLongImage == null) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (_pdfLongImage == null) {
+                      return Center(
+                        child: Text(
+                          'PDF 预览加载失败',
+                          style: Theme.of(dialogContext).textTheme.bodyLarge?.copyWith(
+                            color: cs.onSurfaceVariant,
                           ),
+                        ),
+                      );
+                    }
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        return _buildPdfPreviewViewer(constraints);
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           );
         },
       );
+      await previewTask;
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
