@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/product_item.dart';
@@ -128,6 +129,20 @@ PEEK -> 聚醚醚酮
     }
   }
 
+  Future<Directory?> _getPrivateDataDirectory() async {
+    if (kIsWeb) return null;
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      return Directory('${appDir.path}/rst_data');
+    } on MissingPluginException catch (e) {
+      _addLog('DataService: Private dir plugin unavailable: $e');
+      return null;
+    } catch (e) {
+      _addLog('DataService: Failed to resolve private dir: $e');
+      return null;
+    }
+  }
+
   /// 初始化数据加载
   /// 
   /// 加载顺序：
@@ -152,9 +167,10 @@ PEEK -> 聚醚醚酮
       // 第二步：如果Asset加载失败，从私有目录加载
       if (_products.isEmpty && _applications.isEmpty) {
         _addLog('DataService: Asset load failed, trying private directory...');
-        final appDir = await getApplicationDocumentsDirectory();
-        final dataDir = Directory('${appDir.path}/rst_data');
-        await _loadFromPrivateDir(dataDir);
+        final dataDir = await _getPrivateDataDirectory();
+        if (dataDir != null) {
+          await _loadFromPrivateDir(dataDir);
+        }
         _addLog('DataService: Private dir load complete. Products: ${_products.length}, Applications: ${_applications.length}');
       }
       
@@ -164,9 +180,10 @@ PEEK -> 聚醚醚酮
       } else {
         // 复制到私有目录以便后续使用
         _addLog('DataService: Copying data to private directory...');
-        final appDir = await getApplicationDocumentsDirectory();
-        final dataDir = Directory('${appDir.path}/rst_data');
-        await _copyAssetsToPrivateDir(dataDir);
+        final dataDir = await _getPrivateDataDirectory();
+        if (dataDir != null) {
+          await _copyAssetsToPrivateDir(dataDir);
+        }
       }
       
       _initialized = true;
@@ -315,9 +332,8 @@ PEEK -> 聚醚醚酮
     _builtInTagAliasRulesRaw = _builtInTagAliasRulesDefault;
     _addLog('DataService: Loaded built-in tag alias rules from source code');
 
-    try {
-      final appDir = await getApplicationDocumentsDirectory();
-      final dataDir = Directory('${appDir.path}/rst_data');
+    final dataDir = await _getPrivateDataDirectory();
+    if (dataDir != null) {
       final customRuleFile = File('${dataDir.path}/$_tagAliasCustomRulesFileName');
 
       if (await customRuleFile.exists()) {
@@ -328,8 +344,8 @@ PEEK -> 聚醚醚酮
           _addLog('DataService: Failed to read custom tag alias rules: $e');
         }
       }
-    } catch (e) {
-      _addLog('DataService: Private dir unavailable for custom tag alias rules: $e');
+    } else {
+      _addLog('DataService: Private dir unavailable for custom tag alias rules');
     }
 
     _tagAliasRules = _parseTagAliasRules(_builtInTagAliasRulesRaw);
@@ -341,8 +357,11 @@ PEEK -> 聚醚醚酮
 
   /// 保存用户新增标签同义词规则到私有目录，并更新内存映射。
   Future<void> saveTagAliasRules(String rawContent) async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final dataDir = Directory('${appDir.path}/rst_data');
+    final dataDir = await _getPrivateDataDirectory();
+    if (dataDir == null) {
+      _addLog('DataService: Skip saving custom tag alias rules on this platform');
+      return;
+    }
     await dataDir.create(recursive: true);
     final customRuleFile = File('${dataDir.path}/$_tagAliasCustomRulesFileName');
     await customRuleFile.writeAsString(rawContent);
@@ -710,9 +729,8 @@ PEEK -> 聚醚醚酮
   Future<void> clearData() async {
     _addLog('DataService: Clearing data');
     try {
-      final appDir = await getApplicationDocumentsDirectory();
-      final dataDir = Directory('${appDir.path}/rst_data');
-      if (await dataDir.exists()) {
+      final dataDir = await _getPrivateDataDirectory();
+      if (dataDir != null && await dataDir.exists()) {
         await dataDir.delete(recursive: true);
       }
       _products.clear();
