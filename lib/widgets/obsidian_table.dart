@@ -432,30 +432,47 @@ class _ObsidianTableState extends State<ObsidianTable> {
                             },
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
+                              child: Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
                                       col,
+                                      textAlign: TextAlign.center,
                                       style: TextStyle(
                                         color: isSorted ? cs.primary : cs.onSurface,
                                         fontWeight: FontWeight.w600,
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
-                                  if (isSorted)
-                                    Icon(
-                                      widget.sortDescending
-                                          ? Icons.arrow_downward
-                                          : Icons.arrow_upward,
-                                      size: 14,
-                                      color: cs.primary,
-                                    ),
-                                ],
+                                    if (isSorted) ...[
+                                      const SizedBox(width: 4),
+                                      Icon(
+                                        widget.sortDescending
+                                            ? Icons.arrow_downward
+                                            : Icons.arrow_upward,
+                                        size: 14,
+                                        color: cs.primary,
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
+                          if (index < _columns.length - 1)
+                            Positioned(
+                              right: 4,
+                              top: 0,
+                              bottom: 0,
+                              child: IgnorePointer(
+                                child: Icon(
+                                  Icons.drag_indicator,
+                                  size: 14,
+                                  color: cs.outline.withOpacity(0.7),
+                                ),
+                              ),
+                            ),
                           if (index < _columns.length - 1)
                             Positioned(
                               right: -4,
