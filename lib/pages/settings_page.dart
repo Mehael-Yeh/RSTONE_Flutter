@@ -457,7 +457,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ListTile(
                   leading: const Icon(Icons.file_download_outlined),
                   title: const Text('导出产品笔记'),
-                  subtitle: const Text('导出 Md 文件用于提报（长按可复制）'),
+                  subtitle: const Text('导出文件用于反馈（长按可复制）'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _exportProductNotes,
                   onLongPress: _copyProductNotesMarkdownToClipboard,
