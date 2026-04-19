@@ -51,22 +51,18 @@ class CompactTokenRow extends StatelessWidget {
           child: Row(
             children: [
               for (int index = 0; index < visible.length; index++) ...[
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: cs.outlineVariant),
-                    ),
-                    child: Text(
-                      visible[index],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      softWrap: false,
-                      style: chipTextStyle,
-                    ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: cs.outlineVariant),
+                  ),
+                  child: Text(
+                    visible[index],
+                    maxLines: 1,
+                    softWrap: false,
+                    style: chipTextStyle,
                   ),
                 ),
                 if (index < visible.length - 1) const SizedBox(width: 6),

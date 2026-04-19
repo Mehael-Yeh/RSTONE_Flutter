@@ -11,7 +11,6 @@ class SwipeNoteItemCard extends StatelessWidget {
   final VoidCallback onTap;
   final NoteTapCallback onNoteTap;
   final int noteResetSignal;
-  final Widget? headerTrailing;
   final TextStyle? titleStyle;
 
   const SwipeNoteItemCard({
@@ -22,7 +21,6 @@ class SwipeNoteItemCard extends StatelessWidget {
     required this.onTap,
     required this.onNoteTap,
     required this.noteResetSignal,
-    this.headerTrailing,
     this.titleStyle,
   });
 
@@ -79,10 +77,6 @@ class SwipeNoteItemCard extends StatelessWidget {
                                         ),
                               ),
                             ),
-                            if (headerTrailing != null) ...[
-                              const SizedBox(width: 8),
-                              headerTrailing!,
-                            ],
                           ],
                         ),
                         if (subtitleTokens.isNotEmpty) ...[
