@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
 import 'dart:io';
 import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
@@ -35,6 +37,7 @@ class _SettingsPageState extends State<SettingsPage> {
   static final Uri _webAppUrl = Uri.parse('https://mehael-yeh.github.io/RSTONE_Flutter/');
   static final Uri _releaseUrl = Uri.parse('https://github.com/Mehael-Yeh/RSTONE_Flutter/releases');
   String _appVersion = '...';
+  String _appVersionName = '0.0.0';
   late ThemeMode _selectedThemeMode;
   late Color _selectedThemeSeedColor;
   static const List<Color> _presetThemeColors = <Color>[
@@ -69,7 +72,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     // CI 注入的标准格式：YYYYMMDDHHMM
     if (RegExp(r'^\d{12}$').hasMatch(value)) {
-      return '${value.substring(0, 8)} ${value.substring(8, 10)}:${value.substring(10, 12)} UTC+08';
+      return '${value.substring(0, 8)} ${value.substring(8, 10)}:${value.substring(10, 12)}';
     }
 
     // 兼容纯日期：YYYYMMDD
@@ -88,7 +91,7 @@ class _SettingsPageState extends State<SettingsPage> {
           final d = maybeEpochMinutes.day.toString().padLeft(2, '0');
           final hh = maybeEpochMinutes.hour.toString().padLeft(2, '0');
           final mm = maybeEpochMinutes.minute.toString().padLeft(2, '0');
-          return '$y$m$d $hh:$mm UTC+08';
+          return '$y$m$d $hh:$mm';
         }
       } catch (_) {
         // Ignore and continue to legacy parsing.
@@ -103,10 +106,19 @@ class _SettingsPageState extends State<SettingsPage> {
     final buildTime = buildTimeFromDefine.trim().isNotEmpty
         ? _formatBuildTimeLabel(buildTimeFromDefine)
         : pkg.buildNumber.trim();
-    final displayVersion = buildTime.isNotEmpty
-        ? 'v${pkg.version} ($buildTime)'
+    final normalizedBuildTime = buildTime
+        .replaceAll('UTC+08', '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final displayVersion = normalizedBuildTime.isNotEmpty
+        ? 'v${pkg.version} ($normalizedBuildTime)'
         : 'v${pkg.version}';
-    if (mounted) setState(() => _appVersion = displayVersion);
+    if (mounted) {
+      setState(() {
+        _appVersion = displayVersion;
+        _appVersionName = pkg.version;
+      });
+    }
   }
 
   Future<void> _onThemeChanged(ThemeMode mode) async {
@@ -475,6 +487,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       MaterialPageRoute(
                         builder: (context) => AboutDetailPage(
                           appVersion: _appVersion,
+                          appVersionName: _appVersionName,
                           projectUrl: _projectUrl,
                           webAppUrl: _webAppUrl,
                           releaseUrl: _releaseUrl,
@@ -718,6 +731,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
 class AboutDetailPage extends StatelessWidget {
   final String appVersion;
+  final String appVersionName;
   final Uri projectUrl;
   final Uri webAppUrl;
   final Uri releaseUrl;
@@ -725,49 +739,148 @@ class AboutDetailPage extends StatelessWidget {
   const AboutDetailPage({
     super.key,
     required this.appVersion,
+    required this.appVersionName,
     required this.projectUrl,
     required this.webAppUrl,
     required this.releaseUrl,
   });
 
-  void _copyText(BuildContext context, String value, String label) {
-    Clipboard.setData(ClipboardData(text: value));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label 已复制到剪贴板')),
-    );
+  Future<void> _openExternalUrl(BuildContext context, Uri uri) async {
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('无法打开链接：$uri')),
+      );
+    }
   }
 
-  Future<void> _shareLink(String title, Uri uri) async {
-    await Share.share('${title}：$uri');
+  Future<void> _confirmAndOpenUrl(BuildContext context, String title, Uri uri) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('打开$title'),
+        content: Text('即将跳转到外部浏览器：\n$uri\n\n是否继续？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('继续')),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      await _openExternalUrl(context, uri);
+    }
+  }
+
+  List<int> _parseVersionParts(String raw) {
+    final match = RegExp(r'(\d+(?:\.\d+)+)').firstMatch(raw);
+    if (match == null) return [0];
+    return match.group(1)!.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+  }
+
+  int _compareVersions(String a, String b) {
+    final aParts = _parseVersionParts(a);
+    final bParts = _parseVersionParts(b);
+    final maxLength = aParts.length > bParts.length ? aParts.length : bParts.length;
+    for (int i = 0; i < maxLength; i++) {
+      final av = i < aParts.length ? aParts[i] : 0;
+      final bv = i < bParts.length ? bParts[i] : 0;
+      if (av != bv) return av.compareTo(bv);
+    }
+    return 0;
+  }
+
+  Future<Map<String, dynamic>?> _fetchLatestStableRelease() async {
+    final client = HttpClient();
+    try {
+      final req = await client.getUrl(
+        Uri.parse('https://api.github.com/repos/Mehael-Yeh/RSTONE_Flutter/releases/latest'),
+      );
+      req.headers.set(HttpHeaders.acceptHeader, 'application/vnd.github+json');
+      req.headers.set(HttpHeaders.userAgentHeader, 'RSTONE-Flutter-App');
+      final resp = await req.close();
+      if (resp.statusCode != 200) return null;
+      final body = await utf8.decoder.bind(resp).join();
+      final data = jsonDecode(body);
+      if (data is Map<String, dynamic>) return data;
+      return null;
+    } catch (_) {
+      return null;
+    } finally {
+      client.close(force: true);
+    }
   }
 
   Future<void> _checkForUpdate(BuildContext context) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            SizedBox(width: 12),
+            Expanded(child: Text('正在检查更新...')),
+          ],
+        ),
+      ),
+    );
+    final releaseData = await _fetchLatestStableRelease();
+    if (context.mounted) Navigator.pop(context);
+    if (releaseData == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('检查更新失败，请稍后重试')),
+        );
+      }
+      return;
+    }
+
+    final latestTag = (releaseData['tag_name'] as String? ?? '').trim();
+    final latestUrl = (releaseData['html_url'] as String? ?? '').trim();
+    final latestName = (releaseData['name'] as String? ?? '').trim();
+    final latestVersion = latestTag.isNotEmpty ? latestTag : latestName;
+    final hasNewVersion = _compareVersions(latestVersion, appVersionName) > 0;
+
+    if (!context.mounted) return;
+    if (!hasNewVersion) {
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('检查更新'),
+          content: Text('当前已是最新正式版。\n当前版本：$appVersionName'),
+          actions: [
+            FilledButton(onPressed: () => Navigator.pop(context), child: const Text('知道了')),
+          ],
+        ),
+      );
+      return;
+    }
+
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('检查更新'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('当前版本：$appVersion'),
-            const SizedBox(height: 8),
-            const Text('请通过项目发布页查看最新版本与更新日志。'),
-            const SizedBox(height: 8),
-            SelectableText(releaseUrl.toString()),
-          ],
+        title: const Text('发现新版本'),
+        content: Text(
+          '当前版本：$appVersionName\n最新正式版：$latestVersion\n\n是否前往下载页面？',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: const Text('稍后'),
           ),
           FilledButton(
             onPressed: () async {
-              _copyText(context, releaseUrl.toString(), '发布页地址');
               Navigator.pop(context);
+              final target = latestUrl.isNotEmpty ? Uri.parse(latestUrl) : releaseUrl;
+              if (context.mounted) {
+                await _openExternalUrl(context, target);
+              }
             },
-            child: const Text('复制发布页地址'),
+            child: const Text('前往下载'),
           ),
         ],
       ),
@@ -789,22 +902,8 @@ class AboutDetailPage extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Wrap(
-        spacing: 4,
-        children: [
-          IconButton(
-            tooltip: '复制链接',
-            onPressed: () => _copyText(context, uri.toString(), title),
-            icon: const Icon(Icons.copy_outlined, size: 20),
-          ),
-          IconButton(
-            tooltip: '分享链接',
-            onPressed: () => _shareLink(title, uri),
-            icon: const Icon(Icons.share_outlined, size: 20),
-          ),
-        ],
-      ),
-      onTap: () => _copyText(context, uri.toString(), title),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => _confirmAndOpenUrl(context, title, uri),
     );
   }
 
