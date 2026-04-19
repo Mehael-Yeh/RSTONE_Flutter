@@ -178,6 +178,7 @@ class _ProductListPageState extends State<ProductListPage> {
               formulas: widget.dataService.formulas,
               tdsByProduct: widget.dataService.tdsByProduct,
               defaultColumns: _columns,
+              availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
               isMobile: isMobile,
               onColumnsChanged: _onColumnsChanged,
               onSortChanged: _onSortChanged,
