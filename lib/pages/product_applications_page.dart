@@ -55,6 +55,10 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     final isMobile = MediaQuery.of(context).size.width < 600;
     final defaults = isMobile ? _mobileDefaultColumns : _desktopDefaultColumns;
     _columns = widget.preferencesService.getApplicationColumns(defaults);
+    _columns = _columns.where(defaults.contains).toList();
+    if (_columns.isEmpty) {
+      _columns = List.from(defaults);
+    }
     _sortColumn = widget.preferencesService.getApplicationSort();
     _sortDescending = widget.preferencesService.getApplicationSortDesc();
   }
