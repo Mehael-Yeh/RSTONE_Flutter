@@ -19,8 +19,8 @@ class NoteSwipeTile extends StatefulWidget {
     this.resetSignal = 0,
     this.noteButtonInsets = EdgeInsets.zero,
     this.noteButtonBorderRadius = BorderRadius.zero,
-    this.noteButtonWidthFactor = 0.2,
-    this.noteButtonRightOverlap = 12,
+    this.noteButtonWidthFactor = 0.17,
+    this.noteButtonRightOverlap = 10,
   });
 
   @override
@@ -83,8 +83,8 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
         final availableWidth = (constraints.maxWidth - widget.noteButtonInsets.horizontal)
             .clamp(0.0, double.infinity)
             .toDouble();
-        final revealWidth = (availableWidth * widget.noteButtonWidthFactor).clamp(56.0, 120.0).toDouble();
-        final buttonWidth = (revealWidth + widget.noteButtonRightOverlap).clamp(revealWidth, 140.0).toDouble();
+        final revealWidth = (availableWidth * widget.noteButtonWidthFactor).clamp(52.0, 108.0).toDouble();
+        final buttonWidth = (revealWidth + widget.noteButtonRightOverlap).clamp(revealWidth, 132.0).toDouble();
 
         return Stack(
           children: [
@@ -98,7 +98,10 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
                     height: double.infinity,
                     child: FilledButton(
                       onPressed: _handleNoteTap,
-                      child: const Icon(Icons.note_alt_outlined, size: 20),
+                      child: Transform.translate(
+                        offset: Offset(-2, 0),
+                        child: Icon(Icons.note_alt_outlined, size: 24),
+                      ),
                       style: FilledButton.styleFrom(
                         backgroundColor: cs.primaryContainer,
                         foregroundColor: cs.onPrimaryContainer,
@@ -181,8 +184,12 @@ class _NoteEditorDialogState extends State<NoteEditorDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('笔记 - ${widget.title}'),
-      contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      title: Text(
+        '笔记 - ${widget.title}',
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 16),
+      ),
+      titlePadding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+      contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       actionsPadding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       content: SizedBox(
         width: 460,
