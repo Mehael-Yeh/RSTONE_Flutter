@@ -345,13 +345,37 @@ class _SettingsPageState extends State<SettingsPage> {
             title: '数据统计',
             child: Column(
               children: [
-                _buildInfoTile(icon: Icons.inventory_2, title: '产品数量', value: '${widget.dataService.products.length}'),
-                _buildInfoTile(icon: Icons.apps, title: '应用数量', value: '${widget.dataService.applications.length}'),
-                _buildInfoTile(icon: Icons.description, title: 'TDS数量', value: '${widget.dataService.tdsByProduct.length}'),
-                _buildInfoTile(
-                  icon: Icons.pie_chart,
-                  title: 'TDS覆盖率',
-                  value: '$coveredProducts/$totalProducts ($coveragePercent%)',
+                ListTile(
+                  leading: const Icon(Icons.inventory_2),
+                  title: const Text('产品数量'),
+                  trailing: Text(
+                    '${widget.dataService.products.length}',
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.apps),
+                  title: const Text('应用数量'),
+                  trailing: Text(
+                    '${widget.dataService.applications.length}',
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.description),
+                  title: const Text('TDS数量'),
+                  trailing: Text(
+                    '${widget.dataService.tdsByProduct.length}',
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.pie_chart),
+                  title: const Text('TDS覆盖率'),
+                  trailing: Text(
+                    '$coveredProducts/$totalProducts ($coveragePercent%)',
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
                 ),
               ],
             ),
