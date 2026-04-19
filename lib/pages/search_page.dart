@@ -175,7 +175,8 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                 focusNode: _searchFocusNode,
                 onTapOutside: (_) => _searchFocusNode.unfocus(),
                 decoration: InputDecoration(
-                  hintText: '搜索产品、标签...',
+                  // Web 端聚焦时偶发 hint 重影，聚焦后隐藏占位符可规避双层绘制观感。
+                  hintText: _searchFocusNode.hasFocus ? null : '搜索产品、标签...',
                   hintStyle: TextStyle(
                     color: _searchFocusNode.hasFocus
                         ? cs.onSurfaceVariant.withOpacity(0.55)
