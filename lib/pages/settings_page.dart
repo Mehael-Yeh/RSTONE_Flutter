@@ -1,5 +1,7 @@
 /// 设置中心页面：主题、数据同步、备份恢复与入口导航。
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';

@@ -132,52 +132,34 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
-              child: SizedBox(
-                height: 40,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Text(
-                      'RSTONE',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: IconButton.filledTonal(
-                        onPressed: () {
-                          _searchFocusNode.unfocus();
-                          ProductDetailSheet.hideIfOpen(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SettingsPage(
-                                dataService: widget.dataService,
-                                preferencesService: widget.preferencesService,
-                                themeMode: widget.themeMode,
-                                onThemeModeChanged: widget.onThemeModeChanged,
-                                themeSeedColor: widget.themeSeedColor,
-                                onThemeSeedColorChanged: widget.onThemeSeedColorChanged,
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.settings_outlined, size: 20),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  ],
+      appBar: AppBar(
+        title: const Text('RSTONE'),
+        actions: [
+          IconButton(
+            onPressed: () {
+              _searchFocusNode.unfocus();
+              ProductDetailSheet.hideIfOpen(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsPage(
+                    dataService: widget.dataService,
+                    preferencesService: widget.preferencesService,
+                    themeMode: widget.themeMode,
+                    onThemeModeChanged: widget.onThemeModeChanged,
+                    themeSeedColor: widget.themeSeedColor,
+                    onThemeSeedColorChanged: widget.onThemeSeedColorChanged,
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: '设置',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
               child: TextField(
@@ -244,7 +226,6 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                   : _buildIdleState(),
             ),
           ],
-        ),
       ),
     );
   }
