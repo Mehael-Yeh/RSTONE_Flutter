@@ -1,3 +1,5 @@
+/// 紧凑标签行组件，用于展示可折叠 token 列表。
+
 import 'package:flutter/material.dart';
 
 /// 单行紧凑标签行：每个 token 使用独立圆角矩形包裹。
