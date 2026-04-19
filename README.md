@@ -173,7 +173,7 @@ flutter build apk --release --split-per-abi
 - 触发：`push main` 或手动触发
 - 产物：`flutter build web --release` 后自动发布到 GitHub Pages
 - 路由基路径：自动使用 `/<仓库名>/`，适配 Project Pages
-- 若仓库暂未提交 `web/` 目录，工作流会自动执行 `flutter create --platforms=web .` 生成后再构建
+- 若仓库暂未提交 `web/` 目录，工作流会自动读取 `pubspec.yaml` 的 `name` 并执行 `flutter create --platforms=web --project-name <name> .`，避免仓库名含大写时创建失败
 
 #### 启用步骤
 1. 进入 GitHub 仓库 `Settings -> Pages`
