@@ -17,6 +17,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      PRIVATE_REPO_READ_TOKEN: ${{ secrets.PRIVATE_REPO_READ_TOKEN }}
 
     steps:
       - name: Checkout
@@ -34,21 +36,21 @@ jobs:
         run: flutter pub get
 
       - name: Checkout private repo Rstone
-        if: ${{ secrets.PRIVATE_REPO_READ_TOKEN != '' }}
+        if: ${{ env.PRIVATE_REPO_READ_TOKEN != '' }}
         uses: actions/checkout@v4
         with:
           repository: Mehael-Yeh/Rstone
-          token: ${{ secrets.PRIVATE_REPO_READ_TOKEN }}
+          token: ${{ env.PRIVATE_REPO_READ_TOKEN }}
           path: external/rstone_data
           fetch-depth: 1
           persist-credentials: false
 
       - name: Checkout private repo RstoneTDS
-        if: ${{ secrets.PRIVATE_REPO_READ_TOKEN != '' }}
+        if: ${{ env.PRIVATE_REPO_READ_TOKEN != '' }}
         uses: actions/checkout@v4
         with:
           repository: Mehael-Yeh/RstoneTDS
-          token: ${{ secrets.PRIVATE_REPO_READ_TOKEN }}
+          token: ${{ env.PRIVATE_REPO_READ_TOKEN }}
           path: external/rstone_tds_data
           fetch-depth: 1
           persist-credentials: false
@@ -57,7 +59,7 @@ jobs:
         run: |
           mkdir -p assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
 
-          if [ -n "${{ secrets.PRIVATE_REPO_READ_TOKEN }}" ] && [ -d external/rstone_data ] && [ -d external/rstone_tds_data ]; then
+          if [ -n "$PRIVATE_REPO_READ_TOKEN" ] && [ -d external/rstone_data ] && [ -d external/rstone_tds_data ]; then
             rm -rf assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
             mkdir -p assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
 
