@@ -1,3 +1,5 @@
+/// Obsidian 风格表格组件，支持多行头与横向滚动。
+
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
 import '../services/preferences_service.dart';
