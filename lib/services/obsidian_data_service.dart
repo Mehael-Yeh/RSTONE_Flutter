@@ -1,3 +1,5 @@
+/// Obsidian 数据聚合服务，负责索引、搜索与缓存管理。
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';

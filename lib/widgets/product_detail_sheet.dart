@@ -1,3 +1,5 @@
+/// 产品详情底部弹层，整合 Markdown、配方表与 TDS 预览。
+
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';

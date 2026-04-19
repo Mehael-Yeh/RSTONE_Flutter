@@ -1,3 +1,5 @@
+/// 产品应用列表页面，按场景展示配方与说明。
+
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
