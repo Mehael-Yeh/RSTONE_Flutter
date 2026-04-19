@@ -4,6 +4,7 @@ import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
 import '../widgets/note_swipe_tile.dart';
 import '../widgets/product_detail_sheet.dart';
+import '../widgets/swipe_note_item_card.dart';
 import 'settings_page.dart';
 
 class SearchPage extends StatefulWidget {
@@ -201,7 +202,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                   ? _results.isEmpty
                       ? _buildEmptyState()
                       : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding: EdgeInsets.zero,
                           itemCount: _results.length,
                           itemBuilder: (context, index) => _buildResultItem(_results[index]),
                         )
@@ -254,85 +255,28 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     final isProductList = item.folder == '产品列表';
     final tagColor = isProductList ? cs.primary : cs.tertiary;
 
-    return NoteSwipeTile(
+    return SwipeNoteItemCard(
+      title: item.displayName,
+      subtitleTokens: _buildSubtitleParts(item),
+      indicatorColor: tagColor,
+      onTap: () {
+        _searchFocusNode.unfocus();
+        ProductDetailSheet.show(
+          context,
+          item,
+          formulas: widget.dataService.formulas,
+          tdsContent: widget.dataService.tdsForProduct(item.fileName),
+        );
+      },
       onNoteTap: () => _openNoteEditor(item),
-      resetSignal: _noteResetSignal,
-      noteButtonInsets: const EdgeInsets.only(bottom: 10),
-      noteButtonBorderRadius: const BorderRadius.horizontal(
-        left: Radius.circular(16),
-      ),
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        child: InkWell(
-          onTap: () {
-            _searchFocusNode.unfocus();
-            ProductDetailSheet.show(
-              context,
-              item,
-              formulas: widget.dataService.formulas,
-              tdsContent: widget.dataService.tdsForProduct(item.fileName),
-            );
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Center(
-                  child: Container(
-                    // 左侧竖条作为信息类型视觉锚点（产品/应用）。
-                    width: 4,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: tagColor,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              item.displayName,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                          ),
-                          Chip(
-                            visualDensity: VisualDensity.compact,
-                            label: Text(isProductList ? '产品' : '应用'),
-                            labelStyle: Theme.of(context).textTheme.labelSmall,
-                            backgroundColor: tagColor.withOpacity(0.14),
-                            side: BorderSide(
-                              color: tagColor.withOpacity(0.35),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_buildSubtitleParts(item).isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        _buildSubtitleChips(item),
-                      ],
-                    ],
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.only(top: 2),
-                  child: Icon(Icons.chevron_right),
-                ),
-              ],
-            ),
-          ),
+      noteResetSignal: _noteResetSignal,
+      headerTrailing: Chip(
+        visualDensity: VisualDensity.compact,
+        label: Text(isProductList ? '产品' : '应用'),
+        labelStyle: Theme.of(context).textTheme.labelSmall,
+        backgroundColor: tagColor.withOpacity(0.14),
+        side: BorderSide(
+          color: tagColor.withOpacity(0.35),
         ),
       ),
     );
@@ -347,40 +291,6 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
       ];
     }
     return item.tags.take(4).toList();
-  }
-
-  Widget _buildSubtitleChips(ProductItem item) {
-    final parts = _buildSubtitleParts(item);
-    final cs = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      height: 22,
-      child: Row(
-        children: [
-          for (int index = 0; index < parts.take(3).length; index++) ...[
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: cs.outlineVariant),
-                ),
-                child: Text(
-                  parts[index],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                ),
-              ),
-            ),
-            if (index < parts.take(3).length - 1) const SizedBox(width: 6),
-          ],
-        ],
-      ),
-    );
   }
 
 }

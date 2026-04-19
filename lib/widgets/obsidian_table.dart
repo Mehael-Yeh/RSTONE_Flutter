@@ -3,6 +3,7 @@ import '../models/product_item.dart';
 import '../services/preferences_service.dart';
 import 'note_swipe_tile.dart';
 import 'product_detail_sheet.dart';
+import 'swipe_note_item_card.dart';
 
 /// Obsidian 风格的表格组件，支持列拖拽重排和排序
 class ObsidianTable extends StatefulWidget {
@@ -179,44 +180,18 @@ class _ObsidianTableState extends State<ObsidianTable> {
     for (final col in _columns.skip(1).take(4)) {
       final val = fields[col];
       if (val == null || val.isEmpty) continue;
-      tokens.add(col == '标签' ? val : '$col: $val');
+      if (col == '标签') {
+        tokens.addAll(
+          val
+              .split(RegExp(r'\s*[,，]\s*'))
+              .map((tag) => tag.trim())
+              .where((tag) => tag.isNotEmpty),
+        );
+        continue;
+      }
+      tokens.add('$col: $val');
     }
     return tokens;
-  }
-
-  Widget _buildMobileSubtitleChips(ProductItem item, Map<String, String> fields) {
-    final parts = _buildMobileSubtitleTokens(item, fields).toList();
-    if (parts.isEmpty) return const SizedBox.shrink();
-
-    return SizedBox(
-      height: 22,
-      child: Row(
-        children: [
-          for (int index = 0; index < parts.take(3).length; index++) ...[
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                ),
-                child: Text(
-                  parts[index],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
-            if (index < parts.take(3).length - 1) const SizedBox(width: 6),
-          ],
-        ],
-      ),
-    );
   }
 
   String? _tdsOf(ProductItem item) {
@@ -368,72 +343,24 @@ class _ObsidianTableState extends State<ObsidianTable> {
           final item = sortedItems[index];
           final fields = item.getTableFields();
 
-          return NoteSwipeTile(
-            onNoteTap: () => _openNoteEditor(item),
-            resetSignal: widget.noteResetSignal,
-            noteButtonInsets: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            noteButtonBorderRadius: const BorderRadius.horizontal(
-              left: Radius.circular(12),
+          return SwipeNoteItemCard(
+            title: fields[_columns.first] ?? item.displayName,
+            subtitleTokens: _columns.length > 1 ? _buildMobileSubtitleTokens(item, fields) : const [],
+            indicatorColor: item.folder == '产品列表'
+                ? (_isWaterBased(item) ? Colors.blue.shade400 : Colors.orange.shade400)
+                : cs.primary,
+            onTap: () => ProductDetailSheet.show(
+              context,
+              item,
+              formulas: widget.formulas,
+              tdsContent: _tdsOf(item),
             ),
-            child: Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              child: InkWell(
-                onTap: () => ProductDetailSheet.show(
-                  context,
-                  item,
-                  formulas: widget.formulas,
-                  tdsContent: _tdsOf(item),
-                ),
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 4,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: item.folder == '产品列表'
-                                ? (_isWaterBased(item)
-                                    ? Colors.blue.shade400
-                                    : Colors.orange.shade400)
-                                : cs.primary,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              fields[_columns.first] ?? item.displayName,
-                              style: TextStyle(
-                                color: cs.onSurface,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
-                            if (_columns.length > 1) ...[
-                              const SizedBox(height: 4),
-                              _buildMobileSubtitleChips(item, fields),
-                            ],
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            onNoteTap: () => _openNoteEditor(item),
+            noteResetSignal: widget.noteResetSignal,
+            titleStyle: TextStyle(
+              color: cs.onSurface,
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
             ),
           );
         },
