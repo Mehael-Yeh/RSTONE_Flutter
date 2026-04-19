@@ -42,6 +42,7 @@ class _ProductListPageState extends State<ProductListPage> {
   List<String> _columns = [];
   String? _sortColumn;
   bool _sortDescending = false;
+  String _typeFilter = '全部';
   int _noteResetSignal = 0;
 
   @override
@@ -107,9 +108,19 @@ class _ProductListPageState extends State<ProductListPage> {
   }
 
   List<ProductItem> _getSortedItems() {
-    if (_sortColumn == null) return widget.dataService.products;
-    
-    final sorted = List<ProductItem>.from(widget.dataService.products);
+    final filtered = widget.dataService.products.where((item) {
+      if (_typeFilter == '水性') {
+        return item.tags.any((tag) => tag.contains('水性'));
+      }
+      if (_typeFilter == '油性') {
+        return !item.tags.any((tag) => tag.contains('水性'));
+      }
+      return true;
+    }).toList();
+
+    if (_sortColumn == null) return filtered;
+
+    final sorted = List<ProductItem>.from(filtered);
     sorted.sort((a, b) {
       final aFields = a.getTableFields();
       final bFields = b.getTableFields();
@@ -133,6 +144,34 @@ class _ProductListPageState extends State<ProductListPage> {
       appBar: AppBar(
         title: const Text('产品列表'),
         actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.filter_alt_outlined),
+            tooltip: '筛选',
+            onSelected: (value) {
+              ProductDetailSheet.hideIfOpen(context);
+              setState(() {
+                _typeFilter = value;
+                _noteResetSignal++;
+              });
+            },
+            itemBuilder: (context) => [
+              CheckedPopupMenuItem<String>(
+                value: '全部',
+                checked: _typeFilter == '全部',
+                child: const Text('全部'),
+              ),
+              CheckedPopupMenuItem<String>(
+                value: '水性',
+                checked: _typeFilter == '水性',
+                child: const Text('水性'),
+              ),
+              CheckedPopupMenuItem<String>(
+                value: '油性',
+                checked: _typeFilter == '油性',
+                child: const Text('油性'),
+              ),
+            ],
+          ),
           PopupMenuButton<bool>(
             icon: const Icon(Icons.sort_by_alpha),
             onSelected: _onSortDirectionChanged,
