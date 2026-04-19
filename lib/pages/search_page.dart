@@ -64,12 +64,14 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _searchController.addListener(_onSearchChanged);
+    _searchFocusNode.addListener(_onSearchFocusChanged);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
+    _searchFocusNode.removeListener(_onSearchFocusChanged);
     _searchFocusNode.dispose();
     super.dispose();
   }
@@ -79,6 +81,11 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
       _searchFocusNode.unfocus();
     }
+  }
+
+  void _onSearchFocusChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   void _onSearchChanged() {
@@ -169,6 +176,11 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                 onTapOutside: (_) => _searchFocusNode.unfocus(),
                 decoration: InputDecoration(
                   hintText: '搜索产品、标签...',
+                  hintStyle: TextStyle(
+                    color: _searchFocusNode.hasFocus
+                        ? cs.onSurfaceVariant.withOpacity(0.55)
+                        : cs.onSurfaceVariant,
+                  ),
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _isSearching
                       ? IconButton(
