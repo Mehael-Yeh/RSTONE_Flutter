@@ -3,6 +3,7 @@ import '../models/product_item.dart';
 import '../services/preferences_service.dart';
 import 'note_swipe_tile.dart';
 import 'product_detail_sheet.dart';
+import 'swipe_note_item_card.dart';
 
 /// Obsidian 风格的表格组件，支持列拖拽重排和排序
 class ObsidianTable extends StatefulWidget {
@@ -166,6 +167,33 @@ class _ObsidianTableState extends State<ObsidianTable> {
     return item.tags.any((t) => t.contains('水性'));
   }
 
+  List<String> _buildMobileSubtitleTokens(ProductItem item, Map<String, String> fields) {
+    if (item.folder == '产品应用') {
+      return <String>[
+        if ((item.primer ?? '').isNotEmpty) '底: ${item.primer}',
+        if ((item.midCoat ?? '').isNotEmpty) '中: ${item.midCoat}',
+        if ((item.topCoat ?? '').isNotEmpty) '面: ${item.topCoat}',
+      ];
+    }
+
+    final tokens = <String>[];
+    for (final col in _columns.skip(1).take(4)) {
+      final val = fields[col];
+      if (val == null || val.isEmpty) continue;
+      if (col == '标签') {
+        tokens.addAll(
+          val
+              .split(RegExp(r'\s*[,，]\s*'))
+              .map((tag) => tag.trim())
+              .where((tag) => tag.isNotEmpty),
+        );
+        continue;
+      }
+      tokens.add('$col: $val');
+    }
+    return tokens;
+  }
+
   String? _tdsOf(ProductItem item) {
     if (item.folder != '产品列表') return null;
     final direct = widget.tdsByProduct[item.fileName];
@@ -315,88 +343,24 @@ class _ObsidianTableState extends State<ObsidianTable> {
           final item = sortedItems[index];
           final fields = item.getTableFields();
 
-          return NoteSwipeTile(
-            onNoteTap: () => _openNoteEditor(item),
-            resetSignal: widget.noteResetSignal,
-            noteButtonInsets: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            noteButtonBorderRadius: const BorderRadius.horizontal(
-              left: Radius.circular(12),
+          return SwipeNoteItemCard(
+            title: fields[_columns.first] ?? item.displayName,
+            subtitleTokens: _columns.length > 1 ? _buildMobileSubtitleTokens(item, fields) : const [],
+            indicatorColor: item.folder == '产品列表'
+                ? (_isWaterBased(item) ? Colors.blue.shade400 : Colors.orange.shade400)
+                : cs.primary,
+            onTap: () => ProductDetailSheet.show(
+              context,
+              item,
+              formulas: widget.formulas,
+              tdsContent: _tdsOf(item),
             ),
-            child: Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              child: InkWell(
-                onTap: () => ProductDetailSheet.show(
-                  context,
-                  item,
-                  formulas: widget.formulas,
-                  tdsContent: _tdsOf(item),
-                ),
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 4,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: item.folder == '产品列表'
-                              ? (_isWaterBased(item)
-                                  ? Colors.blue.shade400
-                                  : Colors.orange.shade400)
-                              : cs.primary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              fields[_columns.first] ?? item.displayName,
-                              style: TextStyle(
-                                color: cs.onSurface,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
-                            if (_columns.length > 1) ...[
-                              const SizedBox(height: 4),
-                              Wrap(
-                                spacing: 4,
-                                runSpacing: 2,
-                                children: _columns.skip(1).take(4).map((col) {
-                                  final val = fields[col];
-                                  if (val == null || val.isEmpty) return const SizedBox.shrink();
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: cs.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      col == '标签' ? val : '$col: $val',
-                                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            onNoteTap: () => _openNoteEditor(item),
+            noteResetSignal: widget.noteResetSignal,
+            titleStyle: TextStyle(
+              color: cs.onSurface,
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
             ),
           );
         },
