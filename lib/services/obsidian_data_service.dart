@@ -281,18 +281,24 @@ class ObsidianDataService {
 
   /// 加载标签同义词规则（优先用户私有目录，其次内置 Asset）。
   Future<void> _loadTagAliasRules() async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final dataDir = Directory('${appDir.path}/rst_data');
-    final customRuleFile = File('${dataDir.path}/$_tagAliasRulesFileName');
     String rawContent = '';
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final dataDir = Directory('${appDir.path}/rst_data');
+      final customRuleFile = File('${dataDir.path}/$_tagAliasRulesFileName');
 
-    if (await customRuleFile.exists()) {
-      try {
-        rawContent = await customRuleFile.readAsString();
-        _addLog('DataService: Loaded custom tag alias rules from private dir');
-      } catch (e) {
-        _addLog('DataService: Failed to read custom tag alias rules: $e');
+      if (await customRuleFile.exists()) {
+        try {
+          rawContent = await customRuleFile.readAsString();
+          _addLog('DataService: Loaded custom tag alias rules from private dir');
+        } catch (e) {
+          _addLog('DataService: Failed to read custom tag alias rules: $e');
+        }
       }
+    } catch (e) {
+      _addLog(
+        'DataService: Private dir unavailable for tag alias rules, fallback to assets: $e',
+      );
     }
 
     if (rawContent.trim().isEmpty) {
