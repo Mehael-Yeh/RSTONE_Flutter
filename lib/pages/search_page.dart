@@ -134,42 +134,50 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '锐石',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+              child: SizedBox(
+                height: 40,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Text(
+                      'RSTONE',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontSize: 20,
                             fontWeight: FontWeight.w700,
                           ),
                     ),
-                  ),
-                  IconButton.filledTonal(
-                    onPressed: () {
-                      _searchFocusNode.unfocus();
-                      ProductDetailSheet.hideIfOpen(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SettingsPage(
-                            dataService: widget.dataService,
-                            preferencesService: widget.preferencesService,
-                            themeMode: widget.themeMode,
-                            onThemeModeChanged: widget.onThemeModeChanged,
-                            themeSeedColor: widget.themeSeedColor,
-                            onThemeSeedColorChanged: widget.onThemeSeedColorChanged,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.settings_outlined),
-                  ),
-                ],
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton.filledTonal(
+                        onPressed: () {
+                          _searchFocusNode.unfocus();
+                          ProductDetailSheet.hideIfOpen(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SettingsPage(
+                                dataService: widget.dataService,
+                                preferencesService: widget.preferencesService,
+                                themeMode: widget.themeMode,
+                                onThemeModeChanged: widget.onThemeModeChanged,
+                                themeSeedColor: widget.themeSeedColor,
+                                onThemeSeedColorChanged: widget.onThemeSeedColorChanged,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.settings_outlined, size: 20),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
               child: TextField(
                 controller: _searchController,
                 focusNode: _searchFocusNode,
@@ -209,7 +217,8 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                     borderRadius: BorderRadius.circular(28),
                     borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  isDense: true,
                 ),
               ),
             ),
