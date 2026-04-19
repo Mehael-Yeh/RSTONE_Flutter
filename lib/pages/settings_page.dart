@@ -457,9 +457,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 ListTile(
                   leading: const Icon(Icons.file_download_outlined),
                   title: const Text('导出产品笔记'),
-                  subtitle: const Text('导出 Markdown 文件用于提报'),
+                  subtitle: const Text('导出 Markdown 文件用于提报（长按可复制）'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _exportProductNotes,
+                  onLongPress: _copyProductNotesMarkdownToClipboard,
                 ),
                 ListTile(
                   leading: Icon(Icons.delete_sweep_outlined, color: cs.error),
@@ -658,25 +659,8 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _exportProductNotes() async {
-    final notes = widget.preferencesService.getAllProductNotes();
-    if (notes.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('暂无可导出的笔记')),
-      );
-      return;
-    }
-
-    final buffer = StringBuffer();
-    final sortedKeys = notes.keys.toList()..sort();
-    for (final key in sortedKeys) {
-      final content = notes[key]?.trim() ?? '';
-      if (content.isEmpty) continue;
-      buffer.writeln('# $key');
-      buffer.writeln(content);
-      buffer.writeln();
-    }
-    final markdownContent = buffer.toString().trim();
-    if (markdownContent.isEmpty) {
+    final markdownContent = _buildProductNotesMarkdown();
+    if (markdownContent == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('暂无可导出的笔记')),
       );
@@ -692,6 +676,39 @@ class _SettingsPageState extends State<SettingsPage> {
       subject: '产品笔记',
       text: '产品笔记导出文件（Markdown）',
     );
+  }
+
+  Future<void> _copyProductNotesMarkdownToClipboard() async {
+    final markdownContent = _buildProductNotesMarkdown();
+    if (markdownContent == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('暂无可复制的笔记')),
+      );
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: markdownContent));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Markdown 内容已复制到剪贴板')),
+    );
+  }
+
+  String? _buildProductNotesMarkdown() {
+    final notes = widget.preferencesService.getAllProductNotes();
+    if (notes.isEmpty) return null;
+
+    final buffer = StringBuffer();
+    final sortedKeys = notes.keys.toList()..sort();
+    for (final key in sortedKeys) {
+      final content = notes[key]?.trim() ?? '';
+      if (content.isEmpty) continue;
+      buffer.writeln('# $key');
+      buffer.writeln(content);
+      buffer.writeln();
+    }
+    final markdownContent = buffer.toString().trim();
+    return markdownContent.isEmpty ? null : markdownContent;
   }
 
   Future<void> _confirmClearAllProductNotes() async {
