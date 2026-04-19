@@ -3,9 +3,7 @@
 锐石内部使用的产品资料检索 App，基于 Flutter 开发，支持 **搜索、列表浏览、应用场景查看、TDS/配方详情查看、标签同义词规则维护、产品笔记记录与导出**。
 
 > 🌐 **Web 访问地址（GitHub Pages）**：
-> `https://<你的 GitHub 用户名或组织名>.github.io/RSTONE_Flutter/`
->
-> 例如：`https://my-org.github.io/RSTONE_Flutter/`
+> https://Mehael-Yeh.github.io/RSTONE_Flutter/
 
 ---
 
