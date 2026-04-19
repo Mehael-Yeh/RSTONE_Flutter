@@ -82,8 +82,13 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
 
   void _onSortDirectionChanged(bool descending) {
     ProductDetailSheet.hideIfOpen(context);
+    final fallbackColumn = _sortColumn ?? (_columns.isNotEmpty ? _columns.first : null);
+    if (fallbackColumn != null && _sortColumn == null) {
+      widget.preferencesService.saveApplicationSort(fallbackColumn);
+    }
     widget.preferencesService.saveApplicationSortDesc(descending);
     setState(() {
+      _sortColumn = fallbackColumn;
       _sortDescending = descending;
       _noteResetSignal++;
     });
