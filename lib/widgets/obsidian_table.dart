@@ -406,6 +406,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
     return LayoutBuilder(
       builder: (context, constraints) {
         _ensureDesktopWidths(constraints.maxWidth);
+        const resizeHandleWidth = 16.0;
         return Column(
           children: [
             Container(
@@ -462,22 +463,26 @@ class _ObsidianTableState extends State<ObsidianTable> {
                           ),
                           if (index < _columns.length - 1)
                             Positioned(
-                              right: 4,
+                              right: 0,
                               top: 0,
                               bottom: 0,
+                              width: resizeHandleWidth,
                               child: IgnorePointer(
-                                child: Icon(
-                                  Icons.drag_indicator,
-                                  size: 14,
-                                  color: cs.outline.withOpacity(0.7),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.drag_indicator,
+                                    size: 14,
+                                    color: cs.outline.withOpacity(0.7),
+                                  ),
                                 ),
                               ),
                             ),
                           if (index < _columns.length - 1)
                             Positioned(
-                              right: -4,
+                              right: 0,
                               top: 0,
                               bottom: 0,
+                              width: resizeHandleWidth,
                               child: MouseRegion(
                                 cursor: SystemMouseCursors.resizeColumn,
                                 child: GestureDetector(
@@ -485,7 +490,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                   onHorizontalDragUpdate: (details) {
                                     _resizeColumn(index, details.delta.dx);
                                   },
-                                  child: Container(width: 8, color: Colors.transparent),
+                                  child: const SizedBox.expand(),
                                 ),
                               ),
                             ),
@@ -536,12 +541,15 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                 width: _columnWidths[col] ?? 120,
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 4),
-                                  child: Text(
-                                    val,
-                                    style: TextStyle(
-                                      color: val.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
+                                  child: Center(
+                                    child: Text(
+                                      val,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: val.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               );
