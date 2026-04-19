@@ -252,8 +252,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
 
   Widget _buildResultItem(ProductItem item) {
     final cs = Theme.of(context).colorScheme;
-    final isProductList = item.folder == '产品列表';
-    final tagColor = isProductList ? cs.primary : cs.tertiary;
+    final tagColor = item.folder == '产品列表' ? cs.primary : cs.tertiary;
 
     return SwipeNoteItemCard(
       title: item.displayName,
@@ -270,15 +269,6 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
       },
       onNoteTap: () => _openNoteEditor(item),
       noteResetSignal: _noteResetSignal,
-      headerTrailing: Chip(
-        visualDensity: VisualDensity.compact,
-        label: Text(isProductList ? '产品' : '应用'),
-        labelStyle: Theme.of(context).textTheme.labelSmall,
-        backgroundColor: tagColor.withOpacity(0.14),
-        side: BorderSide(
-          color: tagColor.withOpacity(0.35),
-        ),
-      ),
     );
   }
 
@@ -290,7 +280,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
         if ((item.topCoat ?? '').isNotEmpty) '面: ${item.topCoat}',
       ];
     }
-    return item.tags.take(4).toList();
+    return item.tags.toList();
   }
 
 }
