@@ -521,9 +521,8 @@ PEEK -> 聚醚醚酮
         }
       }
 
-      // 兼容历史“PU 同义词”分段（羟丙 / 羟基丙烯酸）的兜底逻辑，
-      // 但仅在原始输入中确实出现 PU 时才生效，避免误伤纯中文检索。
-      if (!rawLowerQuery.contains('pu')) return false;
+      // 兼容历史“PU 同义词”分段（羟丙 / 羟基丙烯酸）的兜底逻辑。
+      // 纯中文检索也需要生效，以避免“羟丙 / 羟基丙烯酸”误命中 PUD。
       const puLockedTerms = <String>{'羟丙', '羟基丙烯酸'};
       return segmentedKeywords.any(puLockedTerms.contains);
     }
