@@ -235,7 +235,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
             ),
             child: Card(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               child: InkWell(
                 onTap: () => ProductDetailSheet.show(
                   context,
@@ -245,27 +245,29 @@ class _ObsidianTableState extends State<ObsidianTable> {
                 ),
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 4,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: item.folder == '产品列表'
-                                  ? (_isWaterBased(item)
-                                      ? Colors.blue.shade400
-                                      : Colors.orange.shade400)
-                                  : cs.primary,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
+                      Container(
+                        width: 4,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: item.folder == '产品列表'
+                              ? (_isWaterBased(item)
+                                  ? Colors.blue.shade400
+                                  : Colors.orange.shade400)
+                              : cs.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
                               fields[_columns.first] ?? item.displayName,
                               style: TextStyle(
                                 color: cs.onSurface,
@@ -273,32 +275,35 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                 fontSize: 16,
                               ),
                             ),
-                          ),
-                          Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
-                        ],
-                      ),
-                      if (_columns.length > 1) ...[
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: _columns.skip(1).take(4).map((col) {
-                            final val = fields[col];
-                            if (val == null || val.isEmpty) return const SizedBox.shrink();
-                            return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: cs.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(6),
+                            if (_columns.length > 1) ...[
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 4,
+                                runSpacing: 2,
+                                children: _columns.skip(1).take(4).map((col) {
+                                  final val = fields[col];
+                                  if (val == null || val.isEmpty) return const SizedBox.shrink();
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: cs.surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      col == '标签' ? val : '$col: $val',
+                                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                                    ),
+                                  );
+                                }).toList(),
                               ),
-                              child: Text(
-                                col == '标签' ? val : '$col: $val',
-                                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
-                              ),
-                            );
-                          }).toList(),
+                            ],
+                          ],
                         ),
-                      ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+                      ),
                     ],
                   ),
                 ),

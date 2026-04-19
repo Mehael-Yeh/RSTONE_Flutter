@@ -263,7 +263,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
       ),
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        margin: const EdgeInsets.only(bottom: 10),
+        margin: const EdgeInsets.only(bottom: 8),
         child: InkWell(
           onTap: () {
             _searchFocusNode.unfocus();
@@ -276,24 +276,27 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
           },
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   // 左侧竖条作为信息类型视觉锚点（产品/应用）。
                   width: 4,
-                  height: 56,
+                  height: 46,
                   decoration: BoxDecoration(
                     color: tagColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: Text(
@@ -315,10 +318,10 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                         ],
                       ),
                       if (item.tags.isNotEmpty) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
                         Wrap(
                           spacing: 6,
-                          runSpacing: 4,
+                          runSpacing: 2,
                           children: item.tags.take(4).map((tag) {
                             return Chip(
                               visualDensity: VisualDensity.compact,
@@ -338,7 +341,10 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right),
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Icon(Icons.chevron_right),
+                ),
               ],
             ),
           ),
