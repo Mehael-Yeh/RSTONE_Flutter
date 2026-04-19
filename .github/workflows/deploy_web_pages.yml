@@ -36,7 +36,8 @@ jobs:
       - name: Ensure web platform files exist
         run: |
           if [ ! -f web/index.html ]; then
-            flutter create --platforms=web .
+            PROJECT_NAME=$(awk -F': ' '/^name:/{print $2; exit}' pubspec.yaml)
+            flutter create --platforms=web --project-name "$PROJECT_NAME" .
           fi
 
       - name: Build web app
