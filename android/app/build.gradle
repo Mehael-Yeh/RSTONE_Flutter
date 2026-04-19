@@ -49,8 +49,20 @@ android {
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }
-            minifyEnabled = false
-            shrinkResources = false
+            // 启用代码混淆与资源压缩，降低 release 包体积。
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    // 仅按 ABI 产出 APK，可显著降低单个安装包体积（推荐通过 AAB 分发）。
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a", "x86_64"
+            universalApk false
         }
     }
 }
