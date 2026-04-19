@@ -22,10 +22,32 @@ class ObsidianDataService {
   static const String _tdsAssetIndex = 'assets/产品TDS.json';
   /// TDS Asset 目录路径（文件名格式：产品名称.TDS.md）
   static const String _tdsAssetPath = 'assets/产品TDS';
-  /// 标签同义词规则文档（默认内置）
-  static const String _tagAliasRulesAssetPath = 'assets/tag_alias_rules.txt';
-  /// 标签同义词规则文档（用户可编辑）
-  static const String _tagAliasRulesFileName = 'tag_alias_rules.txt';
+  /// 标签同义词规则（代码内置，不依赖可替换 Asset 文件）
+  static const String _builtInTagAliasRulesDefault = '''
+# 标签同义词规则：格式 `左侧标签 -> 右侧扩展词`
+# 支持 `->` 或 `→`，左侧可用 `、` / `,` / `，` 分隔多个标签
+
+PVD -> 真空镀
+PVD -> 镀膜
+PVD -> 物理气相沉积
+PU -> 羟丙
+PU -> 羟基丙烯酸
+PUD -> 自干
+PUD -> 聚氨酯分散体
+PC -> 聚碳酸酯
+ABS -> 丙烯腈-丁二烯-苯乙烯共聚物
+PA、PA6、PA66、TR90 -> 尼龙
+PMMA -> 亚克力
+TPEE -> 热塑性弹性体
+PET -> 聚对苯二甲酸乙二醇酯
+PS -> 聚苯乙烯
+PE -> 聚乙烯
+PP -> 聚丙烯
+PPS -> 聚苯硫醚
+PEEK -> 聚醚醚酮
+''';
+  /// 标签同义词规则文档（用户新增，仅存储在应用私有目录）
+  static const String _tagAliasCustomRulesFileName = 'tag_alias_rules.custom.txt';
   
   /// 产品列表数据
   List<ProductItem> _products = [];
@@ -33,8 +55,12 @@ class ObsidianDataService {
   List<ProductItem> _applications = [];
   /// 产品配方数据
   List<ProductItem> _formulas = [];
-  /// 标签同义词规则文本（可被设置页展示/编辑）
-  String _tagAliasRulesRaw = '';
+  /// 内置标签同义词规则（来自 assets，不允许外部修改）
+  String _builtInTagAliasRulesRaw = '';
+  /// 用户自定义新增规则（来自应用私有目录）
+  String _customTagAliasRulesRaw = '';
+  /// 合并后的规则文本（用于展示）
+  String _combinedTagAliasRulesRaw = '';
   /// TDS 文档缓存（key: 产品名称，value: 对应 .TDS.md 文本）
   Map<String, String> _tdsByProduct = {};
   /// 归一化索引（key: 归一化产品名，value: 对应 .TDS.md 文本）
@@ -50,7 +76,9 @@ class ObsidianDataService {
   List<ProductItem> get products => _products;
   List<ProductItem> get applications => _applications;
   List<ProductItem> get formulas => _formulas;
-  String get tagAliasRulesRaw => _tagAliasRulesRaw;
+  String get builtInTagAliasRulesRaw => _builtInTagAliasRulesRaw;
+  String get customTagAliasRulesRaw => _customTagAliasRulesRaw;
+  String get tagAliasRulesRaw => _combinedTagAliasRulesRaw;
   Map<String, Set<String>> get tagAliasRules => _tagAliasRules;
   Map<String, String> get tdsByProduct => Map.unmodifiable(_tdsByProduct);
   bool get isInitialized => _initialized;
@@ -279,53 +307,65 @@ class ObsidianDataService {
     }
   }
 
-  /// 加载标签同义词规则（优先用户私有目录，其次内置 Asset）。
+  /// 加载标签同义词规则（内置规则 + 用户新增规则）。
   Future<void> _loadTagAliasRules() async {
-    String rawContent = '';
+    _builtInTagAliasRulesRaw = '';
+    _customTagAliasRulesRaw = '';
+
+    _builtInTagAliasRulesRaw = _builtInTagAliasRulesDefault;
+    _addLog('DataService: Loaded built-in tag alias rules from source code');
+
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final dataDir = Directory('${appDir.path}/rst_data');
-      final customRuleFile = File('${dataDir.path}/$_tagAliasRulesFileName');
+      final customRuleFile = File('${dataDir.path}/$_tagAliasCustomRulesFileName');
 
       if (await customRuleFile.exists()) {
         try {
-          rawContent = await customRuleFile.readAsString();
+          _customTagAliasRulesRaw = await customRuleFile.readAsString();
           _addLog('DataService: Loaded custom tag alias rules from private dir');
         } catch (e) {
           _addLog('DataService: Failed to read custom tag alias rules: $e');
         }
       }
     } catch (e) {
-      _addLog(
-        'DataService: Private dir unavailable for tag alias rules, fallback to assets: $e',
-      );
+      _addLog('DataService: Private dir unavailable for custom tag alias rules: $e');
     }
 
-    if (rawContent.trim().isEmpty) {
-      try {
-        rawContent = await rootBundle.loadString(_tagAliasRulesAssetPath);
-        _addLog('DataService: Loaded default tag alias rules from assets');
-      } catch (e) {
-        _addLog('DataService: Failed to load asset tag alias rules: $e');
-        rawContent = '';
-      }
-    }
-
-    _tagAliasRulesRaw = rawContent;
-    _tagAliasRules = _parseTagAliasRules(rawContent);
+    _tagAliasRules = _parseTagAliasRules(_builtInTagAliasRulesRaw);
+    final customMap = _parseTagAliasRules(_customTagAliasRulesRaw);
+    _mergeTagAliasRules(customMap);
+    _combinedTagAliasRulesRaw = _composeCombinedTagAliasRulesText();
     _addLog('DataService: Parsed ${_tagAliasRules.length} tag alias keys');
   }
 
-  /// 保存标签同义词规则到私有目录，并更新内存映射。
+  /// 保存用户新增标签同义词规则到私有目录，并更新内存映射。
   Future<void> saveTagAliasRules(String rawContent) async {
     final appDir = await getApplicationDocumentsDirectory();
     final dataDir = Directory('${appDir.path}/rst_data');
     await dataDir.create(recursive: true);
-    final customRuleFile = File('${dataDir.path}/$_tagAliasRulesFileName');
+    final customRuleFile = File('${dataDir.path}/$_tagAliasCustomRulesFileName');
     await customRuleFile.writeAsString(rawContent);
-    _tagAliasRulesRaw = rawContent;
-    _tagAliasRules = _parseTagAliasRules(rawContent);
+    _customTagAliasRulesRaw = rawContent;
+    _tagAliasRules = _parseTagAliasRules(_builtInTagAliasRulesRaw);
+    final customMap = _parseTagAliasRules(_customTagAliasRulesRaw);
+    _mergeTagAliasRules(customMap);
+    _combinedTagAliasRulesRaw = _composeCombinedTagAliasRulesText();
     _addLog('DataService: Saved custom tag alias rules');
+  }
+
+  void _mergeTagAliasRules(Map<String, Set<String>> additionalRules) {
+    for (final entry in additionalRules.entries) {
+      _tagAliasRules.putIfAbsent(entry.key, () => <String>{}).addAll(entry.value);
+    }
+  }
+
+  String _composeCombinedTagAliasRulesText() {
+    final builtIn = _builtInTagAliasRulesRaw.trim();
+    final custom = _customTagAliasRulesRaw.trim();
+    if (builtIn.isEmpty) return custom;
+    if (custom.isEmpty) return builtIn;
+    return '$builtIn\n\n# ===== 以下为用户新增规则 =====\n$custom';
   }
 
   /// 解析规则文档：支持 `A->B` 与 `A→B`，并支持左侧多 key（逗号分隔）。
