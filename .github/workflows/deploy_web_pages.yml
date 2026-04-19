@@ -33,6 +33,12 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Ensure web platform files exist
+        run: |
+          if [ ! -f web/index.html ]; then
+            flutter create --platforms=web .
+          fi
+
       - name: Build web app
         run: |
           flutter build web --release \
