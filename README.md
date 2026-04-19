@@ -7,7 +7,7 @@
 ![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20Web-6C63FF)
 
 **锐石内部产品资料检索应用**  
-统一查看产品、应用场景、配方与 TDS，并支持现场笔记记录与导出。
+搜索管理产品、应用场景、配方信息，并支持现场笔记记录与导出。
 
 🌐 **静态网页（GitHub Pages）**：  
 https://Mehael-Yeh.github.io/RSTONE_Flutter/
@@ -21,9 +21,9 @@ https://Mehael-Yeh.github.io/RSTONE_Flutter/
 RSTONE 是一个基于 Flutter 的跨平台检索工具，用于集中管理和查询分散的产品资料（Markdown/JSON）。
 核心目标：
 
-- 一个入口完成搜索与浏览
-- 统一展示产品信息、应用场景、配方和 TDS
-- 支持标签同义词提升搜索召回（如 `PA6 -> 尼龙`）
+- 一个入口完成产品以及应用的搜索与浏览
+- 统一展示产品信息、应用场景等产品资料
+- 支持标签同义词提升搜索增强（如 `PA6 -> 尼龙`）
 - 支持业务笔记记录与导出
 
 ---
