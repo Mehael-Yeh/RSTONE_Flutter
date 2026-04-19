@@ -1179,7 +1179,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         return false;
       },
       child: DraggableScrollableSheet(
-        initialChildSize: 0.65,
+        initialChildSize: 0.72,
         minChildSize: 0.1,
         maxChildSize: 1.0,
         builder: (context, scrollController) {

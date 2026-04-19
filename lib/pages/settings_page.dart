@@ -36,11 +36,21 @@ class _SettingsPageState extends State<SettingsPage> {
   late Color _selectedThemeSeedColor;
   static const List<Color> _presetThemeColors = <Color>[
     Color(0xFFFF8A00),
+    Color(0xFFFFB300),
     Color(0xFFE53935),
+    Color(0xFFD81B60),
     Color(0xFF8E24AA),
+    Color(0xFF5E35B1),
     Color(0xFF3949AB),
+    Color(0xFF1E88E5),
+    Color(0xFF039BE5),
+    Color(0xFF00ACC1),
     Color(0xFF00897B),
+    Color(0xFF7CB342),
     Color(0xFF43A047),
+    Color(0xFFF4511E),
+    Color(0xFF6D4C41),
+    Color(0xFF546E7A),
   ];
 
   @override
@@ -107,20 +117,113 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _pickCustomThemeColor() async {
-    final initialHex = _selectedThemeSeedColor.value.toRadixString(16).toUpperCase().padLeft(8, '0');
+    Color workingColor = _selectedThemeSeedColor;
+    final initialHex = workingColor.value.toRadixString(16).toUpperCase().padLeft(8, '0');
     final controller = TextEditingController(text: '#${initialHex.substring(2)}');
     final picked = await showDialog<Color>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('自定义主题色'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'HEX 颜色值',
-            hintText: '#FF8A00',
-            border: OutlineInputBorder(),
-          ),
+        content: StatefulBuilder(
+          builder: (context, setDialogState) {
+            Widget buildChannelSlider({
+              required String label,
+              required int value,
+              required ValueChanged<int> onChanged,
+            }) {
+              return Row(
+                children: [
+                  SizedBox(width: 24, child: Text(label)),
+                  Expanded(
+                    child: Slider(
+                      min: 0,
+                      max: 255,
+                      divisions: 255,
+                      value: value.toDouble(),
+                      onChanged: (v) => onChanged(v.round()),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 34,
+                    child: Text(
+                      value.toString(),
+                      textAlign: TextAlign.right,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            void syncHexFromColor() {
+              final hex = workingColor.value.toRadixString(16).toUpperCase().padLeft(8, '0');
+              controller.text = '#${hex.substring(2)}';
+            }
+
+            return SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: workingColor,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    buildChannelSlider(
+                      label: 'R',
+                      value: workingColor.red,
+                      onChanged: (newValue) {
+                        setDialogState(() {
+                          workingColor = workingColor.withRed(newValue);
+                          syncHexFromColor();
+                        });
+                      },
+                    ),
+                    buildChannelSlider(
+                      label: 'G',
+                      value: workingColor.green,
+                      onChanged: (newValue) {
+                        setDialogState(() {
+                          workingColor = workingColor.withGreen(newValue);
+                          syncHexFromColor();
+                        });
+                      },
+                    ),
+                    buildChannelSlider(
+                      label: 'B',
+                      value: workingColor.blue,
+                      onChanged: (newValue) {
+                        setDialogState(() {
+                          workingColor = workingColor.withBlue(newValue);
+                          syncHexFromColor();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: controller,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'HEX 颜色值',
+                        hintText: '#FF8A00',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
         actions: [
           TextButton(
@@ -381,49 +484,55 @@ class _SettingsPageState extends State<SettingsPage> {
         title: const Text('标签同义词规则'),
         content: SizedBox(
           width: 680,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '内置规则已写入应用，不再接受软件外部文件修改。\n你可以在这里新增规则（会持久化保存）。\n每行一条规则：左侧是可匹配标签（可用“、”分隔多个），右侧是扩展词。\n格式示例：PA、PA6、PA66 -> 尼龙',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 12),
-              ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: EdgeInsets.zero,
-                title: const Text('查看内置规则（只读）'),
-                children: [
-                  Container(
-                    width: double.infinity,
-                    constraints: const BoxConstraints(maxHeight: 180),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: SingleChildScrollView(
-                      child: SelectableText(
-                        builtInRules.trim().isEmpty ? '（暂无内置规则）' : builtInRules,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.72),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '内置规则已写入应用，不再接受软件外部文件修改。\n你可以在这里新增规则（会持久化保存）。\n每行一条规则：左侧是可匹配标签（可用“、”分隔多个），右侧是扩展词。\n格式示例：PA、PA6、PA66 -> 尼龙',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: EdgeInsets.zero,
+                  title: const Text('查看内置规则（只读）'),
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      constraints: const BoxConstraints(maxHeight: 180),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: SingleChildScrollView(
+                        child: SelectableText(
+                          builtInRules.trim().isEmpty ? '（暂无内置规则）' : builtInRules,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                maxLines: 18,
-                minLines: 12,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: '新增自定义规则',
-                  hintText: '# 支持注释行\nPA、PA6、PA66 -> 尼龙',
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    expands: true,
+                    minLines: null,
+                    maxLines: null,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: '新增自定义规则',
+                      hintText: '# 支持注释行\nPA、PA6、PA66 -> 尼龙',
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
