@@ -175,11 +175,13 @@ class _ObsidianTableState extends State<ObsidianTable> {
       ];
     }
 
-    return _columns.skip(1).take(4).map((col) {
+    final tokens = <String>[];
+    for (final col in _columns.skip(1).take(4)) {
       final val = fields[col];
-      if (val == null || val.isEmpty) return '';
-      return col == '标签' ? val : '$col: $val';
-    }).where((text) => text.isNotEmpty);
+      if (val == null || val.isEmpty) continue;
+      tokens.add(col == '标签' ? val : '$col: $val');
+    }
+    return tokens;
   }
 
   Widget _buildMobileSubtitleChips(ProductItem item, Map<String, String> fields) {
