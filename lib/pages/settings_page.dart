@@ -31,6 +31,9 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  static final Uri _projectUrl = Uri.parse('https://github.com/Mehael-Yeh/RSTONE_Flutter');
+  static final Uri _webAppUrl = Uri.parse('https://mehael-yeh.github.io/RSTONE_Flutter/');
+  static final Uri _releaseUrl = Uri.parse('https://github.com/Mehael-Yeh/RSTONE_Flutter/releases');
   String _appVersion = '...';
   late ThemeMode _selectedThemeMode;
   late Color _selectedThemeSeedColor;
@@ -437,9 +440,25 @@ class _SettingsPageState extends State<SettingsPage> {
             title: '关于',
             child: Column(
               children: [
-                _buildInfoTile(icon: Icons.info_outline, title: '版本', value: _appVersion),
-                _buildInfoTile(icon: Icons.diamond, title: '应用名称', value: '锐石 / RSTONE'),
-                _buildInfoTile(icon: Icons.code, title: '技术栈', value: 'Flutter 3.24'),
+                ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: const Text('关于锐石 RSTONE'),
+                  subtitle: Text('版本 $_appVersion'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AboutDetailPage(
+                          appVersion: _appVersion,
+                          projectUrl: _projectUrl,
+                          webAppUrl: _webAppUrl,
+                          releaseUrl: _releaseUrl,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -580,21 +599,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildInfoTile({
-    required IconData icon,
-    required String title,
-    required String value,
-  }) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      trailing: Text(
-        value,
-        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-      ),
-    );
-  }
-
   Future<void> _confirmClearLogs() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -686,6 +690,207 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+}
+
+class AboutDetailPage extends StatelessWidget {
+  final String appVersion;
+  final Uri projectUrl;
+  final Uri webAppUrl;
+  final Uri releaseUrl;
+
+  const AboutDetailPage({
+    super.key,
+    required this.appVersion,
+    required this.projectUrl,
+    required this.webAppUrl,
+    required this.releaseUrl,
+  });
+
+  void _copyText(BuildContext context, String value, String label) {
+    Clipboard.setData(ClipboardData(text: value));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$label 已复制到剪贴板')),
+    );
+  }
+
+  Future<void> _shareLink(String title, Uri uri) async {
+    await Share.share('${title}：$uri');
+  }
+
+  Future<void> _checkForUpdate(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('检查更新'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('当前版本：$appVersion'),
+            const SizedBox(height: 8),
+            const Text('请通过项目发布页查看最新版本与更新日志。'),
+            const SizedBox(height: 8),
+            SelectableText(releaseUrl.toString()),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              _copyText(context, releaseUrl.toString(), '发布页地址');
+              Navigator.pop(context);
+            },
+            child: const Text('复制发布页地址'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLinkTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Uri uri,
+  }) {
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: Text(
+        subtitle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: Wrap(
+        spacing: 4,
+        children: [
+          IconButton(
+            tooltip: '复制链接',
+            onPressed: () => _copyText(context, uri.toString(), title),
+            icon: const Icon(Icons.copy_outlined, size: 20),
+          ),
+          IconButton(
+            tooltip: '分享链接',
+            onPressed: () => _shareLink(title, uri),
+            icon: const Icon(Icons.share_outlined, size: 20),
+          ),
+        ],
+      ),
+      onTap: () => _copyText(context, uri.toString(), title),
+    );
+  }
+
+  Widget _buildSectionCard(BuildContext context, {required String title, required Widget child}) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 2, 4, 8),
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('关于')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          _buildSectionCard(
+            context,
+            title: '应用信息',
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.diamond_outlined),
+                  title: const Text('应用名称'),
+                  trailing: const Text('锐石 / RSTONE'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: const Text('当前版本'),
+                  trailing: Text(appVersion),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.code),
+                  title: const Text('技术栈'),
+                  trailing: const Text('Flutter'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            context,
+            title: '更新与链接',
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.system_update_alt),
+                  title: const Text('检查更新'),
+                  subtitle: const Text('查看 GitHub 发布页获取最新版本'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _checkForUpdate(context),
+                ),
+                _buildLinkTile(
+                  context,
+                  icon: Icons.code_outlined,
+                  title: '项目地址',
+                  subtitle: projectUrl.toString(),
+                  uri: projectUrl,
+                ),
+                _buildLinkTile(
+                  context,
+                  icon: Icons.language,
+                  title: '网页版',
+                  subtitle: webAppUrl.toString(),
+                  uri: webAppUrl,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            context,
+            title: '说明',
+            child: Column(
+              children: const [
+                ListTile(
+                  leading: Icon(Icons.lightbulb_outline),
+                  title: Text('定位'),
+                  subtitle: Text('聚焦锐石产品资料检索、应用场景查询与现场记录。'),
+                ),
+                ListTile(
+                  leading: Icon(Icons.shield_outlined),
+                  title: Text('使用建议'),
+                  subtitle: Text('产品数据会随版本迭代，请在关键业务场景中以最新资料为准。'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class LogViewerPage extends StatefulWidget {
