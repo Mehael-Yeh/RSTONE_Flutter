@@ -112,6 +112,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
   void didUpdateWidget(covariant SearchPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.pageChangeSignal != widget.pageChangeSignal) {
+      _searchFocusNode.unfocus();
       setState(() => _noteResetSignal++);
     }
   }
