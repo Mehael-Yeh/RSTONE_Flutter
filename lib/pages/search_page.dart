@@ -112,6 +112,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
   void didUpdateWidget(covariant SearchPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.pageChangeSignal != widget.pageChangeSignal) {
+      _searchFocusNode.unfocus();
       setState(() => _noteResetSignal++);
     }
   }
@@ -162,14 +163,15 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: SearchBar(
+              child: TextField(
                 controller: _searchController,
                 focusNode: _searchFocusNode,
-                hintText: '搜索产品、标签...',
-                leading: const Icon(Icons.search),
-                trailing: _isSearching
-                    ? [
-                        IconButton(
+                onTapOutside: (_) => _searchFocusNode.unfocus(),
+                decoration: InputDecoration(
+                  hintText: '搜索产品、标签...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _isSearching
+                      ? IconButton(
                           icon: const Icon(Icons.close),
                           onPressed: () {
                             _searchController.clear();
@@ -179,13 +181,22 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                             });
                           },
                         )
-                      ]
-                    : null,
-                elevation: WidgetStateProperty.all(0),
-                // 使用容器高层级色强化输入控件与背景的层级关系。
-                backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHigh),
-                side: WidgetStatePropertyAll(
-                  BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                      : null,
+                  filled: true,
+                  fillColor: cs.surfaceContainerHigh,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(28),
+                    borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(28),
+                    borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(28),
+                    borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
             ),
