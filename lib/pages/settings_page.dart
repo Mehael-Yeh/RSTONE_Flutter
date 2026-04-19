@@ -409,6 +409,29 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 12),
           _buildSectionCard(
+            title: '产品笔记',
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.file_download_outlined),
+                  title: const Text('导出产品笔记'),
+                  subtitle: const Text('导出文件用于反馈（长按可复制）'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _exportProductNotes,
+                  onLongPress: _copyProductNotesMarkdownToClipboard,
+                ),
+                ListTile(
+                  leading: Icon(Icons.delete_sweep_outlined, color: cs.error),
+                  title: const Text('清除所有产品笔记'),
+                  subtitle: const Text('清空全部项目反馈记录'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _confirmClearAllProductNotes,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
             title: '日志',
             child: Column(
               children: [
@@ -445,29 +468,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   subtitle: const Text('清空所有日志记录'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _confirmClearLogs,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildSectionCard(
-            title: '产品笔记',
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.file_download_outlined),
-                  title: const Text('导出产品笔记'),
-                  subtitle: const Text('导出文件用于反馈（长按可复制）'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _exportProductNotes,
-                  onLongPress: _copyProductNotesMarkdownToClipboard,
-                ),
-                ListTile(
-                  leading: Icon(Icons.delete_sweep_outlined, color: cs.error),
-                  title: const Text('清除所有产品笔记'),
-                  subtitle: const Text('清空全部项目反馈记录'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _confirmClearAllProductNotes,
                 ),
               ],
             ),
