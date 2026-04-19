@@ -851,7 +851,7 @@ class AboutDetailPage extends StatelessWidget {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('检查更新'),
-          content: Text('当前已是最新正式版。\n当前版本：$appVersionName'),
+          content: Text('当前已是最新正式版。\n当前版本：v$appVersionName'),
           actions: [
             FilledButton(onPressed: () => Navigator.pop(context), child: const Text('知道了')),
           ],
@@ -865,7 +865,7 @@ class AboutDetailPage extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Text('发现新版本'),
         content: Text(
-          '当前版本：$appVersionName\n最新正式版：$latestVersion\n\n是否前往下载页面？',
+          '当前版本：v$appVersionName\n最新正式版：$latestVersion\n\n是否前往下载页面？',
         ),
         actions: [
           TextButton(
