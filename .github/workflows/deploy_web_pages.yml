@@ -73,17 +73,18 @@ jobs:
           import os, json
 
           specs = [
-              'assets/产品列表.json',
-              'assets/产品应用.json',
-              'assets/产品配方.json',
-              'assets/产品TDS.json',
+              ('产品列表', 'assets/产品列表.json', '.md'),
+              ('产品应用', 'assets/产品应用.json', '.md'),
+              ('产品配方', 'assets/产品配方.json', '.md'),
+              ('产品TDS', 'assets/产品TDS.json', '.TDS.md'),
           ]
 
-          for jsonfile in specs:
-              os.makedirs(os.path.dirname(jsonfile), exist_ok=True)
+          for folder, jsonfile, suffix in specs:
+              os.makedirs(f'assets/{folder}', exist_ok=True)
+              files = sorted([f for f in os.listdir(f'assets/{folder}') if f.endswith(suffix)])
               with open(jsonfile, 'w', encoding='utf-8') as f:
-                  json.dump([], f, ensure_ascii=False)
-              print(f'Initialized {jsonfile} as []')
+                  json.dump(files, f, ensure_ascii=False, indent=2)
+              print(f'{folder}: {len(files)} files written to {jsonfile}')
           "
 
       - name: Ensure web platform files exist

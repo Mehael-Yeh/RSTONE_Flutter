@@ -3,7 +3,7 @@
 锐石内部使用的产品资料检索 App，基于 Flutter 开发，支持 **搜索、列表浏览、应用场景查看、TDS/配方详情查看、标签同义词规则维护、产品笔记记录与导出**。
 
 > 🌐 **Web 访问地址（GitHub Pages）**：
-> `https://<https://Mehael-Yeh.github.io/RSTONE_Flutter/`
+> https://Mehael-Yeh.github.io/RSTONE_Flutter/
 
 ---
 
@@ -177,7 +177,7 @@ flutter build apk --release --split-per-abi
 - 产物：`flutter build web --release` 后自动发布到 GitHub Pages
 - 路由基路径：自动使用 `/<仓库名>/`，适配 Project Pages
 - 若仓库暂未提交 `web/` 目录，工作流会自动读取 `pubspec.yaml` 的 `name` 并执行 `flutter create --platforms=web --project-name <name> .`，避免仓库名含大写时创建失败
-- Web 工作流会对齐 APK 流程：若配置 `PRIVATE_REPO_READ_TOKEN`，会拉取 `Rstone` 与 `RstoneTDS` 私有仓库刷新资产；未配置时会生成空 JSON 索引（`[]`，与当前 `产品TDS.json` 一致）以保证构建不报错
+- Web 工作流会对齐 APK 流程：若配置 `PRIVATE_REPO_READ_TOKEN`，会拉取 `Rstone` 与 `RstoneTDS` 私有仓库刷新资产，并按目录自动生成索引 JSON（文件名列表）用于页面加载数据
 
 #### 启用步骤
 1. 进入 GitHub 仓库 `Settings -> Pages`
