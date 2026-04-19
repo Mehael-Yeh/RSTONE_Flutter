@@ -22,6 +22,7 @@ RSTONE 用于把分散的 Obsidian Markdown 数据（产品列表 / 产品应用
 - Android
 - iOS
 - Windows
+- Web（可通过 GitHub Pages 发布）
 
 ### 主要技术
 - Flutter 3.24（Material 3）
@@ -139,6 +140,9 @@ lib/
 ```bash
 flutter pub get
 flutter run
+
+# 运行 Web
+flutter run -d chrome
 ```
 
 ### 构建 APK
@@ -165,7 +169,22 @@ flutter build apk --release --split-per-abi
 - 版本从 `v1.0.0` 起步并递增补丁号
 - 构建并上传多 ABI APK 到正式 Release
 
-### 8.3 版本展示格式
+### 8.3 Web + GitHub Pages（`deploy_web_pages.yml`）
+- 触发：`push main` 或手动触发
+- 产物：`flutter build web --release` 后自动发布到 GitHub Pages
+- 路由基路径：自动使用 `/<仓库名>/`，适配 Project Pages
+- 若仓库暂未提交 `web/` 目录，工作流会自动读取 `pubspec.yaml` 的 `name` 并执行 `flutter create --platforms=web --project-name <name> .`，避免仓库名含大写时创建失败
+
+#### 启用步骤
+1. 进入 GitHub 仓库 `Settings -> Pages`
+2. `Build and deployment` 选择 `Source: GitHub Actions`
+3. 合并本仓库中的 `deploy_web_pages.yml` 到 `main`
+4. 推送后等待 Action 完成，访问：
+   - `https://<你的 GitHub 用户名>.github.io/<仓库名>/`
+
+> 如果你的仓库是组织仓库，请将用户名替换为组织名。
+
+### 8.4 版本展示格式
 发布界面中会展示带日期的版本文案，例如：
 - `v0.0.149 (20260418)`
 - `v1.0.0 (20260418)`
