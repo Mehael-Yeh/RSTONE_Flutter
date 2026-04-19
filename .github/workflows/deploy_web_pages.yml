@@ -1,0 +1,120 @@
+name: Deploy Flutter Web to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PRIVATE_REPO_READ_TOKEN: ${{ secrets.PRIVATE_REPO_READ_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.0"
+
+      - name: Enable Flutter Web
+        run: flutter config --enable-web
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Checkout private repo Rstone
+        if: ${{ env.PRIVATE_REPO_READ_TOKEN != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: Mehael-Yeh/Rstone
+          token: ${{ env.PRIVATE_REPO_READ_TOKEN }}
+          path: external/rstone_data
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout private repo RstoneTDS
+        if: ${{ env.PRIVATE_REPO_READ_TOKEN != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: Mehael-Yeh/RstoneTDS
+          token: ${{ env.PRIVATE_REPO_READ_TOKEN }}
+          path: external/rstone_tds_data
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Sync web build assets
+        run: |
+          mkdir -p assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
+
+          if [ -n "$PRIVATE_REPO_READ_TOKEN" ] && [ -d external/rstone_data ] && [ -d external/rstone_tds_data ]; then
+            rm -rf assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
+            mkdir -p assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
+
+            cp external/rstone_data/产品列表/*.md assets/产品列表/ || true
+            cp external/rstone_data/产品应用/*.md assets/产品应用/ || true
+            cp external/rstone_data/产品配方/*.md assets/产品配方/ || true
+            cp external/rstone_tds_data/*.TDS.md assets/产品TDS/ || true
+          fi
+
+          python3 -c "
+          import os, json
+
+          specs = [
+              'assets/产品列表.json',
+              'assets/产品应用.json',
+              'assets/产品配方.json',
+              'assets/产品TDS.json',
+          ]
+
+          for jsonfile in specs:
+              os.makedirs(os.path.dirname(jsonfile), exist_ok=True)
+              with open(jsonfile, 'w', encoding='utf-8') as f:
+                  json.dump([], f, ensure_ascii=False)
+              print(f'Initialized {jsonfile} as []')
+          "
+
+      - name: Ensure web platform files exist
+        run: |
+          if [ ! -f web/index.html ]; then
+            PROJECT_NAME=$(awk -F': ' '/^name:/{print $2; exit}' pubspec.yaml)
+            flutter create --platforms=web --project-name "$PROJECT_NAME" .
+          fi
+
+      - name: Build web app
+        run: |
+          flutter build web --release \
+            --base-href "/${{ github.event.repository.name }}/"
+          touch build/web/.nojekyll
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
