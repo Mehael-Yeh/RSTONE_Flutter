@@ -100,7 +100,7 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
                     height: double.infinity,
                     child: FilledButton(
                       onPressed: _handleNoteTap,
-                      child: const Transform.translate(
+                      child: Transform.translate(
                         offset: Offset(-2, 0),
                         child: Icon(Icons.note_alt_outlined, size: 24),
                       ),
