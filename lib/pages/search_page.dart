@@ -4,6 +4,7 @@ import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
 import '../widgets/note_swipe_tile.dart';
 import '../widgets/product_detail_sheet.dart';
+import '../widgets/swipe_note_item_card.dart';
 import 'settings_page.dart';
 
 class SearchPage extends StatefulWidget {
@@ -201,7 +202,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                   ? _results.isEmpty
                       ? _buildEmptyState()
                       : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding: EdgeInsets.zero,
                           itemCount: _results.length,
                           itemBuilder: (context, index) => _buildResultItem(_results[index]),
                         )
@@ -254,103 +255,42 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     final isProductList = item.folder == '产品列表';
     final tagColor = isProductList ? cs.primary : cs.tertiary;
 
-    return NoteSwipeTile(
+    return SwipeNoteItemCard(
+      title: item.displayName,
+      subtitleTokens: _buildSubtitleParts(item),
+      indicatorColor: tagColor,
+      onTap: () {
+        _searchFocusNode.unfocus();
+        ProductDetailSheet.show(
+          context,
+          item,
+          formulas: widget.dataService.formulas,
+          tdsContent: widget.dataService.tdsForProduct(item.fileName),
+        );
+      },
       onNoteTap: () => _openNoteEditor(item),
-      resetSignal: _noteResetSignal,
-      noteButtonInsets: const EdgeInsets.only(bottom: 10),
-      noteButtonBorderRadius: const BorderRadius.horizontal(
-        left: Radius.circular(16),
-      ),
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        margin: const EdgeInsets.only(bottom: 8),
-        child: InkWell(
-          onTap: () {
-            _searchFocusNode.unfocus();
-            ProductDetailSheet.show(
-              context,
-              item,
-              formulas: widget.dataService.formulas,
-              tdsContent: widget.dataService.tdsForProduct(item.fileName),
-            );
-          },
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  // 左侧竖条作为信息类型视觉锚点（产品/应用）。
-                  width: 4,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: tagColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              item.displayName,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                          ),
-                          Chip(
-                            visualDensity: VisualDensity.compact,
-                            label: Text(isProductList ? '产品' : '应用'),
-                            labelStyle: Theme.of(context).textTheme.labelSmall,
-                            backgroundColor: tagColor.withOpacity(0.14),
-                            side: BorderSide(
-                              color: tagColor.withOpacity(0.35),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (item.tags.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 2,
-                          children: item.tags.take(4).map((tag) {
-                            return Chip(
-                              visualDensity: VisualDensity.compact,
-                              label: Text(tag),
-                              labelStyle: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(color: cs.onSecondaryContainer),
-                              backgroundColor: cs.secondaryContainer,
-                              side: BorderSide(
-                                color: cs.outlineVariant,
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.only(top: 2),
-                  child: Icon(Icons.chevron_right),
-                ),
-              ],
-            ),
-          ),
+      noteResetSignal: _noteResetSignal,
+      headerTrailing: Chip(
+        visualDensity: VisualDensity.compact,
+        label: Text(isProductList ? '产品' : '应用'),
+        labelStyle: Theme.of(context).textTheme.labelSmall,
+        backgroundColor: tagColor.withOpacity(0.14),
+        side: BorderSide(
+          color: tagColor.withOpacity(0.35),
         ),
       ),
     );
+  }
+
+  List<String> _buildSubtitleParts(ProductItem item) {
+    if (item.folder == '产品应用') {
+      return <String>[
+        if ((item.primer ?? '').isNotEmpty) '底: ${item.primer}',
+        if ((item.midCoat ?? '').isNotEmpty) '中: ${item.midCoat}',
+        if ((item.topCoat ?? '').isNotEmpty) '面: ${item.topCoat}',
+      ];
+    }
+    return item.tags.take(4).toList();
   }
 
 }
