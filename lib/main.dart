@@ -108,7 +108,7 @@ class _RstoneAppState extends State<RstoneApp> {
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
-        toolbarHeight: 48,
+        toolbarHeight: 44,
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
         titleTextStyle: TextStyle(
@@ -129,7 +129,7 @@ class _RstoneAppState extends State<RstoneApp> {
         // 底部导航使用低层级容器色，保证与内容区域层级分离。
         backgroundColor: colorScheme.surfaceContainerLow,
         indicatorColor: colorScheme.secondaryContainer,
-        height: 56,
+        height: 52,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
