@@ -464,12 +464,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     }
   }
 
-  @override
-  void dispose() {
-    _pdfTransformationController.dispose();
-    super.dispose();
-  }
-
   String _extractMarkdownBody(String rawContent) =>
       FormulaContentParser.extractMarkdownBody(rawContent);
 
