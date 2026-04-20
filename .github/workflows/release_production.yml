@@ -126,9 +126,22 @@ jobs:
 
           echo "Done. Assets updated from Rstone and RstoneTDS."
 
+      - name: Extract database version
+        id: db_version
+        run: |
+          DB_VERSION_FILE="external/rstone_data/版本信息.md"
+          if [ -f "$DB_VERSION_FILE" ]; then
+            DB_VERSION=$(python3 scripts/extract_db_version.py "$DB_VERSION_FILE" || true)
+          fi
+          if [ -z "$DB_VERSION" ]; then
+            DB_VERSION="未知"
+          fi
+          echo "db_version=$DB_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Database version: $DB_VERSION"
+
       - name: Build Release APK (Android)
         run: |
-          flutter build apk --release --split-per-abi --dart-define=APP_BUILD_TIME=${{ steps.build_meta.outputs.build_time }}
+          flutter build apk --release --split-per-abi --dart-define=APP_BUILD_TIME=${{ steps.build_meta.outputs.build_time }} --dart-define=DB_VERSION=${{ steps.db_version.outputs.db_version }}
           cd build/app/outputs/flutter-apk
           for apk in app-*-release.apk; do
             case "$apk" in
@@ -151,6 +164,7 @@ jobs:
             - 标签: `${{ steps.version.outputs.tag }}`
             - 提交: `${{ github.sha }}`
             - 构建日期: `${{ steps.build_meta.outputs.build_time }}`
+            - 数据库版本: `${{ steps.db_version.outputs.db_version }}`
           files: |
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-armeabi-v7a-release.apk
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-arm64-v8a-release.apk

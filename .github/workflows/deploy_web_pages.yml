@@ -94,9 +94,23 @@ jobs:
             flutter create --platforms=web --project-name "$PROJECT_NAME" .
           fi
 
+      - name: Extract database version
+        id: db_version
+        run: |
+          DB_VERSION_FILE="external/rstone_data/版本信息.md"
+          if [ -f "$DB_VERSION_FILE" ]; then
+            DB_VERSION=$(python3 scripts/extract_db_version.py "$DB_VERSION_FILE" || true)
+          fi
+          if [ -z "$DB_VERSION" ]; then
+            DB_VERSION="未知"
+          fi
+          echo "db_version=$DB_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Database version: $DB_VERSION"
+
       - name: Build web app
         run: |
           flutter build web --release \
+            --dart-define=DB_VERSION=${{ steps.db_version.outputs.db_version }} \
             --base-href "/${{ github.event.repository.name }}/"
           touch build/web/.nojekyll
 

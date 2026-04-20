@@ -56,9 +56,9 @@ class CompactTokenRow extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest,
+                    color: _chipBackgroundColor(cs, visible[index]),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: cs.outlineVariant),
+                    border: Border.all(color: _chipBorderColor(cs, visible[index])),
                   ),
                   child: Text(
                     visible[index],
@@ -74,5 +74,29 @@ class CompactTokenRow extends StatelessWidget {
         );
       },
     );
+  }
+
+  Color _chipBackgroundColor(ColorScheme cs, String token) {
+    final normalized = token.trim().toLowerCase();
+    if (normalized == '水性') return const Color(0xFFE1F5FE);
+    if (normalized == '油性') return const Color(0xFFFFF3E0);
+    if (normalized == 'pu') return const Color(0xFFF3E5F5);
+    if (normalized == 'pud') return const Color(0xFFE8F5E9);
+    if (normalized == 'uv') return const Color(0xFFE8EAF6);
+    if (normalized == '双固化') return const Color(0xFFFFEBEE);
+    if (normalized == '聚烯烃') return const Color(0xFFE0F2F1);
+    return cs.surfaceContainerHighest;
+  }
+
+  Color _chipBorderColor(ColorScheme cs, String token) {
+    final normalized = token.trim().toLowerCase();
+    if (normalized == '水性') return const Color(0xFF4FC3F7);
+    if (normalized == '油性') return const Color(0xFFFFB74D);
+    if (normalized == 'pu') return const Color(0xFFBA68C8);
+    if (normalized == 'pud') return const Color(0xFF66BB6A);
+    if (normalized == 'uv') return const Color(0xFF7986CB);
+    if (normalized == '双固化') return const Color(0xFFEF5350);
+    if (normalized == '聚烯烃') return const Color(0xFF4DB6AC);
+    return cs.outlineVariant;
   }
 }
