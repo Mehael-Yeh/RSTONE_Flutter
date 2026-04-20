@@ -20,10 +20,7 @@ class CompactTokenRow extends StatelessWidget {
     const chipPadding = 16.0; // 左右 padding 合计
     const chipBorder = 2.0; // 边框总宽度
     const chipSpacing = 6.0;
-    final chipTextStyle = TextStyle(
-      color: cs.onSurfaceVariant,
-      fontSize: 12,
-    );
+    final chipTextStyle = TextStyle(color: cs.onSurfaceVariant, fontSize: 12);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -56,15 +53,17 @@ class CompactTokenRow extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest,
+                    color: _chipBackgroundColor(cs, visible[index]),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: cs.outlineVariant),
+                    border: Border.all(color: _chipBorderColor(cs, visible[index])),
                   ),
                   child: Text(
                     visible[index],
                     maxLines: 1,
                     softWrap: false,
-                    style: chipTextStyle,
+                    style: chipTextStyle.copyWith(
+                      color: _chipTextColor(cs, visible[index]),
+                    ),
                   ),
                 ),
                 if (index < visible.length - 1) const SizedBox(width: 6),
@@ -74,5 +73,45 @@ class CompactTokenRow extends StatelessWidget {
         );
       },
     );
+  }
+
+  Color _chipBackgroundColor(ColorScheme cs, String token) {
+    final accent = _tokenAccentColor(token);
+    if (accent == null) return cs.surfaceContainerHighest;
+    final isDark = cs.brightness == Brightness.dark;
+    if (isDark) {
+      return Color.alphaBlend(accent.withOpacity(0.26), cs.surfaceContainerHighest);
+    }
+    return Color.alphaBlend(accent.withOpacity(0.14), cs.surface);
+  }
+
+  Color _chipBorderColor(ColorScheme cs, String token) {
+    final accent = _tokenAccentColor(token);
+    if (accent == null) return cs.outlineVariant;
+    final isDark = cs.brightness == Brightness.dark;
+    return isDark
+        ? Color.alphaBlend(accent.withOpacity(0.72), cs.outlineVariant)
+        : Color.alphaBlend(accent.withOpacity(0.54), cs.outlineVariant);
+  }
+
+  Color _chipTextColor(ColorScheme cs, String token) {
+    final accent = _tokenAccentColor(token);
+    if (accent == null) return cs.onSurfaceVariant;
+    final isDark = cs.brightness == Brightness.dark;
+    return isDark
+        ? Color.alphaBlend(accent.withOpacity(0.92), cs.onSurface)
+        : Color.alphaBlend(accent.withOpacity(0.72), cs.onSurface);
+  }
+
+  Color? _tokenAccentColor(String token) {
+    final normalized = token.trim().toLowerCase();
+    if (normalized == '水性') return const Color(0xFF4FC3F7);
+    if (normalized == '油性') return const Color(0xFFFFB74D);
+    if (normalized == 'pu') return const Color(0xFFBA68C8);
+    if (normalized == 'pud') return const Color(0xFF66BB6A);
+    if (normalized == 'uv') return const Color(0xFF7986CB);
+    if (normalized == '双固化') return const Color(0xFFEF5350);
+    if (normalized == '聚烯烃') return const Color(0xFF4DB6AC);
+    return null;
   }
 }
