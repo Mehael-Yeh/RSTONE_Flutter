@@ -1,3 +1,5 @@
+/// TDS PDF 生成服务，负责解析 Markdown 并输出可分享文档。
+
 import 'dart:io';
 import 'dart:typed_data';
 
