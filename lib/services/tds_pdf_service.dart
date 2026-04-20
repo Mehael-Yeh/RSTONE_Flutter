@@ -189,8 +189,8 @@ class TdsPdfService {
     if (block.type == _TdsBlockType.table && block.tableRows != null && block.tableRows!.isNotEmpty) {
       final isPhysicalTable = section.title.contains('物理性能') && block.tableRows!.first.length >= 3;
       final table = pw.TableHelper.fromTextArray(
-        headerStyle: pw.TextStyle(font: fonts.simheiBold, fontSize: 10.5),
-        cellStyle: pw.TextStyle(font: fonts.songtiRegular, fontSize: 10.5),
+        headerStyle: pw.TextStyle(font: fonts.simheiBold, fontSize: 9.5),
+        cellStyle: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9.3),
         cellAlignment: pw.Alignment.center,
         border: pw.TableBorder.all(width: 0.8),
         columnWidths: isPhysicalTable

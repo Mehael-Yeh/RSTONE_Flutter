@@ -42,6 +42,7 @@ class _SettingsPageState extends State<SettingsPage> {
   static final Uri _releaseUrl = Uri.parse('https://github.com/Mehael-Yeh/RSTONE_Flutter/releases');
   String _appVersion = '...';
   String _appVersionName = '0.0.0';
+  String _databaseVersion = '未注入';
   late ThemeMode _selectedThemeMode;
   late Color _selectedThemeSeedColor;
   static const List<Color> _presetThemeColors = <Color>[
@@ -106,6 +107,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _loadVersion() async {
     final pkg = await PackageInfo.fromPlatform();
+    const databaseVersionFromDefine = String.fromEnvironment('DB_VERSION', defaultValue: '');
     const buildTimeFromDefine = String.fromEnvironment('APP_BUILD_TIME', defaultValue: '');
     final buildTime = buildTimeFromDefine.trim().isNotEmpty
         ? _formatBuildTimeLabel(buildTimeFromDefine)
@@ -121,6 +123,9 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         _appVersion = displayVersion;
         _appVersionName = pkg.version;
+        _databaseVersion = databaseVersionFromDefine.trim().isEmpty
+            ? '未注入'
+            : databaseVersionFromDefine.trim();
       });
     }
   }
@@ -346,10 +351,12 @@ class _SettingsPageState extends State<SettingsPage> {
                         onTap: () => _onThemeSeedColorChanged(color),
                       ),
                     ),
-                    OutlinedButton.icon(
-                      onPressed: _pickCustomThemeColor,
-                      icon: const Icon(Icons.palette_outlined),
-                      label: const Text('自定义'),
+                    _buildColorSwatch(
+                      color: _selectedThemeSeedColor,
+                      selected: !_presetThemeColors.any((c) => c.value == _selectedThemeSeedColor.value),
+                      onTap: _pickCustomThemeColor,
+                      icon: Icons.palette_outlined,
+                      tooltip: '自定义主题色',
                     ),
                   ],
                 ),
@@ -361,6 +368,14 @@ class _SettingsPageState extends State<SettingsPage> {
             title: '数据统计',
             child: Column(
               children: [
+                ListTile(
+                  leading: const Icon(Icons.storage_outlined),
+                  title: const Text('数据库版本'),
+                  trailing: Text(
+                    _databaseVersion,
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ),
                 ListTile(
                   leading: const Icon(Icons.inventory_2),
                   title: const Text('产品数量'),
@@ -513,25 +528,32 @@ class _SettingsPageState extends State<SettingsPage> {
     required Color color,
     required bool selected,
     required VoidCallback onTap,
+    IconData? icon,
+    String? tooltip,
   }) {
     final cs = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: selected ? cs.onSurface : cs.outlineVariant,
-            width: selected ? 2.2 : 1.1,
+    return Tooltip(
+      message: tooltip ?? '主题色',
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? cs.onSurface : cs.outlineVariant,
+              width: selected ? 2.2 : 1.1,
+            ),
           ),
+          child: selected
+              ? const Icon(Icons.check, size: 18, color: Colors.white)
+              : icon != null
+                  ? Icon(icon, size: 16, color: Colors.white.withOpacity(0.95))
+                  : null,
         ),
-        child: selected
-            ? const Icon(Icons.check, size: 18, color: Colors.white)
-            : null,
       ),
     );
   }
