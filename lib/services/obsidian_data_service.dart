@@ -2,8 +2,10 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/product_item.dart';
 
@@ -491,9 +493,206 @@ PEEK -> 聚醚醚酮
       } catch (e) {
         _addLog('DataService: Error copying applications: $e');
       }
+
+      // 复制产品配方
+      try {
+        final formulaIndexContent = await rootBundle.loadString('assets/产品配方.json');
+        final List<dynamic> formulaFiles = jsonDecode(formulaIndexContent);
+        final formulasDir = Directory('${dataDir.path}/产品配方');
+        await formulasDir.create(recursive: true);
+        for (final fileName in formulaFiles) {
+          try {
+            final content = await rootBundle.loadString('assets/产品配方/$fileName');
+            final file = File('${formulasDir.path}/$fileName');
+            await file.writeAsString(content);
+          } catch (_) {}
+        }
+        _addLog('DataService: Copied ${formulaFiles.length} formulas to private dir');
+      } catch (e) {
+        _addLog('DataService: Error copying formulas: $e');
+      }
     } catch (e) {
       _addLog('DataService: Error in _copyAssetsToPrivateDir: $e');
     }
+  }
+
+  String _joinTagsToYamlList(List<String> tags) {
+    final normalized = tags.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    if (normalized.isEmpty) return 'tags: []';
+    final lines = normalized.map((tag) => '  - $tag').join('\n');
+    return 'tags:\n$lines';
+  }
+
+  String buildProductMarkdownTemplate({
+    required List<String> tags,
+    String engineer = '',
+    String experimentalCode = '',
+    String solidContent = '',
+    String hydroxylValue = '',
+    String functionality = '',
+    String hardness = '',
+    String gloss60 = '',
+    String boilResistance = '',
+    String waterContactAngle = '',
+    String technologySource = '',
+    String benchmark = '',
+    String viscosity = '',
+  }) {
+    return '''
+---
+${_joinTagsToYamlList(tags)}
+工程师: $engineer
+实验牌号: $experimentalCode
+固含: $solidContent
+羟值: $hydroxylValue
+官能度: $functionality
+硬度: $hardness
+光泽(60°): $gloss60
+水煮: $boilResistance
+水接触角: $waterContactAngle
+技术源: $technologySource
+对标: $benchmark
+粘度: $viscosity
+---
+'''.trim();
+  }
+
+  String buildApplicationMarkdownTemplate({
+    required List<String> tags,
+    String primer = '',
+    String midCoat = '',
+    String topCoat = '',
+    String baseMaterial = '',
+  }) {
+    return '''
+---
+${_joinTagsToYamlList(tags)}
+基材: $baseMaterial
+底漆: $primer
+中漆: $midCoat
+面漆: $topCoat
+---
+'''.trim();
+  }
+
+  String buildFormulaMarkdownTemplate({required String tableMarkdown}) {
+    return tableMarkdown.trim().isEmpty
+        ? '| 项目 | 数值 |\n| --- | --- |\n| 示例 | 0 |'
+        : tableMarkdown.trim();
+  }
+
+  Future<void> addProductMarkdown({
+    required String code,
+    required String markdown,
+  }) async {
+    final normalizedCode = code.trim().toUpperCase();
+    if (!RegExp(r'^R[DS]\d{3,}$').hasMatch(normalizedCode)) {
+      throw ArgumentError('文件名需符合 RDXXX 或 RSXXX 格式');
+    }
+    final dataDir = await _getPrivateDataDirectory();
+    if (dataDir == null) {
+      throw StateError('当前平台不支持写入本地 Markdown 数据');
+    }
+    final productDir = Directory('${dataDir.path}/产品列表');
+    await productDir.create(recursive: true);
+    final file = File('${productDir.path}/$normalizedCode.md');
+    await file.writeAsString(markdown.trim());
+    _products.removeWhere((item) => item.fileName.toUpperCase() == normalizedCode);
+    _products.add(ProductItem.fromMdContent(file.path, markdown));
+    _products.sort((a, b) => a.fileName.compareTo(b.fileName));
+    _addLog('DataService: Saved manual product file $normalizedCode.md');
+  }
+
+  Future<void> addApplicationMarkdown({
+    required String name,
+    required String markdown,
+  }) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) {
+      throw ArgumentError('产品应用名称不能为空');
+    }
+    final dataDir = await _getPrivateDataDirectory();
+    if (dataDir == null) {
+      throw StateError('当前平台不支持写入本地 Markdown 数据');
+    }
+    final appDir = Directory('${dataDir.path}/产品应用');
+    await appDir.create(recursive: true);
+    final file = File('${appDir.path}/$normalizedName.md');
+    await file.writeAsString(markdown.trim());
+    _applications.removeWhere((item) => item.fileName == normalizedName);
+    _applications.add(ProductItem.fromMdContent(file.path, markdown));
+    _applications.sort((a, b) => a.fileName.compareTo(b.fileName));
+    _addLog('DataService: Saved manual application file $normalizedName.md');
+  }
+
+  Future<void> addFormulaMarkdown({
+    required String name,
+    required String markdown,
+  }) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) {
+      throw ArgumentError('产品配方名称不能为空');
+    }
+    final dataDir = await _getPrivateDataDirectory();
+    if (dataDir == null) {
+      throw StateError('当前平台不支持写入本地 Markdown 数据');
+    }
+    final formulaDir = Directory('${dataDir.path}/产品配方');
+    await formulaDir.create(recursive: true);
+    final file = File('${formulaDir.path}/$normalizedName.md');
+    await file.writeAsString(markdown.trim());
+    _formulas.removeWhere((item) => item.fileName == normalizedName);
+    _formulas.add(ProductItem.fromMdContent(file.path, markdown));
+    _formulas.sort((a, b) => a.fileName.compareTo(b.fileName));
+    _addLog('DataService: Saved manual formula file $normalizedName.md');
+  }
+
+  Future<File?> exportMarkdownArchive() async {
+    if (kIsWeb) {
+      _addLog('DataService: Export archive skipped on web platform');
+      return null;
+    }
+    final dataDir = await _getPrivateDataDirectory();
+    if (dataDir == null) return null;
+
+    final archive = Archive();
+    Future<void> addMdFiles(String folderName) async {
+      final folder = Directory('${dataDir.path}/$folderName');
+      if (!await folder.exists()) return;
+      await for (final entity in folder.list(recursive: false)) {
+        if (entity is! File || !entity.path.endsWith('.md')) continue;
+        final content = await entity.readAsString();
+        final bytes = utf8.encode(content);
+        final entryName = '$folderName/${entity.uri.pathSegments.last}';
+        archive.addFile(ArchiveFile(entryName, bytes.length, bytes));
+      }
+    }
+
+    await addMdFiles('产品列表');
+    await addMdFiles('产品应用');
+    await addMdFiles('产品配方');
+
+    if (archive.isEmpty) {
+      _addLog('DataService: Export archive skipped because no markdown file found');
+      return null;
+    }
+
+    final tmpDir = await getTemporaryDirectory();
+    final timestamp = DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '')
+        .replaceAll('-', '')
+        .replaceAll('.', '')
+        .substring(0, 15);
+    final file = File('${tmpDir.path}/RSTONE_Obsidian_MD_$timestamp.zip');
+    final zipBytes = ZipEncoder().encode(archive);
+    if (zipBytes == null) {
+      _addLog('DataService: Export archive failed due to zip encoder returning null');
+      return null;
+    }
+    await file.writeAsBytes(Uint8List.fromList(zipBytes), flush: true);
+    _addLog('DataService: Exported markdown archive at ${file.path}');
+    return file;
   }
 
   /// 搜索产品和应用
