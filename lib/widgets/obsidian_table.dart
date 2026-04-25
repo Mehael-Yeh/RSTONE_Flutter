@@ -22,6 +22,8 @@ class ObsidianTable extends StatefulWidget {
   final bool sortDescending;
   final PreferencesService preferencesService;
   final int noteResetSignal;
+  final bool Function(ProductItem item)? isManualItem;
+  final Future<void> Function(ProductItem item)? onDeleteManualItem;
 
   const ObsidianTable({
     super.key,
@@ -35,6 +37,8 @@ class ObsidianTable extends StatefulWidget {
     required this.onSortChanged,
     required this.onSortDirectionChanged,
     required this.preferencesService,
+    this.isManualItem,
+    this.onDeleteManualItem,
     this.noteResetSignal = 0,
     this.currentSortColumn,
     this.sortDescending = false,
@@ -255,6 +259,12 @@ class _ObsidianTableState extends State<ObsidianTable> {
     }
   }
 
+  bool _isManual(ProductItem item) => widget.isManualItem?.call(item) ?? false;
+
+  Future<void> _deleteManualItem(ProductItem item) async {
+    await widget.onDeleteManualItem?.call(item);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isEditingColumns) {
@@ -362,7 +372,9 @@ class _ObsidianTableState extends State<ObsidianTable> {
               tdsContent: _tdsOf(item),
             ),
             onNoteTap: () => _openNoteEditor(item),
+            onDeleteTap: _isManual(item) ? () => _deleteManualItem(item) : null,
             noteResetSignal: widget.noteResetSignal,
+            showUserAddedDot: _isManual(item),
             titleStyle: TextStyle(
               color: cs.onSurface,
               fontWeight: FontWeight.w700,
@@ -489,6 +501,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
                   return NoteSwipeTile(
                     onNoteTap: () => _openNoteEditor(item),
+                    onDeleteTap: _isManual(item) ? () => _deleteManualItem(item) : null,
                     resetSignal: widget.noteResetSignal,
                     child: InkWell(
                       onTap: () => ProductDetailSheet.show(
@@ -512,13 +525,31 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 4),
                                   child: Center(
-                                    child: Text(
-                                      val,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: val.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            val,
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: val.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (col == _columns.first && _isManual(item))
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            margin: const EdgeInsets.only(left: 6),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.redAccent,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                 ),
