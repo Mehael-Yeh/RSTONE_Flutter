@@ -13,6 +13,7 @@ class NoteSwipeTile extends StatefulWidget {
   final int resetSignal;
   final EdgeInsets noteButtonInsets;
   final BorderRadius noteButtonBorderRadius;
+  final BorderRadius deleteButtonBorderRadius;
   final double noteButtonWidthFactor;
   final double noteButtonRightOverlap;
 
@@ -24,6 +25,7 @@ class NoteSwipeTile extends StatefulWidget {
     this.resetSignal = 0,
     this.noteButtonInsets = EdgeInsets.zero,
     this.noteButtonBorderRadius = BorderRadius.zero,
+    this.deleteButtonBorderRadius = BorderRadius.zero,
     this.noteButtonWidthFactor = 0.17,
     this.noteButtonRightOverlap = 10,
   });
@@ -160,7 +162,7 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           padding: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(
-                            borderRadius: widget.noteButtonBorderRadius,
+                            borderRadius: widget.deleteButtonBorderRadius,
                           ),
                         ),
                       ),

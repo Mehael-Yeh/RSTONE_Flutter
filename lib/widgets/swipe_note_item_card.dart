@@ -44,6 +44,9 @@ class SwipeNoteItemCard extends StatelessWidget {
         noteButtonBorderRadius: const BorderRadius.horizontal(
           left: Radius.circular(12),
         ),
+        deleteButtonBorderRadius: const BorderRadius.horizontal(
+          right: Radius.circular(12),
+        ),
         child: Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: EdgeInsets.zero,
