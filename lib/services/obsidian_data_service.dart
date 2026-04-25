@@ -562,12 +562,10 @@ ${_joinTagsToYamlList(tags)}
     String primer = '',
     String midCoat = '',
     String topCoat = '',
-    String baseMaterial = '',
   }) {
     return '''
 ---
 ${_joinTagsToYamlList(tags)}
-基材: $baseMaterial
 底漆: $primer
 中漆: $midCoat
 面漆: $topCoat
