@@ -130,7 +130,6 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     final primerController = TextEditingController();
     final midController = TextEditingController();
     final topController = TextEditingController();
-    final baseController = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -142,8 +141,6 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(controller: nameController, decoration: const InputDecoration(labelText: '名称')),
-                const SizedBox(height: 8),
-                TextField(controller: baseController, decoration: const InputDecoration(labelText: '基材')),
                 const SizedBox(height: 8),
                 TextField(controller: primerController, decoration: const InputDecoration(labelText: '底漆')),
                 const SizedBox(height: 8),
@@ -178,7 +175,6 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
         primer: primerController.text.trim(),
         midCoat: midController.text.trim(),
         topCoat: topController.text.trim(),
-        baseMaterial: baseController.text.trim(),
       );
       await widget.dataService.addApplicationMarkdown(
         name: nameController.text.trim(),
@@ -320,79 +316,78 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                 ],
               ),
             )
-          : Stack(
+          : Column(
               children: [
-                NotificationListener<ScrollNotification>(
-                  onNotification: (notification) {
-                    if (notification.metrics.pixels > notification.metrics.minScrollExtent + 0.5) {
-                      _closePullButtons();
-                    }
-                    if (notification is OverscrollNotification &&
-                        notification.metrics.pixels <= notification.metrics.minScrollExtent &&
-                        notification.overscroll < 0) {
-                      _updatePullByOverscroll(-notification.overscroll);
-                    } else if (notification is ScrollEndNotification) {
-                      _finishPullGesture();
-                    }
-                    return false;
-                  },
-                  child: ObsidianTable(
-                    items: items,
-                    formulas: widget.dataService.formulas,
-                    tdsByProduct: widget.dataService.tdsByProduct,
-                    defaultColumns: _columns,
-                    availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
-                    isMobile: isMobile,
-                    onColumnsChanged: _onColumnsChanged,
-                    onSortChanged: _onSortChanged,
-                    onSortDirectionChanged: _onSortDirectionChanged,
-                    preferencesService: widget.preferencesService,
-                    currentSortColumn: _sortColumn,
-                    sortDescending: _sortDescending,
-                    noteResetSignal: _noteResetSignal,
-                  ),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  height: _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+                  child: _pullExtent <= 0
+                      ? const SizedBox.shrink()
+                      : Row(
+                          children: [
+                            Expanded(
+                              child: Material(
+                                color: Colors.teal.shade300,
+                                borderRadius: BorderRadius.circular(14),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: _showAddFormulaDialog,
+                                  child: const Center(
+                                    child: Text('新增产品配方', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Material(
+                                color: Colors.indigo.shade300,
+                                borderRadius: BorderRadius.circular(14),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: _showAddApplicationDialog,
+                                  child: const Center(
+                                    child: Text('新增产品应用', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
-                if (_pullExtent > 0)
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    top: 12,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      height: _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Material(
-                              color: Colors.teal.shade300,
-                              borderRadius: BorderRadius.circular(14),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(14),
-                                onTap: _showAddFormulaDialog,
-                                child: const Center(
-                                  child: Text('新增产品配方', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Material(
-                              color: Colors.indigo.shade300,
-                              borderRadius: BorderRadius.circular(14),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(14),
-                                onTap: _showAddApplicationDialog,
-                                child: const Center(
-                                  child: Text('新增产品应用', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                Expanded(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      if (notification.metrics.pixels > notification.metrics.minScrollExtent + 0.5) {
+                        _closePullButtons();
+                      }
+                      if (notification is OverscrollNotification &&
+                          notification.metrics.pixels <= notification.metrics.minScrollExtent &&
+                          notification.overscroll < 0) {
+                        _updatePullByOverscroll(-notification.overscroll);
+                      } else if (notification is ScrollEndNotification) {
+                        _finishPullGesture();
+                      }
+                      return false;
+                    },
+                    child: ObsidianTable(
+                      items: items,
+                      formulas: widget.dataService.formulas,
+                      tdsByProduct: widget.dataService.tdsByProduct,
+                      defaultColumns: _columns,
+                      availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
+                      isMobile: isMobile,
+                      onColumnsChanged: _onColumnsChanged,
+                      onSortChanged: _onSortChanged,
+                      onSortDirectionChanged: _onSortDirectionChanged,
+                      preferencesService: widget.preferencesService,
+                      currentSortColumn: _sortColumn,
+                      sortDescending: _sortDescending,
+                      noteResetSignal: _noteResetSignal,
                     ),
                   ),
+                ),
               ],
             ),
     );

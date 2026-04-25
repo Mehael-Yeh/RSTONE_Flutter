@@ -356,62 +356,61 @@ class _ProductListPageState extends State<ProductListPage> {
                 ],
               ),
             )
-          : Stack(
+          : Column(
               children: [
-                NotificationListener<ScrollNotification>(
-                  onNotification: (notification) {
-                    if (notification.metrics.pixels > notification.metrics.minScrollExtent + 0.5) {
-                      _closePullButton();
-                    }
-                    if (notification is OverscrollNotification &&
-                        notification.metrics.pixels <= notification.metrics.minScrollExtent &&
-                        notification.overscroll < 0) {
-                      _updatePullByOverscroll(-notification.overscroll);
-                    } else if (notification is ScrollEndNotification) {
-                      _finishPullGesture();
-                    }
-                    return false;
-                  },
-                  child: ObsidianTable(
-                    items: items,
-                    formulas: widget.dataService.formulas,
-                    tdsByProduct: widget.dataService.tdsByProduct,
-                    defaultColumns: _columns,
-                    availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
-                    isMobile: isMobile,
-                    onColumnsChanged: _onColumnsChanged,
-                    onSortChanged: _onSortChanged,
-                    onSortDirectionChanged: _onSortDirectionChanged,
-                    preferencesService: widget.preferencesService,
-                    currentSortColumn: _sortColumn,
-                    sortDescending: _sortDescending,
-                    noteResetSignal: _noteResetSignal,
-                  ),
-                ),
-                if (_pullExtent > 0)
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    top: 12,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      height: _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
-                      child: Material(
-                        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(14),
-                        child: InkWell(
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  height: _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+                  child: _pullExtent <= 0
+                      ? const SizedBox.shrink()
+                      : Material(
+                          color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.9),
                           borderRadius: BorderRadius.circular(14),
-                          onTap: _showAddProductDialog,
-                          child: const Center(
-                            child: Text(
-                              '新增产品信息',
-                              style: TextStyle(fontWeight: FontWeight.w700),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: _showAddProductDialog,
+                            child: const Center(
+                              child: Text(
+                                '新增产品信息',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                ),
+                Expanded(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      if (notification.metrics.pixels > notification.metrics.minScrollExtent + 0.5) {
+                        _closePullButton();
+                      }
+                      if (notification is OverscrollNotification &&
+                          notification.metrics.pixels <= notification.metrics.minScrollExtent &&
+                          notification.overscroll < 0) {
+                        _updatePullByOverscroll(-notification.overscroll);
+                      } else if (notification is ScrollEndNotification) {
+                        _finishPullGesture();
+                      }
+                      return false;
+                    },
+                    child: ObsidianTable(
+                      items: items,
+                      formulas: widget.dataService.formulas,
+                      tdsByProduct: widget.dataService.tdsByProduct,
+                      defaultColumns: _columns,
+                      availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
+                      isMobile: isMobile,
+                      onColumnsChanged: _onColumnsChanged,
+                      onSortChanged: _onSortChanged,
+                      onSortDirectionChanged: _onSortDirectionChanged,
+                      preferencesService: widget.preferencesService,
+                      currentSortColumn: _sortColumn,
+                      sortDescending: _sortDescending,
+                      noteResetSignal: _noteResetSignal,
                     ),
                   ),
+                ),
               ],
             ),
     );
