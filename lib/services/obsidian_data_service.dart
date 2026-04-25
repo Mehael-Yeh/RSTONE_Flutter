@@ -529,6 +529,10 @@ PEEK -> 聚醚醚酮
     String experimentalCode = '',
     String solidContent = '',
     String hydroxylValue = '',
+    String functionality = '',
+    String hardness = '',
+    String gloss60 = '',
+    String boilResistance = '',
     String waterContactAngle = '',
     String technologySource = '',
     String benchmark = '',
@@ -541,6 +545,10 @@ ${_joinTagsToYamlList(tags)}
 实验牌号: $experimentalCode
 固含: $solidContent
 羟值: $hydroxylValue
+官能度: $functionality
+硬度: $hardness
+光泽(60°): $gloss60
+水煮: $boilResistance
 水接触角: $waterContactAngle
 技术源: $technologySource
 对标: $benchmark
