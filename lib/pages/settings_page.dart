@@ -440,13 +440,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   onLongPress: _copyProductNotesMarkdownToClipboard,
                 ),
                 ListTile(
-                  leading: const Icon(Icons.folder_zip_outlined),
-                  title: const Text('导出产品 Markdown 数据包'),
-                  subtitle: const Text('打包产品列表/应用/配方为 ZIP'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _exportMarkdownArchive,
-                ),
-                ListTile(
                   leading: Icon(Icons.delete_sweep_outlined, color: cs.error),
                   title: const Text('清除所有产品笔记'),
                   subtitle: const Text('清空全部项目反馈记录'),
