@@ -102,10 +102,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
               TextField(
                 controller: nameController,
                 style: const TextStyle(fontSize: 13),
-                decoration: const InputDecoration(
-                  labelText: '配方文件名',
-                  labelStyle: TextStyle(fontSize: 12),
-                ),
+                decoration: _roundedInputDecoration(labelText: '名称'),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -113,11 +110,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                 minLines: 8,
                 maxLines: 14,
                 style: const TextStyle(fontSize: 13),
-                decoration: const InputDecoration(
-                  labelText: '配方 Markdown 表格',
-                  labelStyle: TextStyle(fontSize: 12),
-                  border: OutlineInputBorder(),
-                ),
+                decoration: _roundedInputDecoration(labelText: '配方 Markdown 表格'),
               ),
             ],
           ),
@@ -179,7 +172,10 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                 TextField(
                   controller: tagsController,
                   style: const TextStyle(fontSize: 13),
-                  decoration: _roundedInputDecoration(labelText: 'tags（英文逗号分隔）'),
+                  decoration: _roundedInputDecoration(
+                    labelText: 'tags（空格分隔）',
+                    hintText: '例如 水性 高光',
+                  ),
                 ),
               ],
             ),
@@ -201,7 +197,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
 
     try {
       final tags = tagsController.text
-          .split(RegExp(r'[,，]'))
+          .split(RegExp(r'[\s,，]+'))
           .map((e) => e.trim())
           .where((e) => e.isNotEmpty)
           .toList();
@@ -224,13 +220,30 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     }
   }
 
-  InputDecoration _roundedInputDecoration({required String labelText}) {
+  InputDecoration _roundedInputDecoration({
+    required String labelText,
+    String? hintText,
+  }) {
+    final cs = Theme.of(context).colorScheme;
     return InputDecoration(
       labelText: labelText,
-      labelStyle: const TextStyle(fontSize: 12),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      hintText: hintText,
+      filled: true,
+      fillColor: cs.surfaceContainerHighest.withOpacity(0.35),
+      labelStyle: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+      hintStyle: TextStyle(fontSize: 12, color: cs.onSurfaceVariant.withOpacity(0.85)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: cs.outlineVariant),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: cs.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: cs.primary, width: 1.6),
+      ),
       isDense: true,
     );
   }
@@ -344,7 +357,10 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   void didUpdateWidget(covariant ProductApplicationsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.pageChangeSignal != widget.pageChangeSignal) {
-      setState(() => _noteResetSignal++);
+      setState(() {
+        _noteResetSignal++;
+        _pullExtent = 0;
+      });
     }
   }
 
@@ -424,54 +440,60 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
               child: Column(
                 children: [
                   AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
                     height: _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
                     padding: const EdgeInsets.fromLTRB(8, 3, 8, 3),
                     alignment: Alignment.center,
                     child: _pullExtent <= 0
                         ? const SizedBox.shrink()
-                        : Card(
-                            margin: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            clipBehavior: Clip.antiAlias,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Material(
-                                    color: Theme.of(context).colorScheme.primaryContainer,
-                                    child: InkWell(
-                                      onTap: _showAddFormulaDialog,
-                                      child: Center(
-                                        child: Text(
-                                          '新增产品配方',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        : AnimatedOpacity(
+                            duration: const Duration(milliseconds: 160),
+                            curve: Curves.easeOut,
+                            opacity: (_pullExtent / _pullButtonHeight).clamp(0.0, 1.0),
+                            child: Card(
+                              margin: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              clipBehavior: Clip.antiAlias,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Material(
+                                      color: Theme.of(context).colorScheme.primaryContainer,
+                                      child: InkWell(
+                                        onTap: _showAddFormulaDialog,
+                                        child: Center(
+                                          child: Text(
+                                            '新增产品配方',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                const VerticalDivider(width: 1),
-                                Expanded(
-                                  child: Material(
-                                    color: Theme.of(context).colorScheme.secondaryContainer,
-                                    child: InkWell(
-                                      onTap: _showAddApplicationDialog,
-                                      child: Center(
-                                        child: Text(
-                                          '新增产品应用',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                  const VerticalDivider(width: 1),
+                                  Expanded(
+                                    child: Material(
+                                      color: Theme.of(context).colorScheme.secondaryContainer,
+                                      child: InkWell(
+                                        onTap: _showAddApplicationDialog,
+                                        child: Center(
+                                          child: Text(
+                                            '新增产品应用',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                   ),

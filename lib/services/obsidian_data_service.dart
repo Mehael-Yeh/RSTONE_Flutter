@@ -171,6 +171,7 @@ PEEK -> 聚醚醚酮
       await _loadFromAssetsOnly();
       await _loadTagAliasRules();
       await _loadManualItemMeta();
+      await _loadManualMarkdownItems();
       _addLog('DataService: Asset load complete. Products: ${_products.length}, Applications: ${_applications.length}');
       
       // 第二步：如果Asset加载失败，从私有目录加载
@@ -467,7 +468,9 @@ PEEK -> 聚醚醚酮
           try {
             final content = await rootBundle.loadString('$_productsAssetPath/$fileName');
             final file = File('${productsDir.path}/$fileName');
-            await file.writeAsString(content);
+            if (!await file.exists()) {
+              await file.writeAsString(content);
+            }
           } catch (e) {
             // 忽略单个文件错误
           }
@@ -489,7 +492,9 @@ PEEK -> 聚醚醚酮
           try {
             final content = await rootBundle.loadString('$_applicationsAssetPath/$fileName');
             final file = File('${appsDir.path}/$fileName');
-            await file.writeAsString(content);
+            if (!await file.exists()) {
+              await file.writeAsString(content);
+            }
           } catch (e) {
             // 忽略单个文件错误
           }
@@ -509,7 +514,9 @@ PEEK -> 聚醚醚酮
           try {
             final content = await rootBundle.loadString('assets/产品配方/$fileName');
             final file = File('${formulasDir.path}/$fileName');
-            await file.writeAsString(content);
+            if (!await file.exists()) {
+              await file.writeAsString(content);
+            }
           } catch (_) {}
         }
         _addLog('DataService: Copied ${formulaFiles.length} formulas to private dir');
@@ -838,6 +845,53 @@ ${_joinTagsToYamlList(tags)}
     } catch (e) {
       _addLog('DataService: Failed to load manual item metadata: $e');
     }
+  }
+
+  Future<void> _loadManualMarkdownItems() async {
+    if (kIsWeb) return;
+    final dataDir = await _getPrivateDataDirectory();
+    if (dataDir == null) return;
+
+    Future<void> mergeManualItems({
+      required String folderName,
+      required Set<String> fileNames,
+      required List<ProductItem> target,
+      bool normalizeUppercaseName = false,
+    }) async {
+      for (final rawName in fileNames) {
+        final resolvedName = normalizeUppercaseName ? rawName.toUpperCase() : rawName;
+        final file = File('${dataDir.path}/$folderName/$resolvedName.md');
+        if (!await file.exists()) {
+          continue;
+        }
+        try {
+          final content = await file.readAsString();
+          final parsed = ProductItem.fromMdContent(file.path, content);
+          target.removeWhere((item) => item.fileName == parsed.fileName);
+          target.add(parsed);
+        } catch (e) {
+          _addLog('DataService: Failed to load manual markdown $folderName/$resolvedName.md: $e');
+        }
+      }
+      target.sort((a, b) => a.fileName.compareTo(b.fileName));
+    }
+
+    await mergeManualItems(
+      folderName: '产品列表',
+      fileNames: _manualProductNames,
+      target: _products,
+      normalizeUppercaseName: true,
+    );
+    await mergeManualItems(
+      folderName: '产品应用',
+      fileNames: _manualApplicationNames,
+      target: _applications,
+    );
+    await mergeManualItems(
+      folderName: '产品配方',
+      fileNames: _manualFormulaNames,
+      target: _formulas,
+    );
   }
 
   Future<void> _saveManualItemMeta() async {

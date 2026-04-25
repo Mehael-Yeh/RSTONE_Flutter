@@ -134,7 +134,7 @@ class _ProductListPageState extends State<ProductListPage> {
                   style: const TextStyle(fontSize: 13),
                   decoration: _roundedInputDecoration(
                     labelText: 'tags',
-                    hintText: '用英文逗号分隔，例如 水性, 高光',
+                    hintText: '用空格分隔，例如 水性 高光',
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -169,7 +169,7 @@ class _ProductListPageState extends State<ProductListPage> {
 
     try {
       final tags = tagsController.text
-          .split(RegExp(r'[,，]'))
+          .split(RegExp(r'[\s,，]+'))
           .map((e) => e.trim())
           .where((e) => e.isNotEmpty)
           .toList();
@@ -205,14 +205,26 @@ class _ProductListPageState extends State<ProductListPage> {
     required String labelText,
     String? hintText,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return InputDecoration(
       labelText: labelText,
       hintText: hintText,
-      labelStyle: const TextStyle(fontSize: 12),
-      hintStyle: const TextStyle(fontSize: 12),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      filled: true,
+      fillColor: cs.surfaceContainerHighest.withOpacity(0.35),
+      labelStyle: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+      hintStyle: TextStyle(fontSize: 12, color: cs.onSurfaceVariant.withOpacity(0.85)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: cs.outlineVariant),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: cs.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: cs.primary, width: 1.6),
+      ),
       isDense: true,
     );
   }
@@ -326,7 +338,10 @@ class _ProductListPageState extends State<ProductListPage> {
   void didUpdateWidget(covariant ProductListPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.pageChangeSignal != widget.pageChangeSignal) {
-      setState(() => _noteResetSignal++);
+      setState(() {
+        _noteResetSignal++;
+        _pullExtent = 0;
+      });
     }
   }
 
@@ -444,25 +459,31 @@ class _ProductListPageState extends State<ProductListPage> {
               child: Column(
                 children: [
                   AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
                     height: _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
                     padding: const EdgeInsets.fromLTRB(8, 3, 8, 3),
                     alignment: Alignment.center,
                     child: _pullExtent <= 0
                         ? const SizedBox.shrink()
-                        : Card(
-                            margin: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            color: Theme.of(context).colorScheme.secondaryContainer,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: _showAddProductDialog,
-                              child: Center(
-                                child: Text(
-                                  '新增产品信息',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                        : AnimatedOpacity(
+                            duration: const Duration(milliseconds: 160),
+                            curve: Curves.easeOut,
+                            opacity: (_pullExtent / _pullButtonHeight).clamp(0.0, 1.0),
+                            child: Card(
+                              margin: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              color: Theme.of(context).colorScheme.secondaryContainer,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: _showAddProductDialog,
+                                child: Center(
+                                  child: Text(
+                                    '新增产品信息',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                    ),
                                   ),
                                 ),
                               ),
