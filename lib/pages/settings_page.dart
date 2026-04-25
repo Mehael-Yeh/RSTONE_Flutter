@@ -428,7 +428,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 12),
           _buildSectionCard(
-            title: '产品笔记',
+            title: '产品笔记与新增',
             child: Column(
               children: [
                 ListTile(
@@ -452,6 +452,14 @@ class _SettingsPageState extends State<SettingsPage> {
                   subtitle: const Text('清空全部项目反馈记录'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _confirmClearAllProductNotes,
+                ),
+                const Divider(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.folder_zip_outlined),
+                  title: const Text('导出产品 Markdown 数据包'),
+                  subtitle: const Text('打包产品列表/应用/配方为 ZIP'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _exportMarkdownArchive,
                 ),
               ],
             ),
