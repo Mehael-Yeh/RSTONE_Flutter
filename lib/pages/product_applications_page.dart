@@ -240,6 +240,145 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     );
   }
 
+  void _updatePullByOverscroll(double overscroll) {
+    final next = (_pullExtent + overscroll).clamp(0.0, _pullButtonHeight * 1.3);
+    if ((next - _pullExtent).abs() < 0.1) return;
+    setState(() => _pullExtent = next);
+  }
+
+  void _finishPullGesture() {
+    setState(() {
+      _pullExtent = _pullExtent >= _pullTriggerHeight ? _pullButtonHeight : 0;
+    });
+  }
+
+  void _closePullButtons() {
+    if (_pullExtent == 0) return;
+    setState(() => _pullExtent = 0);
+  }
+
+  Future<void> _showAddFormulaDialog() async {
+    _closePullButtons();
+    final nameController = TextEditingController();
+    final tableController = TextEditingController(
+      text: '| 原料 | 百分比 |\n| --- | --- |\n| 示例原料A | |\n| 示例原料B | |',
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新增产品配方'),
+        content: SizedBox(
+          width: 680,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: '配方文件名'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: tableController,
+                minLines: 8,
+                maxLines: 14,
+                decoration: const InputDecoration(
+                  labelText: '配方 Markdown 表格',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final markdown = widget.dataService.buildFormulaMarkdownTemplate(
+        tableMarkdown: tableController.text,
+      );
+      await widget.dataService.addFormulaMarkdown(
+        name: nameController.text.trim(),
+        markdown: markdown,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('产品配方已新增')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('新增失败：$e')));
+    }
+  }
+
+  Future<void> _showAddApplicationDialog() async {
+    _closePullButtons();
+    final nameController = TextEditingController();
+    final tagsController = TextEditingController();
+    final primerController = TextEditingController();
+    final midController = TextEditingController();
+    final topController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新增产品应用'),
+        content: SizedBox(
+          width: 640,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nameController, decoration: const InputDecoration(labelText: '名称')),
+                const SizedBox(height: 8),
+                TextField(controller: primerController, decoration: const InputDecoration(labelText: '底漆')),
+                const SizedBox(height: 8),
+                TextField(controller: midController, decoration: const InputDecoration(labelText: '中漆')),
+                const SizedBox(height: 8),
+                TextField(controller: topController, decoration: const InputDecoration(labelText: '面漆')),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: tagsController,
+                  decoration: const InputDecoration(labelText: 'tags（英文逗号分隔）'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final tags = tagsController.text
+          .split(RegExp(r'[,，]'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      final markdown = widget.dataService.buildApplicationMarkdownTemplate(
+        tags: tags,
+        primer: primerController.text.trim(),
+        midCoat: midController.text.trim(),
+        topCoat: topController.text.trim(),
+      );
+      await widget.dataService.addApplicationMarkdown(
+        name: nameController.text.trim(),
+        markdown: markdown,
+      );
+      if (!mounted) return;
+      setState(() => _noteResetSignal++);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('产品应用已新增')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('新增失败：$e')));
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
