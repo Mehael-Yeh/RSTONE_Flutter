@@ -35,6 +35,10 @@ class _ProductListPageState extends State<ProductListPage> {
     '工程师',
     '固含',
     '羟值',
+    '官能度',
+    '硬度',
+    '光泽(60°)',
+    '水煮',
     '水接触角',
     '技术源',
     '对标',
@@ -88,6 +92,10 @@ class _ProductListPageState extends State<ProductListPage> {
     final solidController = TextEditingController();
     final hydroxylController = TextEditingController();
     final contactAngleController = TextEditingController();
+    final functionalityController = TextEditingController();
+    final hardnessController = TextEditingController();
+    final glossController = TextEditingController();
+    final boilController = TextEditingController();
     final sourceController = TextEditingController();
     final benchmarkController = TextEditingController();
     final viscosityController = TextEditingController();
@@ -126,6 +134,14 @@ class _ProductListPageState extends State<ProductListPage> {
                 const SizedBox(height: 8),
                 TextField(controller: hydroxylController, decoration: const InputDecoration(labelText: '羟值')),
                 const SizedBox(height: 8),
+                TextField(controller: functionalityController, decoration: const InputDecoration(labelText: '官能度')),
+                const SizedBox(height: 8),
+                TextField(controller: hardnessController, decoration: const InputDecoration(labelText: '硬度')),
+                const SizedBox(height: 8),
+                TextField(controller: glossController, decoration: const InputDecoration(labelText: '光泽(60°)')),
+                const SizedBox(height: 8),
+                TextField(controller: boilController, decoration: const InputDecoration(labelText: '水煮')),
+                const SizedBox(height: 8),
                 TextField(controller: contactAngleController, decoration: const InputDecoration(labelText: '水接触角')),
                 const SizedBox(height: 8),
                 TextField(controller: sourceController, decoration: const InputDecoration(labelText: '技术源')),
@@ -157,6 +173,10 @@ class _ProductListPageState extends State<ProductListPage> {
         experimentalCode: expCodeController.text.trim(),
         solidContent: solidController.text.trim(),
         hydroxylValue: hydroxylController.text.trim(),
+        functionality: functionalityController.text.trim(),
+        hardness: hardnessController.text.trim(),
+        gloss60: glossController.text.trim(),
+        boilResistance: boilController.text.trim(),
         waterContactAngle: contactAngleController.text.trim(),
         technologySource: sourceController.text.trim(),
         benchmark: benchmarkController.text.trim(),
