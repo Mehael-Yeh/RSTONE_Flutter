@@ -40,11 +40,153 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   String? _sortColumn;
   bool _sortDescending = false;
   int _noteResetSignal = 0;
+  double _pullExtent = 0;
+  static const double _pullButtonHeight = 72;
+  static const double _pullTriggerHeight = 56;
 
   @override
   void initState() {
     super.initState();
     // 不在这里调用MediaQuery，延迟到didChangeDependencies
+  }
+
+  void _updatePullByOverscroll(double overscroll) {
+    final next = (_pullExtent + overscroll).clamp(0.0, _pullButtonHeight * 1.3);
+    if ((next - _pullExtent).abs() < 0.1) return;
+    setState(() => _pullExtent = next);
+  }
+
+  void _finishPullGesture() {
+    setState(() {
+      _pullExtent = _pullExtent >= _pullTriggerHeight ? _pullButtonHeight : 0;
+    });
+  }
+
+  void _closePullButtons() {
+    if (_pullExtent == 0) return;
+    setState(() => _pullExtent = 0);
+  }
+
+  Future<void> _showAddFormulaDialog() async {
+    _closePullButtons();
+    final nameController = TextEditingController();
+    final tableController = TextEditingController(
+      text: '| 原料 | 百分比 |\n| --- | --- |\n| 示例原料A | |\n| 示例原料B | |',
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新增产品配方'),
+        content: SizedBox(
+          width: 680,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: '配方文件名'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: tableController,
+                minLines: 8,
+                maxLines: 14,
+                decoration: const InputDecoration(
+                  labelText: '配方 Markdown 表格',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final markdown = widget.dataService.buildFormulaMarkdownTemplate(
+        tableMarkdown: tableController.text,
+      );
+      await widget.dataService.addFormulaMarkdown(
+        name: nameController.text.trim(),
+        markdown: markdown,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('产品配方已新增')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('新增失败：$e')));
+    }
+  }
+
+  Future<void> _showAddApplicationDialog() async {
+    _closePullButtons();
+    final nameController = TextEditingController();
+    final tagsController = TextEditingController();
+    final primerController = TextEditingController();
+    final midController = TextEditingController();
+    final topController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新增产品应用'),
+        content: SizedBox(
+          width: 640,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nameController, decoration: const InputDecoration(labelText: '名称')),
+                const SizedBox(height: 8),
+                TextField(controller: primerController, decoration: const InputDecoration(labelText: '底漆')),
+                const SizedBox(height: 8),
+                TextField(controller: midController, decoration: const InputDecoration(labelText: '中漆')),
+                const SizedBox(height: 8),
+                TextField(controller: topController, decoration: const InputDecoration(labelText: '面漆')),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: tagsController,
+                  decoration: const InputDecoration(labelText: 'tags（英文逗号分隔）'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final tags = tagsController.text
+          .split(RegExp(r'[,，]'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      final markdown = widget.dataService.buildApplicationMarkdownTemplate(
+        tags: tags,
+        primer: primerController.text.trim(),
+        midCoat: midController.text.trim(),
+        topCoat: topController.text.trim(),
+      );
+      await widget.dataService.addApplicationMarkdown(
+        name: nameController.text.trim(),
+        markdown: markdown,
+      );
+      if (!mounted) return;
+      setState(() => _noteResetSignal++);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('产品应用已新增')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('新增失败：$e')));
+    }
   }
 
   @override
@@ -174,20 +316,79 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                 ],
               ),
             )
-          : ObsidianTable(
-              items: items,
-              formulas: widget.dataService.formulas,
-              tdsByProduct: widget.dataService.tdsByProduct,
-              defaultColumns: _columns,
-              availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
-              isMobile: isMobile,
-              onColumnsChanged: _onColumnsChanged,
-              onSortChanged: _onSortChanged,
-              onSortDirectionChanged: _onSortDirectionChanged,
-              preferencesService: widget.preferencesService,
-              currentSortColumn: _sortColumn,
-              sortDescending: _sortDescending,
-              noteResetSignal: _noteResetSignal,
+          : Column(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  height: _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+                  child: _pullExtent <= 0
+                      ? const SizedBox.shrink()
+                      : Row(
+                          children: [
+                            Expanded(
+                              child: Material(
+                                color: Colors.teal.shade300,
+                                borderRadius: BorderRadius.circular(14),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: _showAddFormulaDialog,
+                                  child: const Center(
+                                    child: Text('新增产品配方', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Material(
+                                color: Colors.indigo.shade300,
+                                borderRadius: BorderRadius.circular(14),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: _showAddApplicationDialog,
+                                  child: const Center(
+                                    child: Text('新增产品应用', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+                Expanded(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      if (notification.metrics.pixels > notification.metrics.minScrollExtent + 0.5) {
+                        _closePullButtons();
+                      }
+                      if (notification is OverscrollNotification &&
+                          notification.metrics.pixels <= notification.metrics.minScrollExtent &&
+                          notification.overscroll < 0) {
+                        _updatePullByOverscroll(-notification.overscroll);
+                      } else if (notification is ScrollEndNotification) {
+                        _finishPullGesture();
+                      }
+                      return false;
+                    },
+                    child: ObsidianTable(
+                      items: items,
+                      formulas: widget.dataService.formulas,
+                      tdsByProduct: widget.dataService.tdsByProduct,
+                      defaultColumns: _columns,
+                      availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
+                      isMobile: isMobile,
+                      onColumnsChanged: _onColumnsChanged,
+                      onSortChanged: _onSortChanged,
+                      onSortDirectionChanged: _onSortDirectionChanged,
+                      preferencesService: widget.preferencesService,
+                      currentSortColumn: _sortColumn,
+                      sortDescending: _sortDescending,
+                      noteResetSignal: _noteResetSignal,
+                    ),
+                  ),
+                ),
+              ],
             ),
     );
   }
