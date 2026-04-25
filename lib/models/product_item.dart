@@ -24,6 +24,10 @@ class ProductItem {
   final String? experimentalCode; // 实验牌号
   final String? solidContent;  // 固含
   final String? hydroxylValue;  // 羟值
+  final String? functionality; // 官能度
+  final String? hardness; // 硬度
+  final String? gloss60; // 光泽(60°)
+  final String? boilResistance; // 水煮
   final String? waterContactAngle; // 水接触角
   final String? technologySource; // 技术源
   final String? benchmark;     // 对标
@@ -46,6 +50,10 @@ class ProductItem {
     this.experimentalCode,
     this.solidContent,
     this.hydroxylValue,
+    this.functionality,
+    this.hardness,
+    this.gloss60,
+    this.boilResistance,
     this.waterContactAngle,
     this.technologySource,
     this.benchmark,
@@ -73,6 +81,10 @@ class ProductItem {
     String? experimentalCode;
     String? solidContent;
     String? hydroxylValue;
+    String? functionality;
+    String? hardness;
+    String? gloss60;
+    String? boilResistance;
     String? waterContactAngle;
     String? technologySource;
     String? benchmark;
@@ -134,6 +146,14 @@ class ProductItem {
         solidContent = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('羟值:')) {
         hydroxylValue = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+      } else if (line.trim().startsWith('官能度:')) {
+        functionality = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+      } else if (line.trim().startsWith('硬度:')) {
+        hardness = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+      } else if (line.trim().startsWith('光泽(60°):')) {
+        gloss60 = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+      } else if (line.trim().startsWith('水煮:')) {
+        boilResistance = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('水接触角:')) {
         waterContactAngle = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('技术源:')) {
@@ -173,6 +193,10 @@ class ProductItem {
       experimentalCode: experimentalCode,
       solidContent: solidContent,
       hydroxylValue: hydroxylValue,
+      functionality: functionality,
+      hardness: hardness,
+      gloss60: gloss60,
+      boilResistance: boilResistance,
       waterContactAngle: waterContactAngle,
       technologySource: technologySource,
       benchmark: benchmark,
@@ -234,6 +258,10 @@ class ProductItem {
         if (engineer != null) '工程师': engineer!,
         if (solidContent != null) '固含': solidContent!,
         if (hydroxylValue != null) '羟值': hydroxylValue!,
+        if (functionality != null) '官能度': functionality!,
+        if (hardness != null) '硬度': hardness!,
+        if (gloss60 != null) '光泽(60°)': gloss60!,
+        if (boilResistance != null) '水煮': boilResistance!,
         if (waterContactAngle != null) '水接触角': waterContactAngle!,
         if (technologySource != null) '技术源': technologySource!,
         if (benchmark != null) '对标': benchmark!,
