@@ -12,8 +12,10 @@ class SwipeNoteItemCard extends StatelessWidget {
   final Color indicatorColor;
   final VoidCallback onTap;
   final NoteTapCallback onNoteTap;
+  final DeleteTapCallback? onDeleteTap;
   final int noteResetSignal;
   final TextStyle? titleStyle;
+  final bool showUserAddedDot;
 
   const SwipeNoteItemCard({
     super.key,
@@ -22,8 +24,10 @@ class SwipeNoteItemCard extends StatelessWidget {
     required this.indicatorColor,
     required this.onTap,
     required this.onNoteTap,
+    this.onDeleteTap,
     required this.noteResetSignal,
     this.titleStyle,
+    this.showUserAddedDot = false,
   });
 
   @override
@@ -34,10 +38,14 @@ class SwipeNoteItemCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       child: NoteSwipeTile(
         onNoteTap: onNoteTap,
+        onDeleteTap: onDeleteTap,
         resetSignal: noteResetSignal,
         noteButtonInsets: const EdgeInsets.symmetric(vertical: 1),
         noteButtonBorderRadius: const BorderRadius.horizontal(
           left: Radius.circular(12),
+        ),
+        deleteButtonBorderRadius: const BorderRadius.horizontal(
+          right: Radius.circular(12),
         ),
         child: Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -79,6 +87,16 @@ class SwipeNoteItemCard extends StatelessWidget {
                                         ),
                               ),
                             ),
+                            if (showUserAddedDot)
+                              Container(
+                                width: 8,
+                                height: 8,
+                                margin: const EdgeInsets.only(left: 8),
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
                           ],
                         ),
                         if (subtitleTokens.isNotEmpty) ...[

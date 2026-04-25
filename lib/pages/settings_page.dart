@@ -450,9 +450,16 @@ class _SettingsPageState extends State<SettingsPage> {
                 ListTile(
                   leading: const Icon(Icons.folder_zip_outlined),
                   title: const Text('导出产品 Markdown 数据包'),
-                  subtitle: const Text('打包产品列表/应用/配方为 ZIP'),
+                  subtitle: const Text('仅导出通过“新增”按钮创建的产品列表/应用/配方'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _exportMarkdownArchive,
+                ),
+                ListTile(
+                  leading: Icon(Icons.delete_forever_outlined, color: cs.error),
+                  title: const Text('删除所有新增 Markdown 数据'),
+                  subtitle: const Text('清空通过“新增”按钮写入的产品列表/应用/配方'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _confirmClearAllManualMarkdownData,
                 ),
               ],
             ),
@@ -743,6 +750,45 @@ class _SettingsPageState extends State<SettingsPage> {
       subject: 'RSTONE Markdown 数据包',
       text: '产品列表/产品应用/产品配方 Markdown 导出包',
     );
+  }
+
+  Future<void> _confirmClearAllManualMarkdownData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除新增 Markdown'),
+        content: const Text('将删除所有通过“新增产品信息/新增产品配方/新增产品应用”创建的数据，是否继续？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('继续')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final reconfirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('二次确认'),
+        content: const Text('请再次确认：删除后不可恢复。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('返回')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('确认删除')),
+        ],
+      ),
+    );
+    if (reconfirmed != true) return;
+
+    try {
+      final count = await widget.dataService.clearAllManualMarkdownData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(count == 0 ? '暂无新增 Markdown 数据' : '已删除 $count 条新增 Markdown 数据')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('删除失败：$e')));
+    }
   }
 
   String? _buildProductNotesMarkdown() {
