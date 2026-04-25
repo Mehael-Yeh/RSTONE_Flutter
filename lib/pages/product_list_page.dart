@@ -35,6 +35,10 @@ class _ProductListPageState extends State<ProductListPage> {
     '工程师',
     '固含',
     '羟值',
+    '官能度',
+    '硬度',
+    '光泽(60°)',
+    '水煮',
     '水接触角',
     '技术源',
     '对标',
@@ -46,11 +50,149 @@ class _ProductListPageState extends State<ProductListPage> {
   bool _sortDescending = false;
   String _typeFilter = '全部';
   int _noteResetSignal = 0;
+  double _pullExtent = 0;
+  bool _pullPinned = false;
+  static const double _pullButtonHeight = 72;
+  static const double _pullTriggerHeight = 56;
 
   @override
   void initState() {
     super.initState();
     // 不在这里调用MediaQuery，延迟到build中
+  }
+
+  void _updatePullByOverscroll(double overscroll) {
+    final next = (_pullExtent + overscroll).clamp(0.0, _pullButtonHeight * 1.3);
+    if ((next - _pullExtent).abs() < 0.1) return;
+    setState(() => _pullExtent = next);
+  }
+
+  void _finishPullGesture() {
+    final shouldPin = _pullExtent >= _pullTriggerHeight;
+    setState(() {
+      _pullPinned = shouldPin;
+      _pullExtent = shouldPin ? _pullButtonHeight : 0;
+    });
+  }
+
+  void _closePullButton() {
+    if (_pullExtent == 0 && !_pullPinned) return;
+    setState(() {
+      _pullExtent = 0;
+      _pullPinned = false;
+    });
+  }
+
+  Future<void> _showAddProductDialog() async {
+    _closePullButton();
+    final codeController = TextEditingController();
+    final tagsController = TextEditingController();
+    final engineerController = TextEditingController();
+    final expCodeController = TextEditingController();
+    final solidController = TextEditingController();
+    final hydroxylController = TextEditingController();
+    final contactAngleController = TextEditingController();
+    final functionalityController = TextEditingController();
+    final hardnessController = TextEditingController();
+    final glossController = TextEditingController();
+    final boilController = TextEditingController();
+    final sourceController = TextEditingController();
+    final benchmarkController = TextEditingController();
+    final viscosityController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新增产品信息'),
+        content: SizedBox(
+          width: 640,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: codeController,
+                  decoration: const InputDecoration(
+                    labelText: '文件名',
+                    hintText: 'RD001 或 RS001',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: tagsController,
+                  decoration: const InputDecoration(
+                    labelText: 'tags',
+                    hintText: '用英文逗号分隔，例如 水性, 高光',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(controller: engineerController, decoration: const InputDecoration(labelText: '工程师')),
+                const SizedBox(height: 8),
+                TextField(controller: expCodeController, decoration: const InputDecoration(labelText: '实验牌号')),
+                const SizedBox(height: 8),
+                TextField(controller: solidController, decoration: const InputDecoration(labelText: '固含')),
+                const SizedBox(height: 8),
+                TextField(controller: hydroxylController, decoration: const InputDecoration(labelText: '羟值')),
+                const SizedBox(height: 8),
+                TextField(controller: functionalityController, decoration: const InputDecoration(labelText: '官能度')),
+                const SizedBox(height: 8),
+                TextField(controller: hardnessController, decoration: const InputDecoration(labelText: '硬度')),
+                const SizedBox(height: 8),
+                TextField(controller: glossController, decoration: const InputDecoration(labelText: '光泽(60°)')),
+                const SizedBox(height: 8),
+                TextField(controller: boilController, decoration: const InputDecoration(labelText: '水煮')),
+                const SizedBox(height: 8),
+                TextField(controller: contactAngleController, decoration: const InputDecoration(labelText: '水接触角')),
+                const SizedBox(height: 8),
+                TextField(controller: sourceController, decoration: const InputDecoration(labelText: '技术源')),
+                const SizedBox(height: 8),
+                TextField(controller: benchmarkController, decoration: const InputDecoration(labelText: '对标')),
+                const SizedBox(height: 8),
+                TextField(controller: viscosityController, decoration: const InputDecoration(labelText: '粘度')),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final tags = tagsController.text
+          .split(RegExp(r'[,，]'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      final markdown = widget.dataService.buildProductMarkdownTemplate(
+        tags: tags,
+        engineer: engineerController.text.trim(),
+        experimentalCode: expCodeController.text.trim(),
+        solidContent: solidController.text.trim(),
+        hydroxylValue: hydroxylController.text.trim(),
+        functionality: functionalityController.text.trim(),
+        hardness: hardnessController.text.trim(),
+        gloss60: glossController.text.trim(),
+        boilResistance: boilController.text.trim(),
+        waterContactAngle: contactAngleController.text.trim(),
+        technologySource: sourceController.text.trim(),
+        benchmark: benchmarkController.text.trim(),
+        viscosity: viscosityController.text.trim(),
+      );
+      await widget.dataService.addProductMarkdown(
+        code: codeController.text.trim(),
+        markdown: markdown,
+      );
+      if (!mounted) return;
+      setState(() => _noteResetSignal++);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('产品信息已新增')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('新增失败：$e')));
+    }
   }
 
   @override
@@ -214,20 +356,63 @@ class _ProductListPageState extends State<ProductListPage> {
                 ],
               ),
             )
-          : ObsidianTable(
-              items: items,
-              formulas: widget.dataService.formulas,
-              tdsByProduct: widget.dataService.tdsByProduct,
-              defaultColumns: _columns,
-              availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
-              isMobile: isMobile,
-              onColumnsChanged: _onColumnsChanged,
-              onSortChanged: _onSortChanged,
-              onSortDirectionChanged: _onSortDirectionChanged,
-              preferencesService: widget.preferencesService,
-              currentSortColumn: _sortColumn,
-              sortDescending: _sortDescending,
-              noteResetSignal: _noteResetSignal,
+          : Stack(
+              children: [
+                NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification.metrics.pixels > notification.metrics.minScrollExtent + 0.5) {
+                      _closePullButton();
+                    }
+                    if (notification is OverscrollNotification &&
+                        notification.metrics.pixels <= notification.metrics.minScrollExtent &&
+                        notification.overscroll < 0) {
+                      _updatePullByOverscroll(-notification.overscroll);
+                    } else if (notification is ScrollEndNotification) {
+                      _finishPullGesture();
+                    }
+                    return false;
+                  },
+                  child: ObsidianTable(
+                    items: items,
+                    formulas: widget.dataService.formulas,
+                    tdsByProduct: widget.dataService.tdsByProduct,
+                    defaultColumns: _columns,
+                    availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
+                    isMobile: isMobile,
+                    onColumnsChanged: _onColumnsChanged,
+                    onSortChanged: _onSortChanged,
+                    onSortDirectionChanged: _onSortDirectionChanged,
+                    preferencesService: widget.preferencesService,
+                    currentSortColumn: _sortColumn,
+                    sortDescending: _sortDescending,
+                    noteResetSignal: _noteResetSignal,
+                  ),
+                ),
+                if (_pullExtent > 0)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    top: 12,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      height: _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
+                      child: Material(
+                        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: _showAddProductDialog,
+                          child: const Center(
+                            child: Text(
+                              '新增产品信息',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
     );
   }
