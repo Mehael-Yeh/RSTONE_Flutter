@@ -1,7 +1,5 @@
 /// 产品应用列表页面，按场景展示配方与说明。
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
@@ -43,7 +41,6 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   bool _sortDescending = false;
   int _noteResetSignal = 0;
   double _pullExtent = 0;
-  Timer? _pullHideTimer;
   static const double _pullButtonHeight = 58;
   static const double _pullTriggerHeight = 56;
 
@@ -57,7 +54,6 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   @override
   void dispose() {
     FocusManager.instance.removeListener(_handleFocusLost);
-    _pullHideTimer?.cancel();
     super.dispose();
   }
 
@@ -74,18 +70,13 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   }
 
   void _finishPullGesture() {
-    _pullHideTimer?.cancel();
     final shouldShow = _pullExtent >= _pullTriggerHeight;
     setState(() {
       _pullExtent = shouldShow ? _pullButtonHeight : 0;
     });
-    if (shouldShow) {
-      _pullHideTimer = Timer(const Duration(milliseconds: 1800), _closePullButtons);
-    }
   }
 
   void _closePullButtons() {
-    _pullHideTimer?.cancel();
     if (_pullExtent == 0) return;
     setState(() => _pullExtent = 0);
   }
@@ -99,7 +90,10 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('新增产品配方'),
+        title: const Text(
+          '新增产品配方',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        ),
         content: SizedBox(
           width: 680,
           child: Column(
@@ -107,15 +101,21 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
             children: [
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: '配方文件名'),
+                style: const TextStyle(fontSize: 13),
+                decoration: const InputDecoration(
+                  labelText: '配方文件名',
+                  labelStyle: TextStyle(fontSize: 12),
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: tableController,
                 minLines: 8,
                 maxLines: 14,
+                style: const TextStyle(fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: '配方 Markdown 表格',
+                  labelStyle: TextStyle(fontSize: 12),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -123,8 +123,14 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('保存')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消', style: TextStyle(fontSize: 13)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('保存', style: TextStyle(fontSize: 13)),
+          ),
         ],
       ),
     );
@@ -156,7 +162,10 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('新增产品应用'),
+        title: const Text(
+          '新增产品应用',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        ),
         content: SizedBox(
           width: 640,
           child: SingleChildScrollView(
@@ -169,6 +178,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                 const SizedBox(height: 10),
                 TextField(
                   controller: tagsController,
+                  style: const TextStyle(fontSize: 13),
                   decoration: _roundedInputDecoration(labelText: 'tags（英文逗号分隔）'),
                 ),
               ],
@@ -176,8 +186,14 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('保存')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消', style: TextStyle(fontSize: 13)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('保存', style: TextStyle(fontSize: 13)),
+          ),
         ],
       ),
     );
@@ -211,6 +227,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   InputDecoration _roundedInputDecoration({required String labelText}) {
     return InputDecoration(
       labelText: labelText,
+      labelStyle: const TextStyle(fontSize: 12),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -221,6 +238,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   Widget _buildRoundedField(TextEditingController controller, String label) {
     return TextField(
       controller: controller,
+      style: const TextStyle(fontSize: 13),
       decoration: _roundedInputDecoration(labelText: label),
     );
   }
