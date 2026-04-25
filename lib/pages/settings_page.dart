@@ -450,7 +450,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ListTile(
                   leading: const Icon(Icons.folder_zip_outlined),
                   title: const Text('导出产品 Markdown 数据包'),
-                  subtitle: const Text('打包产品列表/应用/配方为 ZIP'),
+                  subtitle: const Text('仅导出通过“新增”按钮创建的产品列表/应用/配方'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _exportMarkdownArchive,
                 ),
