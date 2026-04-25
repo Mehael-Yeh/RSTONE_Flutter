@@ -428,7 +428,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 12),
           _buildSectionCard(
-            title: '产品笔记',
+            title: '产品笔记与新增',
             child: Column(
               children: [
                 ListTile(
@@ -445,6 +445,14 @@ class _SettingsPageState extends State<SettingsPage> {
                   subtitle: const Text('清空全部项目反馈记录'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _confirmClearAllProductNotes,
+                ),
+                const Divider(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.folder_zip_outlined),
+                  title: const Text('导出产品 Markdown 数据包'),
+                  subtitle: const Text('打包产品列表/应用/配方为 ZIP'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _exportMarkdownArchive,
                 ),
               ],
             ),
@@ -717,6 +725,23 @@ class _SettingsPageState extends State<SettingsPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Markdown 内容已复制到剪贴板')),
+    );
+  }
+
+  Future<void> _exportMarkdownArchive() async {
+    final archive = await widget.dataService.exportMarkdownArchive();
+    if (archive == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('暂无可导出的 Markdown 文件')),
+      );
+      return;
+    }
+
+    await Share.shareXFiles(
+      [XFile(archive.path)],
+      subject: 'RSTONE Markdown 数据包',
+      text: '产品列表/产品应用/产品配方 Markdown 导出包',
     );
   }
 

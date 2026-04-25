@@ -1,5 +1,7 @@
 /// 产品应用列表页面，按场景展示配方与说明。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
@@ -40,11 +42,202 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   String? _sortColumn;
   bool _sortDescending = false;
   int _noteResetSignal = 0;
+  double _pullExtent = 0;
+  Timer? _pullHideTimer;
+  static const double _pullButtonHeight = 58;
+  static const double _pullTriggerHeight = 56;
 
   @override
   void initState() {
     super.initState();
     // 不在这里调用MediaQuery，延迟到didChangeDependencies
+    FocusManager.instance.addListener(_handleFocusLost);
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_handleFocusLost);
+    _pullHideTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handleFocusLost() {
+    if (FocusManager.instance.primaryFocus == null) {
+      _closePullButtons();
+    }
+  }
+
+  void _updatePullByOverscroll(double overscroll) {
+    final next = (_pullExtent + overscroll).clamp(0.0, _pullButtonHeight * 1.3);
+    if ((next - _pullExtent).abs() < 0.1) return;
+    setState(() => _pullExtent = next);
+  }
+
+  void _finishPullGesture() {
+    _pullHideTimer?.cancel();
+    final shouldShow = _pullExtent >= _pullTriggerHeight;
+    setState(() {
+      _pullExtent = shouldShow ? _pullButtonHeight : 0;
+    });
+    if (shouldShow) {
+      _pullHideTimer = Timer(const Duration(milliseconds: 1800), _closePullButtons);
+    }
+  }
+
+  void _closePullButtons() {
+    _pullHideTimer?.cancel();
+    if (_pullExtent == 0) return;
+    setState(() => _pullExtent = 0);
+  }
+
+  Future<void> _showAddFormulaDialog() async {
+    _closePullButtons();
+    final nameController = TextEditingController();
+    final tableController = TextEditingController(
+      text: '| 原料 | 百分比 |\n| --- | --- |\n| 示例原料A | |\n| 示例原料B | |',
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新增产品配方'),
+        content: SizedBox(
+          width: 680,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: '配方文件名'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: tableController,
+                minLines: 8,
+                maxLines: 14,
+                decoration: const InputDecoration(
+                  labelText: '配方 Markdown 表格',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final markdown = widget.dataService.buildFormulaMarkdownTemplate(
+        tableMarkdown: tableController.text,
+      );
+      await widget.dataService.addFormulaMarkdown(
+        name: nameController.text.trim(),
+        markdown: markdown,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('产品配方已新增')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('新增失败：$e')));
+    }
+  }
+
+  Future<void> _showAddApplicationDialog() async {
+    _closePullButtons();
+    final nameController = TextEditingController();
+    final tagsController = TextEditingController();
+    final primerController = TextEditingController();
+    final midController = TextEditingController();
+    final topController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新增产品应用'),
+        content: SizedBox(
+          width: 640,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildTwoFieldRow(nameController, '名称', primerController, '底漆'),
+                const SizedBox(height: 10),
+                _buildTwoFieldRow(midController, '中漆', topController, '面漆'),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: tagsController,
+                  decoration: _roundedInputDecoration(labelText: 'tags（英文逗号分隔）'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final tags = tagsController.text
+          .split(RegExp(r'[,，]'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      final markdown = widget.dataService.buildApplicationMarkdownTemplate(
+        tags: tags,
+        primer: primerController.text.trim(),
+        midCoat: midController.text.trim(),
+        topCoat: topController.text.trim(),
+      );
+      await widget.dataService.addApplicationMarkdown(
+        name: nameController.text.trim(),
+        markdown: markdown,
+      );
+      if (!mounted) return;
+      setState(() => _noteResetSignal++);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('产品应用已新增')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('新增失败：$e')));
+    }
+  }
+
+  InputDecoration _roundedInputDecoration({required String labelText}) {
+    return InputDecoration(
+      labelText: labelText,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      isDense: true,
+    );
+  }
+
+  Widget _buildRoundedField(TextEditingController controller, String label) {
+    return TextField(
+      controller: controller,
+      decoration: _roundedInputDecoration(labelText: label),
+    );
+  }
+
+  Widget _buildTwoFieldRow(
+    TextEditingController leftController,
+    String leftLabel,
+    TextEditingController rightController,
+    String rightLabel,
+  ) {
+    return Row(
+      children: [
+        Expanded(child: _buildRoundedField(leftController, leftLabel)),
+        const SizedBox(width: 10),
+        Expanded(child: _buildRoundedField(rightController, rightLabel)),
+      ],
+    );
   }
 
   @override
@@ -174,20 +367,100 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                 ],
               ),
             )
-          : ObsidianTable(
-              items: items,
-              formulas: widget.dataService.formulas,
-              tdsByProduct: widget.dataService.tdsByProduct,
-              defaultColumns: _columns,
-              availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
-              isMobile: isMobile,
-              onColumnsChanged: _onColumnsChanged,
-              onSortChanged: _onSortChanged,
-              onSortDirectionChanged: _onSortDirectionChanged,
-              preferencesService: widget.preferencesService,
-              currentSortColumn: _sortColumn,
-              sortDescending: _sortDescending,
-              noteResetSignal: _noteResetSignal,
+          : GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () {
+                FocusManager.instance.primaryFocus?.unfocus();
+                _closePullButtons();
+              },
+              child: Column(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    height: _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
+                    padding: const EdgeInsets.fromLTRB(8, 3, 8, 3),
+                    alignment: Alignment.center,
+                    child: _pullExtent <= 0
+                        ? const SizedBox.shrink()
+                        : Card(
+                            margin: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            clipBehavior: Clip.antiAlias,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Material(
+                                    color: Theme.of(context).colorScheme.primaryContainer,
+                                    child: InkWell(
+                                      onTap: _showAddFormulaDialog,
+                                      child: Center(
+                                        child: Text(
+                                          '新增产品配方',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const VerticalDivider(width: 1),
+                                Expanded(
+                                  child: Material(
+                                    color: Theme.of(context).colorScheme.secondaryContainer,
+                                    child: InkWell(
+                                      onTap: _showAddApplicationDialog,
+                                      child: Center(
+                                        child: Text(
+                                          '新增产品应用',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+                  Expanded(
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (notification) {
+                        if (notification.metrics.pixels > notification.metrics.minScrollExtent + 0.5) {
+                          _closePullButtons();
+                        }
+                        if (notification is OverscrollNotification &&
+                            notification.metrics.pixels <= notification.metrics.minScrollExtent &&
+                            notification.overscroll < 0) {
+                          _updatePullByOverscroll(-notification.overscroll);
+                        } else if (notification is ScrollEndNotification) {
+                          _finishPullGesture();
+                        }
+                        return false;
+                      },
+                      child: ObsidianTable(
+                        items: items,
+                        formulas: widget.dataService.formulas,
+                        tdsByProduct: widget.dataService.tdsByProduct,
+                        defaultColumns: _columns,
+                        availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
+                        isMobile: isMobile,
+                        onColumnsChanged: _onColumnsChanged,
+                        onSortChanged: _onSortChanged,
+                        onSortDirectionChanged: _onSortDirectionChanged,
+                        preferencesService: widget.preferencesService,
+                        currentSortColumn: _sortColumn,
+                        sortDescending: _sortDescending,
+                        noteResetSignal: _noteResetSignal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
     );
   }
