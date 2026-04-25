@@ -3,11 +3,13 @@
 import 'package:flutter/material.dart';
 
 typedef NoteTapCallback = Future<void> Function();
+typedef DeleteTapCallback = Future<void> Function();
 
 /// 可右滑露出“笔记”按钮的容器。
 class NoteSwipeTile extends StatefulWidget {
   final Widget child;
-  final NoteTapCallback onNoteTap;
+  final NoteTapCallback? onNoteTap;
+  final DeleteTapCallback? onDeleteTap;
   final int resetSignal;
   final EdgeInsets noteButtonInsets;
   final BorderRadius noteButtonBorderRadius;
@@ -17,7 +19,8 @@ class NoteSwipeTile extends StatefulWidget {
   const NoteSwipeTile({
     super.key,
     required this.child,
-    required this.onNoteTap,
+    this.onNoteTap,
+    this.onDeleteTap,
     this.resetSignal = 0,
     this.noteButtonInsets = EdgeInsets.zero,
     this.noteButtonBorderRadius = BorderRadius.zero,
@@ -33,7 +36,7 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
   static _NoteSwipeTileState? _activeTile;
   double _offsetX = 0;
 
-  bool get _isRevealed => _offsetX > 0;
+  bool get _isRevealed => _offsetX != 0;
 
   void _collapse() {
     if (!mounted || _offsetX == 0) return;
@@ -49,7 +52,18 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
   }
 
   Future<void> _handleNoteTap() async {
-    await widget.onNoteTap();
+    if (widget.onNoteTap == null) return;
+    await widget.onNoteTap!();
+    if (!mounted) return;
+    _collapse();
+    if (identical(_activeTile, this)) {
+      _activeTile = null;
+    }
+  }
+
+  Future<void> _handleDeleteTap() async {
+    if (widget.onDeleteTap == null) return;
+    await widget.onDeleteTap!();
     if (!mounted) return;
     _collapse();
     if (identical(_activeTile, this)) {
@@ -87,48 +101,89 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
             .toDouble();
         final revealWidth = (availableWidth * widget.noteButtonWidthFactor).clamp(52.0, 108.0).toDouble();
         final buttonWidth = (revealWidth + widget.noteButtonRightOverlap).clamp(revealWidth, 132.0).toDouble();
+        final canRevealLeft = widget.onNoteTap != null;
+        final canRevealRight = widget.onDeleteTap != null;
+        final minOffset = canRevealRight ? -revealWidth : 0.0;
+        final maxOffset = canRevealLeft ? revealWidth : 0.0;
 
         return Stack(
           children: [
-            Positioned.fill(
-              child: Padding(
-                padding: widget.noteButtonInsets,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: SizedBox(
-                    width: buttonWidth,
-                    height: double.infinity,
-                    child: FilledButton(
-                      onPressed: _handleNoteTap,
-                      child: Transform.translate(
-                        offset: Offset(-2, 0),
-                        child: Icon(Icons.note_alt_outlined, size: 24),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: cs.primaryContainer,
-                        foregroundColor: cs.onPrimaryContainer,
-                        elevation: 0,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: widget.noteButtonBorderRadius,
+            if (canRevealLeft)
+              Positioned.fill(
+                child: Padding(
+                  padding: widget.noteButtonInsets,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: buttonWidth,
+                      height: double.infinity,
+                      child: FilledButton(
+                        onPressed: _handleNoteTap,
+                        child: Transform.translate(
+                          offset: Offset(-2, 0),
+                          child: Icon(Icons.note_alt_outlined, size: 24),
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: cs.primaryContainer,
+                          foregroundColor: cs.onPrimaryContainer,
+                          elevation: 0,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: widget.noteButtonBorderRadius,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
+            if (canRevealRight)
+              Positioned.fill(
+                child: Padding(
+                  padding: widget.noteButtonInsets,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(
+                      width: buttonWidth,
+                      height: double.infinity,
+                      child: FilledButton(
+                        onPressed: _handleDeleteTap,
+                        child: Transform.translate(
+                          offset: Offset(2, 0),
+                          child: Icon(Icons.delete_outline, size: 24),
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: cs.errorContainer,
+                          foregroundColor: cs.onErrorContainer,
+                          elevation: 0,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: widget.noteButtonBorderRadius,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             GestureDetector(
               onHorizontalDragUpdate: (details) {
                 setState(() {
-                  _offsetX = (_offsetX + details.delta.dx).clamp(0, revealWidth);
+                  _offsetX = (_offsetX + details.delta.dx).clamp(minOffset, maxOffset);
                 });
                 _markAsActiveIfNeeded();
               },
               onHorizontalDragEnd: (_) {
                 setState(() {
-                  _offsetX = _offsetX >= revealWidth * 0.5 ? revealWidth : 0;
+                  if (_offsetX > 0 && canRevealLeft) {
+                    _offsetX = _offsetX >= revealWidth * 0.5 ? revealWidth : 0;
+                  } else if (_offsetX < 0 && canRevealRight) {
+                    _offsetX = _offsetX <= -revealWidth * 0.5 ? -revealWidth : 0;
+                  } else {
+                    _offsetX = 0;
+                  }
                 });
                 if (_isRevealed) {
                   _markAsActiveIfNeeded();

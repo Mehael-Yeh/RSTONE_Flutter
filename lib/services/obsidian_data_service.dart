@@ -53,6 +53,7 @@ PEEK -> 聚醚醚酮
 ''';
   /// 标签同义词规则文档（用户新增，仅存储在应用私有目录）
   static const String _tagAliasCustomRulesFileName = 'tag_alias_rules.custom.txt';
+  static const String _manualItemsMetaFileName = 'manual_items.json';
   
   /// 产品列表数据
   List<ProductItem> _products = [];
@@ -74,6 +75,9 @@ PEEK -> 聚醚醚酮
   Map<String, Set<String>> _tagAliasRules = {};
   /// 是否已完成初始化
   bool _initialized = false;
+  final Set<String> _manualProductNames = <String>{};
+  final Set<String> _manualApplicationNames = <String>{};
+  final Set<String> _manualFormulaNames = <String>{};
   
   /// 日志记录（最近 100 条）
   final List<String> _logs = [];
@@ -166,6 +170,7 @@ PEEK -> 聚醚醚酮
       _addLog('DataService: Loading from assets...');
       await _loadFromAssetsOnly();
       await _loadTagAliasRules();
+      await _loadManualItemMeta();
       _addLog('DataService: Asset load complete. Products: ${_products.length}, Applications: ${_applications.length}');
       
       // 第二步：如果Asset加载失败，从私有目录加载
@@ -598,6 +603,8 @@ ${_joinTagsToYamlList(tags)}
     _products.removeWhere((item) => item.fileName.toUpperCase() == normalizedCode);
     _products.add(ProductItem.fromMdContent(file.path, markdown));
     _products.sort((a, b) => a.fileName.compareTo(b.fileName));
+    _manualProductNames.add(normalizedCode);
+    await _saveManualItemMeta();
     _addLog('DataService: Saved manual product file $normalizedCode.md');
   }
 
@@ -620,6 +627,8 @@ ${_joinTagsToYamlList(tags)}
     _applications.removeWhere((item) => item.fileName == normalizedName);
     _applications.add(ProductItem.fromMdContent(file.path, markdown));
     _applications.sort((a, b) => a.fileName.compareTo(b.fileName));
+    _manualApplicationNames.add(normalizedName);
+    await _saveManualItemMeta();
     _addLog('DataService: Saved manual application file $normalizedName.md');
   }
 
@@ -642,7 +651,46 @@ ${_joinTagsToYamlList(tags)}
     _formulas.removeWhere((item) => item.fileName == normalizedName);
     _formulas.add(ProductItem.fromMdContent(file.path, markdown));
     _formulas.sort((a, b) => a.fileName.compareTo(b.fileName));
+    _manualFormulaNames.add(normalizedName);
+    await _saveManualItemMeta();
     _addLog('DataService: Saved manual formula file $normalizedName.md');
+  }
+
+  bool isManualItem(ProductItem item) {
+    switch (item.folder) {
+      case '产品列表':
+        return _manualProductNames.contains(item.fileName.toUpperCase());
+      case '产品应用':
+        return _manualApplicationNames.contains(item.fileName);
+      case '产品配方':
+        return _manualFormulaNames.contains(item.fileName);
+      default:
+        return false;
+    }
+  }
+
+  Future<void> deleteManualItem(ProductItem item) async {
+    if (!isManualItem(item)) {
+      throw StateError('仅支持删除通过新增按钮创建的项目');
+    }
+    final dataDir = await _getPrivateDataDirectory();
+    if (dataDir == null) {
+      throw StateError('当前平台不支持写入本地 Markdown 数据');
+    }
+    final folderName = item.folder;
+    final file = File('${dataDir.path}/$folderName/${item.fileName}.md');
+    if (await file.exists()) {
+      await file.delete();
+    }
+
+    _products.removeWhere((entry) => entry.folder == item.folder && entry.fileName == item.fileName);
+    _applications.removeWhere((entry) => entry.folder == item.folder && entry.fileName == item.fileName);
+    _formulas.removeWhere((entry) => entry.folder == item.folder && entry.fileName == item.fileName);
+    _manualProductNames.remove(item.fileName.toUpperCase());
+    _manualApplicationNames.remove(item.fileName);
+    _manualFormulaNames.remove(item.fileName);
+    await _saveManualItemMeta();
+    _addLog('DataService: Deleted manual item ${item.folder}/${item.fileName}.md');
   }
 
   Future<File?> exportMarkdownArchive() async {
@@ -654,21 +702,22 @@ ${_joinTagsToYamlList(tags)}
     if (dataDir == null) return null;
 
     final archive = Archive();
-    Future<void> addMdFiles(String folderName) async {
+    Future<void> addMdFiles(String folderName, Iterable<String> fileNames) async {
       final folder = Directory('${dataDir.path}/$folderName');
       if (!await folder.exists()) return;
-      await for (final entity in folder.list(recursive: false)) {
-        if (entity is! File || !entity.path.endsWith('.md')) continue;
+      for (final name in fileNames) {
+        final entity = File('${folder.path}/$name.md');
+        if (!await entity.exists()) continue;
         final content = await entity.readAsString();
         final bytes = utf8.encode(content);
-        final entryName = '$folderName/${entity.uri.pathSegments.last}';
+        final entryName = '$folderName/$name.md';
         archive.addFile(ArchiveFile(entryName, bytes.length, bytes));
       }
     }
 
-    await addMdFiles('产品列表');
-    await addMdFiles('产品应用');
-    await addMdFiles('产品配方');
+    await addMdFiles('产品列表', _manualProductNames);
+    await addMdFiles('产品应用', _manualApplicationNames);
+    await addMdFiles('产品配方', _manualFormulaNames);
 
     if (archive.isEmpty) {
       _addLog('DataService: Export archive skipped because no markdown file found');
@@ -691,6 +740,52 @@ ${_joinTagsToYamlList(tags)}
     await file.writeAsBytes(Uint8List.fromList(zipBytes), flush: true);
     _addLog('DataService: Exported markdown archive at ${file.path}');
     return file;
+  }
+
+  Future<void> _loadManualItemMeta() async {
+    if (kIsWeb) return;
+    final dataDir = await _getPrivateDataDirectory();
+    if (dataDir == null) return;
+    final file = File('${dataDir.path}/$_manualItemsMetaFileName');
+    if (!await file.exists()) return;
+    try {
+      final parsed = jsonDecode(await file.readAsString());
+      if (parsed is! Map<String, dynamic>) return;
+      _manualProductNames
+        ..clear()
+        ..addAll(((parsed['products'] as List?) ?? const [])
+            .whereType<String>()
+            .map((e) => e.trim().toUpperCase())
+            .where((e) => e.isNotEmpty));
+      _manualApplicationNames
+        ..clear()
+        ..addAll(((parsed['applications'] as List?) ?? const [])
+            .whereType<String>()
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty));
+      _manualFormulaNames
+        ..clear()
+        ..addAll(((parsed['formulas'] as List?) ?? const [])
+            .whereType<String>()
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty));
+    } catch (e) {
+      _addLog('DataService: Failed to load manual item metadata: $e');
+    }
+  }
+
+  Future<void> _saveManualItemMeta() async {
+    if (kIsWeb) return;
+    final dataDir = await _getPrivateDataDirectory();
+    if (dataDir == null) return;
+    await dataDir.create(recursive: true);
+    final file = File('${dataDir.path}/$_manualItemsMetaFileName');
+    final payload = <String, dynamic>{
+      'products': _manualProductNames.toList()..sort(),
+      'applications': _manualApplicationNames.toList()..sort(),
+      'formulas': _manualFormulaNames.toList()..sort(),
+    };
+    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(payload));
   }
 
   /// 搜索产品和应用
@@ -934,6 +1029,10 @@ ${_joinTagsToYamlList(tags)}
       }
       _products.clear();
       _applications.clear();
+      _formulas.clear();
+      _manualProductNames.clear();
+      _manualApplicationNames.clear();
+      _manualFormulaNames.clear();
       _initialized = false;
     } catch (e) {
       _addLog('DataService: Error clearing data: $e');
