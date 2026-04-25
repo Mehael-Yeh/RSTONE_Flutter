@@ -689,8 +689,74 @@ ${_joinTagsToYamlList(tags)}
     _manualProductNames.remove(item.fileName.toUpperCase());
     _manualApplicationNames.remove(item.fileName);
     _manualFormulaNames.remove(item.fileName);
+    await _tryRestoreBundledItem(item.folder, item.fileName);
     await _saveManualItemMeta();
     _addLog('DataService: Deleted manual item ${item.folder}/${item.fileName}.md');
+  }
+
+  Future<int> clearAllManualMarkdownData() async {
+    final dataDir = await _getPrivateDataDirectory();
+    if (dataDir == null) {
+      throw StateError('当前平台不支持写入本地 Markdown 数据');
+    }
+
+    final entries = <(String folder, String name)>[
+      ..._manualProductNames.map((name) => ('产品列表', name)),
+      ..._manualApplicationNames.map((name) => ('产品应用', name)),
+      ..._manualFormulaNames.map((name) => ('产品配方', name)),
+    ];
+
+    var deletedCount = 0;
+    for (final entry in entries) {
+      final file = File('${dataDir.path}/${entry.$1}/${entry.$2}.md');
+      if (await file.exists()) {
+        await file.delete();
+      }
+      _products.removeWhere((item) => item.folder == entry.$1 && item.fileName == entry.$2);
+      _applications.removeWhere((item) => item.folder == entry.$1 && item.fileName == entry.$2);
+      _formulas.removeWhere((item) => item.folder == entry.$1 && item.fileName == entry.$2);
+      await _tryRestoreBundledItem(entry.$1, entry.$2);
+      deletedCount++;
+    }
+
+    _manualProductNames.clear();
+    _manualApplicationNames.clear();
+    _manualFormulaNames.clear();
+    await _saveManualItemMeta();
+    _addLog('DataService: Cleared all manual markdown data, removed $deletedCount item(s)');
+    return deletedCount;
+  }
+
+  Future<void> _tryRestoreBundledItem(String folderName, String fileName) async {
+    String? assetPath;
+    if (folderName == '产品列表') {
+      assetPath = '$_productsAssetPath/$fileName.md';
+    } else if (folderName == '产品应用') {
+      assetPath = '$_applicationsAssetPath/$fileName.md';
+    } else if (folderName == '产品配方') {
+      assetPath = 'assets/产品配方/$fileName.md';
+    }
+    if (assetPath == null) return;
+
+    try {
+      final content = await rootBundle.loadString(assetPath);
+      final restored = ProductItem.fromMdContent(assetPath, content);
+      if (folderName == '产品列表') {
+        _products.removeWhere((item) => item.fileName == fileName);
+        _products.add(restored);
+        _products.sort((a, b) => a.fileName.compareTo(b.fileName));
+      } else if (folderName == '产品应用') {
+        _applications.removeWhere((item) => item.fileName == fileName);
+        _applications.add(restored);
+        _applications.sort((a, b) => a.fileName.compareTo(b.fileName));
+      } else if (folderName == '产品配方') {
+        _formulas.removeWhere((item) => item.fileName == fileName);
+        _formulas.add(restored);
+        _formulas.sort((a, b) => a.fileName.compareTo(b.fileName));
+      }
+    } catch (_) {
+      // 如果资源中不存在同名文件则不恢复。
+    }
   }
 
   Future<File?> exportMarkdownArchive() async {
