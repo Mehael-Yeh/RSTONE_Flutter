@@ -258,6 +258,36 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     );
   }
 
+  Future<void> _deleteManualItem(ProductItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除新增项目'),
+        content: Text('确认删除“${item.displayName}”吗？此操作不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await widget.dataService.deleteManualItem(item);
+      if (!mounted) return;
+      setState(() => _noteResetSignal++);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已删除新增项目')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('删除失败：$e')));
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -474,6 +504,8 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                         currentSortColumn: _sortColumn,
                         sortDescending: _sortDescending,
                         noteResetSignal: _noteResetSignal,
+                        isManualItem: widget.dataService.isManualItem,
+                        onDeleteManualItem: _deleteManualItem,
                       ),
                     ),
                   ),
