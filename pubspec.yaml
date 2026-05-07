@@ -40,7 +40,9 @@ flutter:
     - assets/产品应用.json
     - assets/产品配方.json
     - assets/产品TDS.json
-    - assets/fonts/
+    - assets/fonts/Arial.ttf
+    - assets/fonts/MicrosoftYaHei.ttf
+    - assets/fonts/SimHei.ttf
 
 flutter_launcher_icons:
   android: true
