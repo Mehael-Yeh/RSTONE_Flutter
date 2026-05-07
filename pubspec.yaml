@@ -41,6 +41,7 @@ flutter:
     - assets/产品配方.json
     - assets/产品TDS.json
     - assets/fonts/Arial.ttf
+    - assets/fonts/ArialBold.ttf
     - assets/fonts/MicrosoftYaHei.ttf
     - assets/fonts/MicrosoftYaHeiBold.ttf
     - assets/fonts/SimHei.ttf
