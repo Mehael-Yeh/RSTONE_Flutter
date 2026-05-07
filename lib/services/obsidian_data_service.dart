@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/product_item.dart';
+import '../utils/natural_sort.dart';
 
 /// Obsidian 数据服务
 /// 
@@ -37,6 +38,8 @@ PVD -> 镀膜
 PVD -> 物理气相沉积
 PU -> 羟丙
 PU -> 羟基丙烯酸
+双固化 -> PU
+双固化 -> UV
 PUD -> 自干
 PUD -> 聚氨酯分散体
 PC -> 聚碳酸酯
@@ -137,6 +140,12 @@ PEEK -> 聚醚醚酮
     }
   }
 
+  void _sortIndexedItems() {
+    _products.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
+    _applications.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
+    _formulas.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
+  }
+
   Future<Directory?> _getPrivateDataDirectory() async {
     if (kIsWeb) return null;
     try {
@@ -188,6 +197,7 @@ PEEK -> 聚醚醚酮
       if (_products.isEmpty && _applications.isEmpty) {
         _addLog('DataService: All loads failed, product list is empty!');
       } else {
+        _sortIndexedItems();
         // 复制到私有目录以便后续使用
         _addLog('DataService: Copying data to private directory...');
         final dataDir = await _getPrivateDataDirectory();
@@ -609,7 +619,7 @@ ${_joinTagsToYamlList(tags)}
     await file.writeAsString(markdown.trim());
     _products.removeWhere((item) => item.fileName.toUpperCase() == normalizedCode);
     _products.add(ProductItem.fromMdContent(file.path, markdown));
-    _products.sort((a, b) => a.fileName.compareTo(b.fileName));
+    _products.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
     _manualProductNames.add(normalizedCode);
     await _saveManualItemMeta();
     _addLog('DataService: Saved manual product file $normalizedCode.md');
@@ -633,7 +643,7 @@ ${_joinTagsToYamlList(tags)}
     await file.writeAsString(markdown.trim());
     _applications.removeWhere((item) => item.fileName == normalizedName);
     _applications.add(ProductItem.fromMdContent(file.path, markdown));
-    _applications.sort((a, b) => a.fileName.compareTo(b.fileName));
+    _applications.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
     _manualApplicationNames.add(normalizedName);
     await _saveManualItemMeta();
     _addLog('DataService: Saved manual application file $normalizedName.md');
@@ -657,7 +667,7 @@ ${_joinTagsToYamlList(tags)}
     await file.writeAsString(markdown.trim());
     _formulas.removeWhere((item) => item.fileName == normalizedName);
     _formulas.add(ProductItem.fromMdContent(file.path, markdown));
-    _formulas.sort((a, b) => a.fileName.compareTo(b.fileName));
+    _formulas.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
     _manualFormulaNames.add(normalizedName);
     await _saveManualItemMeta();
     _addLog('DataService: Saved manual formula file $normalizedName.md');
@@ -751,15 +761,15 @@ ${_joinTagsToYamlList(tags)}
       if (folderName == '产品列表') {
         _products.removeWhere((item) => item.fileName == fileName);
         _products.add(restored);
-        _products.sort((a, b) => a.fileName.compareTo(b.fileName));
+        _products.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
       } else if (folderName == '产品应用') {
         _applications.removeWhere((item) => item.fileName == fileName);
         _applications.add(restored);
-        _applications.sort((a, b) => a.fileName.compareTo(b.fileName));
+        _applications.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
       } else if (folderName == '产品配方') {
         _formulas.removeWhere((item) => item.fileName == fileName);
         _formulas.add(restored);
-        _formulas.sort((a, b) => a.fileName.compareTo(b.fileName));
+        _formulas.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
       }
     } catch (_) {
       // 如果资源中不存在同名文件则不恢复。
@@ -873,7 +883,7 @@ ${_joinTagsToYamlList(tags)}
           _addLog('DataService: Failed to load manual markdown $folderName/$resolvedName.md: $e');
         }
       }
-      target.sort((a, b) => a.fileName.compareTo(b.fileName));
+      target.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
     }
 
     await mergeManualItems(
