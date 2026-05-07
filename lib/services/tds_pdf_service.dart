@@ -66,6 +66,7 @@ class TdsPdfService {
         candidates: const ['assets/fonts/MicrosoftYaHeiBold.ttf'],
         fallback: PdfGoogleFonts.notoSansSCBold,
       ),
+      headerLogoBold: pw.Font.helveticaBold(),
       arialRegular: await _loadFirstAvailableFont(
         candidates: const ['assets/fonts/Arial.ttf'],
         fallback: PdfGoogleFonts.robotoRegular,
@@ -92,7 +93,7 @@ class TdsPdfService {
         margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
         theme: pw.ThemeData.withFont(
           base: pdfFonts.bodyRegular,
-          bold: pdfFonts.bodyBold,
+          bold: pdfFonts.bodyRegular,
         ),
         header: (context) => _buildHeader(pdfFonts),
         footer: (context) => _buildFooter(pdfFonts),
@@ -136,7 +137,7 @@ class TdsPdfService {
     return pw.TextStyle(
       font: fonts.bodyRegular,
       fontNormal: fonts.bodyRegular,
-      fontBold: fonts.bodyBold,
+      fontBold: fonts.bodyRegular,
       fontSize: fontSize,
       fontWeight: fontWeight,
       lineSpacing: lineSpacing,
@@ -734,6 +735,7 @@ class _PdfFonts {
   const _PdfFonts({
     required this.bodyRegular,
     required this.bodyBold,
+    required this.headerLogoBold,
     required this.arialRegular,
     required this.tdsHeaderArialBold,
     required this.simheiRegular,
@@ -742,6 +744,7 @@ class _PdfFonts {
 
   final pw.Font bodyRegular;
   final pw.Font bodyBold;
+  final pw.Font headerLogoBold;
   final pw.Font arialRegular;
   final pw.Font tdsHeaderArialBold;
   final pw.Font simheiRegular;
