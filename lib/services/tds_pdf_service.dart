@@ -70,11 +70,8 @@ class TdsPdfService {
         candidates: const ['assets/fonts/Arial.ttf'],
         fallback: PdfGoogleFonts.robotoRegular,
       ),
-      arialBold: await _loadFirstAvailableFont(
-        candidates: const [
-          'assets/fonts/ArialBold.ttf',
-          'assets/fonts/Arial.ttf',
-        ],
+      tdsHeaderArialBold: await _loadFirstAvailableFont(
+        candidates: const ['assets/fonts/ArialBold.ttf'],
         fallback: PdfGoogleFonts.robotoBold,
       ),
       simheiRegular: await _loadFirstAvailableFont(
@@ -104,7 +101,7 @@ class TdsPdfService {
           pw.Center(
             child: pw.Text(
               '产品技术数据表（TDS）',
-              style: _bodyTextStyle(pdfFonts, fontSize: 16),
+              style: _bodyBoldTextStyle(pdfFonts, fontSize: 16),
             ),
           ),
           pw.SizedBox(height: 16),
@@ -120,7 +117,8 @@ class TdsPdfService {
             ),
           ],
           pw.SizedBox(height: 10),
-          ...parsed.sections.map((section) => _buildSection(section, pdfFonts)),
+          for (var i = 0; i < parsed.sections.length; i++)
+            _buildSection(parsed.sections[i], pdfFonts, sectionIndex: i),
           _buildDisclaimerSection(pdfFonts),
         ],
       ),
@@ -168,10 +166,9 @@ class TdsPdfService {
             pw.Text(
               'RSTONE',
               style: pw.TextStyle(
-                font: fonts.arialBold,
+                font: fonts.tdsHeaderArialBold,
                 fontSize: 44,
                 color: const PdfColor.fromInt(0xFF9A3F10),
-                fontWeight: pw.FontWeight.bold,
               ),
             ),
             pw.Column(
@@ -200,7 +197,11 @@ class TdsPdfService {
     );
   }
 
-  static pw.Widget _buildSection(_TdsSection section, _PdfFonts fonts) {
+  static pw.Widget _buildSection(
+    _TdsSection section,
+    _PdfFonts fonts, {
+    required int sectionIndex,
+  }) {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 9),
       child: pw.Column(
@@ -214,7 +215,13 @@ class TdsPdfService {
             pw.SizedBox(height: 5),
           ],
           for (var i = 0; i < section.blocks.length; i++)
-            _buildBlock(section.blocks[i], section, fonts, blockIndex: i),
+            _buildBlock(
+              section.blocks[i],
+              section,
+              fonts,
+              blockIndex: i,
+              forceRegularParagraph: sectionIndex == 0,
+            ),
         ],
       ),
     );
@@ -225,6 +232,7 @@ class TdsPdfService {
     _TdsSection section,
     _PdfFonts fonts, {
     required int blockIndex,
+    required bool forceRegularParagraph,
   }) {
     if (block.type == _TdsBlockType.table && block.tableRows != null && block.tableRows!.isNotEmpty) {
       final isPhysicalTable =
@@ -276,6 +284,7 @@ class TdsPdfService {
       fontSize: 10.5,
       lineSpacing: 2,
       textAlign: centerParagraph ? pw.TextAlign.center : pw.TextAlign.left,
+      enableMarkdownBold: !forceRegularParagraph,
     );
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 3),
@@ -310,13 +319,25 @@ class TdsPdfService {
     required double fontSize,
     double lineSpacing = 0,
     pw.TextAlign textAlign = pw.TextAlign.left,
+    bool enableMarkdownBold = true,
   }) {
     final spans = <pw.InlineSpan>[];
     final pattern = RegExp(r'\*\*(.+?)\*\*');
     var start = 0;
-    final source = _normalizeTextForPdf(text) ?? '';
+    final source = _normalizeTextForPdf(
+          enableMarkdownBold
+              ? text
+              : text.replaceAllMapped(
+                  pattern,
+                  (match) => match.group(1) ?? '',
+                ),
+        ) ??
+        '';
 
-    for (final match in pattern.allMatches(source)) {
+    final boldMatches = enableMarkdownBold
+        ? pattern.allMatches(source)
+        : const <RegExpMatch>[];
+    for (final match in boldMatches) {
       if (match.start > start) {
         spans.add(
           pw.TextSpan(
@@ -442,7 +463,15 @@ class TdsPdfService {
           children: [
             pw.Row(
               children: [
-                pw.Text('网址 WEBSITE: ', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
+                pw.RichText(
+                  text: pw.TextSpan(
+                    children: [
+                      pw.TextSpan(text: '网址', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
+                      pw.TextSpan(text: ' ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                      pw.TextSpan(text: 'WEBSITE: ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                    ],
+                  ),
+                ),
                 pw.UrlLink(
                   destination: 'http://www.rstone-resin.com/',
                   child: pw.Text(
@@ -706,7 +735,7 @@ class _PdfFonts {
     required this.bodyRegular,
     required this.bodyBold,
     required this.arialRegular,
-    required this.arialBold,
+    required this.tdsHeaderArialBold,
     required this.simheiRegular,
     required this.simheiBold,
   });
@@ -714,7 +743,7 @@ class _PdfFonts {
   final pw.Font bodyRegular;
   final pw.Font bodyBold;
   final pw.Font arialRegular;
-  final pw.Font arialBold;
+  final pw.Font tdsHeaderArialBold;
   final pw.Font simheiRegular;
   final pw.Font simheiBold;
 }
