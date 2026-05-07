@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:rst_flutter/models/product_item.dart';
+import 'package:rst_flutter/services/obsidian_data_service.dart';
 import 'package:rst_flutter/utils/natural_sort.dart';
 import 'package:rst_flutter/widgets/product_detail/formula_content_parser.dart';
 
@@ -95,6 +96,33 @@ tags:
 
       expect(item.linkedWikiReferences, ['RS8214-银', 'RS8214-黑']);
       expect(item.searchText, contains('rs8214-黑'.toLowerCase()));
+    });
+  });
+
+  group('ObsidianDataService.search', () {
+    test('keeps PU and UV curing-mode tags mutually exclusive except dual cure', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final service = ObsidianDataService();
+
+      await service.initialize();
+
+      bool hasTag(ProductItem item, String tag) =>
+          item.tags.any((candidate) => candidate.toLowerCase() == tag);
+      bool hasDualCureTag(ProductItem item) => item.tags.contains('双固化');
+
+      final uvResults = service.search('UV');
+      expect(uvResults, isNotEmpty);
+      expect(
+        uvResults.where((item) => hasTag(item, 'pu') && !hasDualCureTag(item)),
+        isEmpty,
+      );
+
+      final puResults = service.search('PU');
+      expect(puResults, isNotEmpty);
+      expect(
+        puResults.where((item) => hasTag(item, 'uv') && !hasDualCureTag(item)),
+        isEmpty,
+      );
     });
   });
 
