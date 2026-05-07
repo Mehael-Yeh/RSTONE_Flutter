@@ -114,12 +114,12 @@ class TdsPdfService {
             pw.SizedBox(height: 8),
             pw.Text(
               productSubtitle,
-              style: _bodyBoldTextStyle(pdfFonts, fontSize: 10.5),
+              style: _bodyTextStyle(pdfFonts, fontSize: 10.5),
             ),
           ],
           pw.SizedBox(height: 10),
-          for (var i = 0; i < parsed.sections.length; i++)
-            _buildSection(parsed.sections[i], pdfFonts, sectionIndex: i),
+          for (final section in parsed.sections)
+            _buildSection(section, pdfFonts),
           _buildDisclaimerSection(pdfFonts),
         ],
       ),
@@ -137,7 +137,8 @@ class TdsPdfService {
     return pw.TextStyle(
       font: fonts.bodyRegular,
       fontNormal: fonts.bodyRegular,
-      fontBold: fonts.bodyBold,
+      fontBold:
+          fontWeight == pw.FontWeight.bold ? fonts.bodyBold : fonts.bodyRegular,
       fontSize: fontSize,
       fontWeight: fontWeight,
       lineSpacing: lineSpacing,
@@ -203,9 +204,8 @@ class TdsPdfService {
 
   static pw.Widget _buildSection(
     _TdsSection section,
-    _PdfFonts fonts, {
-    required int sectionIndex,
-  }) {
+    _PdfFonts fonts,
+  ) {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 9),
       child: pw.Column(
@@ -224,7 +224,6 @@ class TdsPdfService {
               section,
               fonts,
               blockIndex: i,
-              forceRegularParagraph: sectionIndex == 0,
             ),
         ],
       ),
@@ -236,14 +235,12 @@ class TdsPdfService {
     _TdsSection section,
     _PdfFonts fonts, {
     required int blockIndex,
-    required bool forceRegularParagraph,
   }) {
     if (block.type == _TdsBlockType.table &&
         block.tableRows != null &&
         block.tableRows!.isNotEmpty) {
       final table = _buildTdsTable(
         block.tableRows!,
-        section,
         fonts,
       );
       return pw.Padding(
@@ -277,7 +274,6 @@ class TdsPdfService {
       fontSize: 10.5,
       lineSpacing: 2,
       textAlign: centerParagraph ? pw.TextAlign.center : pw.TextAlign.left,
-      enableMarkdownBold: !forceRegularParagraph,
     );
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 3),
@@ -287,32 +283,39 @@ class TdsPdfService {
 
   static pw.Widget _buildTdsTable(
     List<List<String>> rows,
-    _TdsSection section,
     _PdfFonts fonts,
   ) {
-    final isPhysicalTable =
-        section.title.contains('物理性能') && rows.first.length >= 3;
-    final columnWidths = isPhysicalTable
-        ? <int, pw.TableColumnWidth>{
-            0: const pw.FlexColumnWidth(3),
-            1: const pw.FlexColumnWidth(2.2),
-            2: const pw.FlexColumnWidth(1.2),
-          }
-        : null;
+    final columnCount = rows.fold<int>(
+      0,
+      (maxLength, row) => row.length > maxLength ? row.length : maxLength,
+    );
+    if (columnCount == 0) return pw.SizedBox();
+
+    final normalizedRows = rows
+        .map(
+          (row) => [
+            ...row,
+            for (var i = row.length; i < columnCount; i++) '',
+          ],
+        )
+        .toList();
+    final columnWidths = <int, pw.TableColumnWidth>{
+      for (var i = 0; i < columnCount; i++) i: const pw.FlexColumnWidth(),
+    };
 
     return pw.Table(
       columnWidths: columnWidths,
       defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
       children: [
-        for (var rowIndex = 0; rowIndex < rows.length; rowIndex++)
+        for (var rowIndex = 0; rowIndex < normalizedRows.length; rowIndex++)
           pw.TableRow(
             children: [
-              for (final cell in rows[rowIndex])
+              for (final cell in normalizedRows[rowIndex])
                 _buildTdsTableCell(
                   cell,
                   fonts,
                   isHeader: rowIndex == 0,
-                  isLastRow: rowIndex == rows.length - 1,
+                  isLastRow: rowIndex == normalizedRows.length - 1,
                 ),
             ],
           ),
@@ -654,11 +657,7 @@ class TdsPdfService {
         collectingTableRows ??= [];
         if (!RegExp(r'^\|?\s*[-:| ]+\|?$').hasMatch(line)) {
           collectingTableRows!.add(
-            line
-                .split('|')
-                .map((cell) => cell.trim())
-                .where((cell) => cell.isNotEmpty)
-                .toList(),
+            _parseMarkdownTableRow(line),
           );
         }
         continue;
@@ -702,6 +701,17 @@ class TdsPdfService {
       productSubtitle: productSubtitle,
       sections: sections,
     );
+  }
+
+  static List<String> _parseMarkdownTableRow(String line) {
+    final cells = line.split('|');
+    if (cells.isNotEmpty && cells.first.trim().isEmpty) {
+      cells.removeAt(0);
+    }
+    if (cells.isNotEmpty && cells.last.trim().isEmpty) {
+      cells.removeLast();
+    }
+    return cells.map((cell) => cell.trim()).toList();
   }
 
   static String _mergeWrappedParagraphLines(List<String> lines) {
