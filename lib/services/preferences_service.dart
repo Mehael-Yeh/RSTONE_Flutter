@@ -30,8 +30,6 @@ class PreferencesService {
   static const String _themeSeedColorValueKey = 'theme_seed_color_value';
   /// 产品笔记存储键（Map<项目名称, 笔记内容>）
   static const String _productNotesKey = 'product_notes';
-  /// TDS PDF 正文字体存储键（simhei/simsun）
-  static const String _tdsBodyFontKey = 'tds_body_font';
 
   /// SharedPreferences 实例
   SharedPreferences? _prefs;
@@ -140,17 +138,6 @@ class PreferencesService {
   /// 保存主题色种子值（Color.value）。
   Future<void> saveThemeSeedColorValue(int colorValue) async {
     await _prefs?.setInt(_themeSeedColorValueKey, colorValue);
-  }
-
-  /// 获取 TDS PDF 正文字体，默认黑体。
-  String getTdsBodyFont() {
-    final saved = _prefs?.getString(_tdsBodyFontKey);
-    return saved == 'simsun' ? 'simsun' : 'simhei';
-  }
-
-  /// 保存 TDS PDF 正文字体（simhei/simsun）。
-  Future<void> saveTdsBodyFont(String font) async {
-    await _prefs?.setString(_tdsBodyFontKey, font == 'simsun' ? 'simsun' : 'simhei');
   }
 
   /// 获取全部产品笔记。

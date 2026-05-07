@@ -45,7 +45,6 @@ class _SettingsPageState extends State<SettingsPage> {
   String _databaseVersion = '未注入';
   late ThemeMode _selectedThemeMode;
   late Color _selectedThemeSeedColor;
-  late String _selectedTdsBodyFont;
   static const List<Color> _presetThemeColors = <Color>[
     Color(0xFFFF8A00),
     Color(0xFFFFB300),
@@ -70,7 +69,6 @@ class _SettingsPageState extends State<SettingsPage> {
     super.initState();
     _selectedThemeMode = widget.themeMode;
     _selectedThemeSeedColor = widget.themeSeedColor;
-    _selectedTdsBodyFont = widget.preferencesService.getTdsBodyFont();
     _loadVersion();
   }
 
@@ -140,12 +138,6 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _onThemeSeedColorChanged(Color color) async {
     setState(() => _selectedThemeSeedColor = color);
     await widget.onThemeSeedColorChanged(color);
-  }
-
-  Future<void> _onTdsBodyFontChanged(String font) async {
-    final normalizedFont = font == 'simsun' ? 'simsun' : 'simhei';
-    setState(() => _selectedTdsBodyFont = normalizedFont);
-    await widget.preferencesService.saveTdsBodyFont(normalizedFont);
   }
 
   Future<void> _pickCustomThemeColor() async {
@@ -367,42 +359,6 @@ class _SettingsPageState extends State<SettingsPage> {
                       tooltip: '自定义主题色',
                     ),
                   ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildSectionCard(
-            title: 'TDS生成',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '正文字体',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment<String>(
-                      value: 'simsun',
-                      label: Text('宋体'),
-                    ),
-                    ButtonSegment<String>(
-                      value: 'simhei',
-                      label: Text('黑体'),
-                    ),
-                  ],
-                  selected: {_selectedTdsBodyFont},
-                  onSelectionChanged: (selection) {
-                    if (selection.isNotEmpty) {
-                      _onTdsBodyFontChanged(selection.first);
-                    }
-                  },
-                  showSelectedIcon: false,
                 ),
               ],
             ),
