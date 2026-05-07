@@ -62,6 +62,11 @@ class TdsPdfService {
         candidates: const ['assets/fonts/MicrosoftYaHei.ttf'],
         fallback: PdfGoogleFonts.notoSansSCRegular,
       ),
+      bodyBold: await _loadFirstAvailableFont(
+        candidates: const ['assets/fonts/MicrosoftYaHeiBold.ttf'],
+        fallback: PdfGoogleFonts.notoSansSCBold,
+      ),
+      headerLogoBold: pw.Font.helveticaBold(),
       arialRegular: await _loadFirstAvailableFont(
         candidates: const ['assets/fonts/Arial.ttf'],
         fallback: PdfGoogleFonts.robotoRegular,
@@ -158,10 +163,9 @@ class TdsPdfService {
             pw.Text(
               'RSTONE',
               style: pw.TextStyle(
-                font: fonts.arialRegular,
+                font: fonts.headerLogoBold,
                 fontSize: 44,
                 color: const PdfColor.fromInt(0xFF9A3F10),
-                fontWeight: pw.FontWeight.bold,
               ),
             ),
             pw.Column(
@@ -726,12 +730,16 @@ class TdsPdfService {
 class _PdfFonts {
   const _PdfFonts({
     required this.bodyRegular,
+    required this.bodyBold,
+    required this.headerLogoBold,
     required this.arialRegular,
     required this.simheiRegular,
     required this.simheiBold,
   });
 
   final pw.Font bodyRegular;
+  final pw.Font bodyBold;
+  final pw.Font headerLogoBold;
   final pw.Font arialRegular;
   final pw.Font simheiRegular;
   final pw.Font simheiBold;
