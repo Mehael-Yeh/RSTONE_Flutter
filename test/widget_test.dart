@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:rst_flutter/models/product_item.dart';
+import 'package:rst_flutter/utils/natural_sort.dart';
 import 'package:rst_flutter/widgets/product_detail/formula_content_parser.dart';
 
 void main() {
@@ -110,6 +111,30 @@ tags:
 
       expect(parsed.preTableContent, isEmpty);
       expect(parsed.postTableContent, isEmpty);
+    });
+  });
+
+  group('compareNaturalText', () {
+    test('sorts product codes by numeric value and digit-run length', () {
+      final codes = [
+        'RD1010-4',
+        'RD1011-6',
+        'RD824-8',
+        'RD1011-5',
+        'RD02',
+        'RD2',
+      ];
+
+      codes.sort(compareNaturalText);
+
+      expect(codes, [
+        'RD2',
+        'RD02',
+        'RD824-8',
+        'RD1010-4',
+        'RD1011-5',
+        'RD1011-6',
+      ]);
     });
   });
 }
