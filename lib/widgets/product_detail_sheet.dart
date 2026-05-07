@@ -11,7 +11,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/product_item.dart';
-import '../services/preferences_service.dart';
 import '../services/tds_pdf_service.dart';
 import 'product_detail/formula_content_parser.dart';
 import 'product_detail/markdown_table_parser.dart';
@@ -26,7 +25,6 @@ import 'product_detail/markdown_table_parser.dart';
 /// - 拖拽调整弹窗高度（向上展开、向下收起）
 class ProductDetailSheet extends StatefulWidget {
   final ProductItem product;
-  final PreferencesService preferencesService;
   final List<ProductItem> formulas;
   final String? tdsContent;
   static bool _isShowing = false;
@@ -34,7 +32,6 @@ class ProductDetailSheet extends StatefulWidget {
   const ProductDetailSheet({
     super.key,
     required this.product,
-    required this.preferencesService,
     this.formulas = const [],
     this.tdsContent,
   });
@@ -43,7 +40,6 @@ class ProductDetailSheet extends StatefulWidget {
   static Future<void> show(
     BuildContext context,
     ProductItem product, {
-    required PreferencesService preferencesService,
     List<ProductItem> formulas = const [],
     String? tdsContent,
   }) async {
@@ -59,7 +55,6 @@ class ProductDetailSheet extends StatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (context) => ProductDetailSheet(
         product: product,
-        preferencesService: preferencesService,
         formulas: formulas,
         tdsContent: tdsContent,
       ),
@@ -327,7 +322,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       final pdfBytes = await TdsPdfService.generatePdfBytes(
         widget.product,
         tdsMarkdown: widget.tdsContent!,
-        bodyFont: widget.preferencesService.getTdsBodyFont(),
       );
       if (!mounted) return;
       final previewTask = _preparePdfPreview(pdfBytes);
@@ -412,7 +406,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       await TdsPdfService.generateAndShareTds(
         widget.product,
         tdsMarkdown: widget.tdsContent!,
-        bodyFont: widget.preferencesService.getTdsBodyFont(),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
