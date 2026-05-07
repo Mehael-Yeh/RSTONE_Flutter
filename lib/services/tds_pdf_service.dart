@@ -93,7 +93,7 @@ class TdsPdfService {
         margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
         theme: pw.ThemeData.withFont(
           base: pdfFonts.bodyRegular,
-          bold: pdfFonts.bodyRegular,
+          bold: pdfFonts.bodyBold,
         ),
         header: (context) => _buildHeader(pdfFonts),
         footer: (context) => _buildFooter(pdfFonts),
@@ -137,7 +137,7 @@ class TdsPdfService {
     return pw.TextStyle(
       font: fonts.bodyRegular,
       fontNormal: fonts.bodyRegular,
-      fontBold: fonts.bodyRegular,
+      fontBold: fonts.bodyBold,
       fontSize: fontSize,
       fontWeight: fontWeight,
       lineSpacing: lineSpacing,
@@ -149,8 +149,10 @@ class TdsPdfService {
     required double fontSize,
     double lineSpacing = 0,
   }) {
-    return _bodyTextStyle(
-      fonts,
+    return pw.TextStyle(
+      font: fonts.bodyBold,
+      fontNormal: fonts.bodyRegular,
+      fontBold: fonts.bodyBold,
       fontSize: fontSize,
       fontWeight: pw.FontWeight.bold,
       lineSpacing: lineSpacing,
@@ -169,6 +171,7 @@ class TdsPdfService {
               style: pw.TextStyle(
                 font: fonts.tdsHeaderArialBold,
                 fontSize: 44,
+                fontWeight: pw.FontWeight.bold,
                 color: const PdfColor.fromInt(0xFF9A3F10),
               ),
             ),
