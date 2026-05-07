@@ -238,25 +238,13 @@ class TdsPdfService {
     required int blockIndex,
     required bool forceRegularParagraph,
   }) {
-    if (block.type == _TdsBlockType.table && block.tableRows != null && block.tableRows!.isNotEmpty) {
-      final isPhysicalTable =
-          section.title.contains('物理性能') && block.tableRows!.first.length >= 3;
-      final table = pw.TableHelper.fromTextArray(
-        headerStyle: _bodyBoldTextStyle(fonts, fontSize: 9.5),
-        cellStyle: _bodyTextStyle(fonts, fontSize: 9.3),
-        cellAlignment: pw.Alignment.center,
-        border: pw.TableBorder.all(width: 0.8),
-        columnWidths: isPhysicalTable
-            ? <int, pw.TableColumnWidth>{
-                0: const pw.FlexColumnWidth(3),
-                1: const pw.FlexColumnWidth(2.2),
-                2: const pw.FlexColumnWidth(1.2),
-              }
-            : null,
-        headers: block.tableRows!.first,
-        data: block.tableRows!.length > 1
-            ? block.tableRows!.sublist(1)
-            : const <List<String>>[],
+    if (block.type == _TdsBlockType.table &&
+        block.tableRows != null &&
+        block.tableRows!.isNotEmpty) {
+      final table = _buildTdsTable(
+        block.tableRows!,
+        section,
+        fonts,
       );
       return pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 4),
@@ -276,6 +264,7 @@ class TdsPdfService {
           block.text!,
           fonts: fonts,
           fontSize: 9,
+          enableMarkdownBold: !forceRegularParagraph,
         ),
       );
     }
@@ -293,6 +282,73 @@ class TdsPdfService {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 3),
       child: centerParagraph ? pw.Center(child: paragraph) : paragraph,
+    );
+  }
+
+  static pw.Widget _buildTdsTable(
+    List<List<String>> rows,
+    _TdsSection section,
+    _PdfFonts fonts,
+  ) {
+    final isPhysicalTable =
+        section.title.contains('物理性能') && rows.first.length >= 3;
+    final columnWidths = isPhysicalTable
+        ? <int, pw.TableColumnWidth>{
+            0: const pw.FlexColumnWidth(3),
+            1: const pw.FlexColumnWidth(2.2),
+            2: const pw.FlexColumnWidth(1.2),
+          }
+        : null;
+
+    return pw.Table(
+      columnWidths: columnWidths,
+      defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+      children: [
+        for (var rowIndex = 0; rowIndex < rows.length; rowIndex++)
+          pw.TableRow(
+            children: [
+              for (final cell in rows[rowIndex])
+                _buildTdsTableCell(
+                  cell,
+                  fonts,
+                  isHeader: rowIndex == 0,
+                  isLastRow: rowIndex == rows.length - 1,
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  static pw.Widget _buildTdsTableCell(
+    String text,
+    _PdfFonts fonts, {
+    required bool isHeader,
+    required bool isLastRow,
+  }) {
+    const thickLineWidth = 0.8;
+    const thinLineWidth = 0.35;
+    final bottomLineWidth =
+        isHeader || isLastRow ? thickLineWidth : thinLineWidth;
+
+    return pw.Container(
+      alignment: pw.Alignment.center,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(
+          top: isHeader
+              ? const pw.BorderSide(width: thickLineWidth)
+              : pw.BorderSide.none,
+          bottom: pw.BorderSide(width: bottomLineWidth),
+        ),
+      ),
+      child: pw.Text(
+        text,
+        textAlign: pw.TextAlign.center,
+        style: isHeader
+            ? _bodyBoldTextStyle(fonts, fontSize: 9.5)
+            : _bodyTextStyle(fonts, fontSize: 9.3),
+      ),
     );
   }
 
