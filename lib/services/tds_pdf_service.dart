@@ -25,8 +25,13 @@ class TdsPdfService {
   static Future<File> generateAndShareTds(
     ProductItem product, {
     required String tdsMarkdown,
+    String bodyFont = 'simhei',
   }) async {
-    final bytes = await generatePdfBytes(product, tdsMarkdown: tdsMarkdown);
+    final bytes = await generatePdfBytes(
+      product,
+      tdsMarkdown: tdsMarkdown,
+      bodyFont: bodyFont,
+    );
     final dir = await getTemporaryDirectory();
     final safeName = product.fileName.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_').trim();
     final fileName = '${safeName.isEmpty ? '产品' : safeName} TDS(CN).pdf';
@@ -44,6 +49,7 @@ class TdsPdfService {
   static Future<Uint8List> generatePdfBytes(
     ProductItem product, {
     required String tdsMarkdown,
+    String bodyFont = 'simhei',
   }) async {
     final body = _extractMarkdownBody(tdsMarkdown);
     final parsed = _parseTdsSections(body);
@@ -51,29 +57,33 @@ class TdsPdfService {
         _normalizeTextForPdf(product.fileName) ??
         product.fileName;
     final productSubtitle = _normalizeTextForPdf(parsed.productSubtitle);
+    final useSimSunBody = bodyFont == 'simsun';
 
     final pdfFonts = _PdfFonts(
-      songtiRegular: await _loadFirstAvailableFont(
-        candidates: const [
-          'assets/fonts/SimSun.ttf',
-          'assets/fonts/simsun.ttf',
-          'assets/fonts/STSong.ttf',
-        ],
-        fallback: PdfGoogleFonts.notoSerifSCRegular,
+      bodyRegular: await _loadFirstAvailableFont(
+        candidates: useSimSunBody
+            ? const ['assets/fonts/SimSun.ttf']
+            : const ['assets/fonts/SimHei.ttf'],
+        fallback: useSimSunBody
+            ? PdfGoogleFonts.notoSerifSCRegular
+            : PdfGoogleFonts.notoSansSCRegular,
       ),
-      songtiBold: await _loadFirstAvailableFont(
-        candidates: const ['assets/fonts/SimSun-Bold.ttf', 'assets/fonts/simsunb.ttf'],
-        fallback: PdfGoogleFonts.notoSerifSCBold,
+      bodyBold: await _loadFirstAvailableFont(
+        candidates: useSimSunBody
+            ? const ['assets/fonts/SimSun.ttf']
+            : const ['assets/fonts/SimHei.ttf'],
+        fallback: useSimSunBody
+            ? PdfGoogleFonts.notoSerifSCBold
+            : PdfGoogleFonts.notoSansSCBold,
       ),
       arialRegular: await _loadFirstAvailableFont(
-        candidates: const ['assets/fonts/Arial.ttf', 'assets/fonts/arial.ttf'],
+        candidates: const ['assets/fonts/Arial.ttf'],
         fallback: PdfGoogleFonts.robotoRegular,
       ),
       arialBold: await _loadFirstAvailableFont(
         candidates: const [
-          'assets/fonts/Arial-Bold.ttf',
-          'assets/fonts/arialbd.ttf',
-          'assets/fonts/arial.ttf',
+          'assets/fonts/ArialBold.ttf',
+          'assets/fonts/Arial.ttf',
         ],
         fallback: PdfGoogleFonts.robotoBold,
       ),
@@ -94,8 +104,8 @@ class TdsPdfService {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
         theme: pw.ThemeData.withFont(
-          base: pdfFonts.songtiRegular,
-          bold: pdfFonts.songtiBold,
+          base: pdfFonts.bodyRegular,
+          bold: pdfFonts.bodyBold,
         ),
         header: (context) => _buildHeader(pdfFonts),
         footer: (context) => _buildFooter(pdfFonts),
@@ -104,7 +114,7 @@ class TdsPdfService {
           pw.Center(
             child: pw.Text(
               '产品技术数据表（TDS）',
-              style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 16),
+              style: pw.TextStyle(font: pdfFonts.bodyRegular, fontSize: 16),
             ),
           ),
           pw.SizedBox(height: 16),
@@ -120,7 +130,7 @@ class TdsPdfService {
             pw.SizedBox(height: 8),
             pw.Text(
               productSubtitle,
-              style: pw.TextStyle(font: pdfFonts.songtiRegular, fontSize: 10.5),
+              style: pw.TextStyle(font: pdfFonts.bodyRegular, fontSize: 10.5),
             ),
           ],
           pw.SizedBox(height: 10),
@@ -196,7 +206,7 @@ class TdsPdfService {
       final isPhysicalTable = section.title.contains('物理性能') && block.tableRows!.first.length >= 3;
       final table = pw.TableHelper.fromTextArray(
         headerStyle: pw.TextStyle(font: fonts.simheiBold, fontSize: 9.5),
-        cellStyle: pw.TextStyle(font: fonts.songtiRegular, fontSize: 9.3),
+        cellStyle: pw.TextStyle(font: fonts.bodyRegular, fontSize: 9.3),
         cellAlignment: pw.Alignment.center,
         border: pw.TableBorder.all(width: 0.8),
         columnWidths: isPhysicalTable
@@ -255,7 +265,6 @@ class TdsPdfService {
     required double fontSize,
     double lineSpacing = 0,
     pw.TextAlign textAlign = pw.TextAlign.left,
-    bool useSongti = true,
   }) {
     final spans = <pw.InlineSpan>[];
     final pattern = RegExp(r'\*\*(.+?)\*\*');
@@ -266,9 +275,9 @@ class TdsPdfService {
       if (match.start > start) {
         spans.add(
           pw.TextSpan(
-              text: source.substring(start, match.start),
-              style: pw.TextStyle(
-              font: useSongti ? fonts.songtiRegular : fonts.simheiRegular,
+            text: source.substring(start, match.start),
+            style: pw.TextStyle(
+              font: fonts.bodyRegular,
               fontSize: fontSize,
               lineSpacing: lineSpacing,
             ),
@@ -280,7 +289,7 @@ class TdsPdfService {
         pw.TextSpan(
           text: boldText,
           style: pw.TextStyle(
-            font: useSongti ? fonts.songtiBold : fonts.simheiBold,
+            font: fonts.bodyBold,
             fontSize: fontSize,
             fontWeight: pw.FontWeight.bold,
             lineSpacing: lineSpacing,
@@ -295,7 +304,7 @@ class TdsPdfService {
         pw.TextSpan(
           text: source.substring(start),
           style: pw.TextStyle(
-            font: useSongti ? fonts.songtiRegular : fonts.simheiRegular,
+            font: fonts.bodyRegular,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
           ),
@@ -308,7 +317,7 @@ class TdsPdfService {
         source,
         textAlign: textAlign,
         style: pw.TextStyle(
-          font: useSongti ? fonts.songtiRegular : fonts.simheiRegular,
+          font: fonts.bodyRegular,
           fontSize: fontSize,
           lineSpacing: lineSpacing,
         ),
@@ -338,7 +347,6 @@ class TdsPdfService {
                 fontSize: 8,
                 lineSpacing: 2,
                 textAlign: pw.TextAlign.left,
-                useSongti: false,
               ),
             ),
           ),
@@ -642,16 +650,16 @@ class TdsPdfService {
 
 class _PdfFonts {
   const _PdfFonts({
-    required this.songtiRegular,
-    required this.songtiBold,
+    required this.bodyRegular,
+    required this.bodyBold,
     required this.arialRegular,
     required this.arialBold,
     required this.simheiRegular,
     required this.simheiBold,
   });
 
-  final pw.Font songtiRegular;
-  final pw.Font songtiBold;
+  final pw.Font bodyRegular;
+  final pw.Font bodyBold;
   final pw.Font arialRegular;
   final pw.Font arialBold;
   final pw.Font simheiRegular;
