@@ -71,6 +71,10 @@ class TdsPdfService {
         candidates: const ['assets/fonts/Arial.ttf'],
         fallback: PdfGoogleFonts.robotoRegular,
       ),
+      arialBold: await _loadFirstAvailableFont(
+        candidates: const ['assets/fonts/ArialBold.ttf'],
+        fallback: PdfGoogleFonts.robotoBold,
+      ),
       simheiRegular: await _loadFirstAvailableFont(
         candidates: const ['assets/fonts/SimHei.ttf', 'assets/fonts/simhei.ttf'],
         fallback: PdfGoogleFonts.notoSansSCRegular,
