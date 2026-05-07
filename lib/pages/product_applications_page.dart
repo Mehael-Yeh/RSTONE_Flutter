@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
+import '../utils/natural_sort.dart';
 import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
 import '../widgets/obsidian_table.dart';
@@ -375,7 +376,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
       final aVal = aFields[_sortColumn] ?? '';
       final bVal = bFields[_sortColumn] ?? '';
       
-      final result = aVal.compareTo(bVal);
+      final result = compareNaturalText(aVal, bVal);
       return _sortDescending ? -result : result;
     });
     

@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
+import '../utils/natural_sort.dart';
 import '../services/preferences_service.dart';
 import 'note_swipe_tile.dart';
 import 'product_detail_sheet.dart';
@@ -162,7 +163,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
     sorted.sort((a, b) {
       final aVal = a.getTableFields()[sortCol] ?? '';
       final bVal = b.getTableFields()[sortCol] ?? '';
-      final result = aVal.compareTo(bVal);
+      final result = compareNaturalText(aVal, bVal);
       return widget.sortDescending ? -result : result;
     });
 

@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/product_item.dart';
 
@@ -36,9 +37,10 @@ class TdsPdfService {
     final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(bytes, flush: true);
 
-    await Printing.sharePdf(
-      bytes: bytes,
-      filename: '${product.fileName} TDS(CN).pdf',
+    await Share.shareXFiles(
+      [XFile(file.path, mimeType: 'application/pdf', name: fileName)],
+      subject: '${product.fileName} TDS(CN).pdf',
+      text: '产品 TDS PDF 文件',
     );
 
     return file;
@@ -61,7 +63,7 @@ class TdsPdfService {
         fallback: PdfGoogleFonts.notoSansSCRegular,
       ),
       bodyBold: await _loadFirstAvailableFont(
-        candidates: const ['assets/fonts/MicrosoftYaHei.ttf'],
+        candidates: const ['assets/fonts/MicrosoftYaHeiBold.ttf'],
         fallback: PdfGoogleFonts.notoSansSCBold,
       ),
       arialRegular: await _loadFirstAvailableFont(
@@ -102,27 +104,19 @@ class TdsPdfService {
           pw.Center(
             child: pw.Text(
               '产品技术数据表（TDS）',
-              style: pw.TextStyle(font: pdfFonts.bodyRegular, fontSize: 16),
+              style: _bodyTextStyle(pdfFonts, fontSize: 16),
             ),
           ),
           pw.SizedBox(height: 16),
           pw.Text(
             productGrade,
-            style: pw.TextStyle(
-              font: pdfFonts.bodyBold,
-              fontSize: 14,
-              fontWeight: pw.FontWeight.bold,
-            ),
+            style: _bodyBoldTextStyle(pdfFonts, fontSize: 14),
           ),
           if (productSubtitle != null && productSubtitle.isNotEmpty) ...[
             pw.SizedBox(height: 8),
             pw.Text(
               productSubtitle,
-              style: pw.TextStyle(
-                font: pdfFonts.bodyBold,
-                fontSize: 10.5,
-                fontWeight: pw.FontWeight.bold,
-              ),
+              style: _bodyBoldTextStyle(pdfFonts, fontSize: 10.5),
             ),
           ],
           pw.SizedBox(height: 10),
@@ -133,6 +127,35 @@ class TdsPdfService {
     );
 
     return doc.save();
+  }
+
+  static pw.TextStyle _bodyTextStyle(
+    _PdfFonts fonts, {
+    required double fontSize,
+    pw.FontWeight? fontWeight,
+    double lineSpacing = 0,
+  }) {
+    return pw.TextStyle(
+      font: fonts.bodyRegular,
+      fontNormal: fonts.bodyRegular,
+      fontBold: fonts.bodyBold,
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      lineSpacing: lineSpacing,
+    );
+  }
+
+  static pw.TextStyle _bodyBoldTextStyle(
+    _PdfFonts fonts, {
+    required double fontSize,
+    double lineSpacing = 0,
+  }) {
+    return _bodyTextStyle(
+      fonts,
+      fontSize: fontSize,
+      fontWeight: pw.FontWeight.bold,
+      lineSpacing: lineSpacing,
+    );
   }
 
   static pw.Widget _buildHeader(_PdfFonts fonts) {
@@ -186,30 +209,29 @@ class TdsPdfService {
           if (section.title.isNotEmpty) ...[
             pw.Text(
               section.title,
-              style: pw.TextStyle(
-                font: fonts.bodyBold,
-                fontSize: 14,
-                fontWeight: pw.FontWeight.bold,
-              ),
+              style: _bodyBoldTextStyle(fonts, fontSize: 14),
             ),
             pw.SizedBox(height: 5),
           ],
-          ...section.blocks.map((block) => _buildBlock(block, section, fonts)),
+          for (var i = 0; i < section.blocks.length; i++)
+            _buildBlock(section.blocks[i], section, fonts, blockIndex: i),
         ],
       ),
     );
   }
 
-  static pw.Widget _buildBlock(_TdsBlock block, _TdsSection section, _PdfFonts fonts) {
+  static pw.Widget _buildBlock(
+    _TdsBlock block,
+    _TdsSection section,
+    _PdfFonts fonts, {
+    required int blockIndex,
+  }) {
     if (block.type == _TdsBlockType.table && block.tableRows != null && block.tableRows!.isNotEmpty) {
-      final isPhysicalTable = section.title.contains('物理性能') && block.tableRows!.first.length >= 3;
+      final isPhysicalTable =
+          section.title.contains('物理性能') && block.tableRows!.first.length >= 3;
       final table = pw.TableHelper.fromTextArray(
-        headerStyle: pw.TextStyle(
-          font: fonts.bodyBold,
-          fontSize: 9.5,
-          fontWeight: pw.FontWeight.bold,
-        ),
-        cellStyle: pw.TextStyle(font: fonts.bodyRegular, fontSize: 9.3),
+        headerStyle: _bodyBoldTextStyle(fonts, fontSize: 9.5),
+        cellStyle: _bodyTextStyle(fonts, fontSize: 9.3),
         cellAlignment: pw.Alignment.center,
         border: pw.TableBorder.all(width: 0.8),
         columnWidths: isPhysicalTable
@@ -220,7 +242,9 @@ class TdsPdfService {
               }
             : null,
         headers: block.tableRows!.first,
-        data: block.tableRows!.length > 1 ? block.tableRows!.sublist(1) : const <List<String>>[],
+        data: block.tableRows!.length > 1
+            ? block.tableRows!.sublist(1)
+            : const <List<String>>[],
       );
       return pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 4),
@@ -244,15 +268,33 @@ class TdsPdfService {
       );
     }
 
+    final centerParagraph =
+        _shouldCenterSingleLineParagraph(section.blocks, blockIndex);
+    final paragraph = _buildMarkdownStyledText(
+      _formatParagraphText(block),
+      fonts: fonts,
+      fontSize: 10.5,
+      lineSpacing: 2,
+      textAlign: centerParagraph ? pw.TextAlign.center : pw.TextAlign.left,
+    );
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 3),
-      child: _buildMarkdownStyledText(
-        _formatParagraphText(block),
-        fonts: fonts,
-        fontSize: 10.5,
-        lineSpacing: 2,
-      ),
+      child: centerParagraph ? pw.Center(child: paragraph) : paragraph,
     );
+  }
+
+  static bool _shouldCenterSingleLineParagraph(List<_TdsBlock> blocks, int index) {
+    if (index <= 0 || index >= blocks.length) return false;
+    final block = blocks[index];
+    if (block.type != _TdsBlockType.paragraph || block.sourceLineCount != 1) {
+      return false;
+    }
+
+    final previousBlock = blocks[index - 1];
+    if (previousBlock.type != _TdsBlockType.table) return false;
+
+    final hasNextBlock = index + 1 < blocks.length;
+    return !hasNextBlock || blocks[index + 1].type == _TdsBlockType.table;
   }
 
   static String _formatParagraphText(_TdsBlock block) {
@@ -279,8 +321,8 @@ class TdsPdfService {
         spans.add(
           pw.TextSpan(
             text: source.substring(start, match.start),
-            style: pw.TextStyle(
-              font: fonts.bodyRegular,
+            style: _bodyTextStyle(
+              fonts,
               fontSize: fontSize,
               lineSpacing: lineSpacing,
             ),
@@ -291,10 +333,9 @@ class TdsPdfService {
       spans.add(
         pw.TextSpan(
           text: boldText,
-          style: pw.TextStyle(
-            font: fonts.bodyBold,
+          style: _bodyBoldTextStyle(
+            fonts,
             fontSize: fontSize,
-            fontWeight: pw.FontWeight.bold,
             lineSpacing: lineSpacing,
           ),
         ),
@@ -306,8 +347,8 @@ class TdsPdfService {
       spans.add(
         pw.TextSpan(
           text: source.substring(start),
-          style: pw.TextStyle(
-            font: fonts.bodyRegular,
+          style: _bodyTextStyle(
+            fonts,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
           ),
@@ -319,8 +360,8 @@ class TdsPdfService {
       return pw.Text(
         source,
         textAlign: textAlign,
-        style: pw.TextStyle(
-          font: fonts.bodyRegular,
+        style: _bodyTextStyle(
+          fonts,
           fontSize: fontSize,
           lineSpacing: lineSpacing,
         ),
@@ -341,11 +382,7 @@ class TdsPdfService {
         children: [
           pw.Text(
             '免责声明',
-            style: pw.TextStyle(
-              font: fonts.bodyBold,
-              fontSize: 14,
-              fontWeight: pw.FontWeight.bold,
-            ),
+            style: _bodyBoldTextStyle(fonts, fontSize: 14),
           ),
           pw.SizedBox(height: 8),
           ..._defaultDisclaimer.map(
@@ -471,7 +508,12 @@ class TdsPdfService {
       if (paragraphBuffer.isEmpty) return;
       current ??= _TdsSection(title: '');
       final paragraphText = _mergeWrappedParagraphLines(paragraphBuffer);
-      current!.blocks.add(_TdsBlock.paragraph(paragraphText));
+      current!.blocks.add(
+        _TdsBlock.paragraph(
+          paragraphText,
+          sourceLineCount: paragraphBuffer.length,
+        ),
+      );
       paragraphBuffer.clear();
     }
 
@@ -552,7 +594,10 @@ class TdsPdfService {
         flushParagraphIfNeeded();
         current ??= _TdsSection(title: '');
         current!.blocks.add(
-          _TdsBlock.paragraph(_normalizeParagraphSpacing(line)),
+          _TdsBlock.paragraph(
+            _normalizeParagraphSpacing(line),
+            sourceLineCount: 1,
+          ),
         );
         continue;
       }
@@ -702,16 +747,31 @@ class _TdsBlock {
     required this.type,
     this.text,
     this.tableRows,
+    this.sourceLineCount = 0,
   });
 
-  factory _TdsBlock.paragraph(String text) => _TdsBlock._(
-    type: _TdsBlockType.paragraph,
-    text: text,
-  );
-  factory _TdsBlock.note(String text) => _TdsBlock._(type: _TdsBlockType.note, text: text);
-  factory _TdsBlock.table(List<List<String>> rows) => _TdsBlock._(type: _TdsBlockType.table, tableRows: rows);
+  factory _TdsBlock.paragraph(
+    String text, {
+    required int sourceLineCount,
+  }) =>
+      _TdsBlock._(
+        type: _TdsBlockType.paragraph,
+        text: text,
+        sourceLineCount: sourceLineCount,
+      );
+
+  factory _TdsBlock.note(String text) => _TdsBlock._(
+        type: _TdsBlockType.note,
+        text: text,
+      );
+
+  factory _TdsBlock.table(List<List<String>> rows) => _TdsBlock._(
+        type: _TdsBlockType.table,
+        tableRows: rows,
+      );
 
   final _TdsBlockType type;
   final String? text;
   final List<List<String>>? tableRows;
+  final int sourceLineCount;
 }
