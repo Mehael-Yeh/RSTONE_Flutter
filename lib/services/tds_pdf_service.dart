@@ -89,7 +89,7 @@ class TdsPdfService {
         margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
         theme: pw.ThemeData.withFont(
           base: pdfFonts.bodyRegular,
-          bold: pdfFonts.bodyBold,
+          bold: pdfFonts.bodyRegular,
         ),
         header: (context) => _buildHeader(pdfFonts),
         footer: (context) => _buildFooter(pdfFonts),
@@ -133,7 +133,7 @@ class TdsPdfService {
     return pw.TextStyle(
       font: fonts.bodyRegular,
       fontNormal: fonts.bodyRegular,
-      fontBold: fonts.bodyBold,
+      fontBold: fonts.bodyRegular,
       fontSize: fontSize,
       fontWeight: fontWeight,
       lineSpacing: lineSpacing,
