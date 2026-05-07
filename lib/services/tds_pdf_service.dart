@@ -25,12 +25,10 @@ class TdsPdfService {
   static Future<File> generateAndShareTds(
     ProductItem product, {
     required String tdsMarkdown,
-    String bodyFont = 'simhei',
   }) async {
     final bytes = await generatePdfBytes(
       product,
       tdsMarkdown: tdsMarkdown,
-      bodyFont: bodyFont,
     );
     final dir = await getTemporaryDirectory();
     final safeName = product.fileName.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_').trim();
@@ -49,7 +47,6 @@ class TdsPdfService {
   static Future<Uint8List> generatePdfBytes(
     ProductItem product, {
     required String tdsMarkdown,
-    String bodyFont = 'simhei',
   }) async {
     final body = _extractMarkdownBody(tdsMarkdown);
     final parsed = _parseTdsSections(body);
@@ -57,24 +54,15 @@ class TdsPdfService {
         _normalizeTextForPdf(product.fileName) ??
         product.fileName;
     final productSubtitle = _normalizeTextForPdf(parsed.productSubtitle);
-    final useSimSunBody = bodyFont == 'simsun';
 
     final pdfFonts = _PdfFonts(
       bodyRegular: await _loadFirstAvailableFont(
-        candidates: useSimSunBody
-            ? const ['assets/fonts/SimSun.ttf']
-            : const ['assets/fonts/SimHei.ttf'],
-        fallback: useSimSunBody
-            ? PdfGoogleFonts.notoSerifSCRegular
-            : PdfGoogleFonts.notoSansSCRegular,
+        candidates: const ['assets/fonts/MicrosoftYaHei.ttf'],
+        fallback: PdfGoogleFonts.notoSansSCRegular,
       ),
       bodyBold: await _loadFirstAvailableFont(
-        candidates: useSimSunBody
-            ? const ['assets/fonts/SimSun.ttf']
-            : const ['assets/fonts/SimHei.ttf'],
-        fallback: useSimSunBody
-            ? PdfGoogleFonts.notoSerifSCBold
-            : PdfGoogleFonts.notoSansSCBold,
+        candidates: const ['assets/fonts/MicrosoftYaHei.ttf'],
+        fallback: PdfGoogleFonts.notoSansSCBold,
       ),
       arialRegular: await _loadFirstAvailableFont(
         candidates: const ['assets/fonts/Arial.ttf'],
@@ -121,7 +109,7 @@ class TdsPdfService {
           pw.Text(
             productGrade,
             style: pw.TextStyle(
-              font: pdfFonts.simheiBold,
+              font: pdfFonts.bodyBold,
               fontSize: 14,
               fontWeight: pw.FontWeight.bold,
             ),
@@ -130,7 +118,11 @@ class TdsPdfService {
             pw.SizedBox(height: 8),
             pw.Text(
               productSubtitle,
-              style: pw.TextStyle(font: pdfFonts.bodyRegular, fontSize: 10.5),
+              style: pw.TextStyle(
+                font: pdfFonts.bodyBold,
+                fontSize: 10.5,
+                fontWeight: pw.FontWeight.bold,
+              ),
             ),
           ],
           pw.SizedBox(height: 10),
@@ -192,7 +184,14 @@ class TdsPdfService {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           if (section.title.isNotEmpty) ...[
-            pw.Text(section.title, style: pw.TextStyle(font: fonts.simheiBold, fontSize: 14)),
+            pw.Text(
+              section.title,
+              style: pw.TextStyle(
+                font: fonts.bodyBold,
+                fontSize: 14,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
             pw.SizedBox(height: 5),
           ],
           ...section.blocks.map((block) => _buildBlock(block, section, fonts)),
@@ -205,7 +204,11 @@ class TdsPdfService {
     if (block.type == _TdsBlockType.table && block.tableRows != null && block.tableRows!.isNotEmpty) {
       final isPhysicalTable = section.title.contains('物理性能') && block.tableRows!.first.length >= 3;
       final table = pw.TableHelper.fromTextArray(
-        headerStyle: pw.TextStyle(font: fonts.simheiBold, fontSize: 9.5),
+        headerStyle: pw.TextStyle(
+          font: fonts.bodyBold,
+          fontSize: 9.5,
+          fontWeight: pw.FontWeight.bold,
+        ),
         cellStyle: pw.TextStyle(font: fonts.bodyRegular, fontSize: 9.3),
         cellAlignment: pw.Alignment.center,
         border: pw.TableBorder.all(width: 0.8),
@@ -336,7 +339,14 @@ class TdsPdfService {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text('免责声明', style: pw.TextStyle(font: fonts.simheiBold, fontSize: 14)),
+          pw.Text(
+            '免责声明',
+            style: pw.TextStyle(
+              font: fonts.bodyBold,
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
           pw.SizedBox(height: 8),
           ..._defaultDisclaimer.map(
             (line) => pw.Padding(
@@ -395,9 +405,7 @@ class TdsPdfService {
           children: [
             pw.Row(
               children: [
-                pw.Text('网址', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
-                pw.Text(' ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
-                pw.Text('WEBSITE: ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                pw.Text('网址 WEBSITE: ', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
                 pw.UrlLink(
                   destination: 'http://www.rstone-resin.com/',
                   child: pw.Text(
