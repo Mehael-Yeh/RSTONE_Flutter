@@ -47,12 +47,18 @@ class TdsPdfService {
   }) async {
     final body = _extractMarkdownBody(tdsMarkdown);
     final parsed = _parseTdsSections(body);
-    final productGrade = _normalizeTextForPdf(parsed.productCode) ?? _normalizeTextForPdf(product.fileName) ?? product.fileName;
+    final productGrade = _normalizeTextForPdf(parsed.productCode) ??
+        _normalizeTextForPdf(product.fileName) ??
+        product.fileName;
     final productSubtitle = _normalizeTextForPdf(parsed.productSubtitle);
 
     final pdfFonts = _PdfFonts(
       songtiRegular: await _loadFirstAvailableFont(
-        candidates: const ['assets/fonts/SimSun.ttf', 'assets/fonts/simsun.ttf', 'assets/fonts/STSong.ttf'],
+        candidates: const [
+          'assets/fonts/SimSun.ttf',
+          'assets/fonts/simsun.ttf',
+          'assets/fonts/STSong.ttf',
+        ],
         fallback: PdfGoogleFonts.notoSerifSCRegular,
       ),
       songtiBold: await _loadFirstAvailableFont(
@@ -63,6 +69,14 @@ class TdsPdfService {
         candidates: const ['assets/fonts/Arial.ttf', 'assets/fonts/arial.ttf'],
         fallback: PdfGoogleFonts.robotoRegular,
       ),
+      arialBold: await _loadFirstAvailableFont(
+        candidates: const [
+          'assets/fonts/Arial-Bold.ttf',
+          'assets/fonts/arialbd.ttf',
+          'assets/fonts/arial.ttf',
+        ],
+        fallback: PdfGoogleFonts.robotoBold,
+      ),
       simheiRegular: await _loadFirstAvailableFont(
         candidates: const ['assets/fonts/SimHei.ttf', 'assets/fonts/simhei.ttf'],
         fallback: PdfGoogleFonts.notoSansSCRegular,
@@ -70,10 +84,6 @@ class TdsPdfService {
       simheiBold: await _loadFirstAvailableFont(
         candidates: const ['assets/fonts/SimHei.ttf', 'assets/fonts/simhei.ttf'],
         fallback: PdfGoogleFonts.notoSansSCBold,
-      ),
-      impactLikeBold: await _loadFirstAvailableFont(
-        candidates: const ['assets/fonts/Impact.ttf', 'assets/fonts/impact.ttf'],
-        fallback: PdfGoogleFonts.oswaldBold,
       ),
     );
 
@@ -83,7 +93,10 @@ class TdsPdfService {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 22),
-        theme: pw.ThemeData.withFont(base: pdfFonts.songtiRegular, bold: pdfFonts.songtiBold),
+        theme: pw.ThemeData.withFont(
+          base: pdfFonts.songtiRegular,
+          bold: pdfFonts.songtiBold,
+        ),
         header: (context) => _buildHeader(pdfFonts),
         footer: (context) => _buildFooter(pdfFonts),
         build: (context) => [
@@ -97,7 +110,11 @@ class TdsPdfService {
           pw.SizedBox(height: 16),
           pw.Text(
             productGrade,
-            style: pw.TextStyle(font: pdfFonts.simheiBold, fontSize: 14, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(
+              font: pdfFonts.simheiBold,
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+            ),
           ),
           if (productSubtitle != null && productSubtitle.isNotEmpty) ...[
             pw.SizedBox(height: 8),
@@ -123,28 +140,13 @@ class TdsPdfService {
           crossAxisAlignment: pw.CrossAxisAlignment.end,
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.RichText(
-              text: pw.TextSpan(
-                children: [
-                  pw.TextSpan(
-                    text: 'R',
-                    style: pw.TextStyle(
-                      font: fonts.impactLikeBold,
-                      fontSize: 48,
-                      color: const PdfColor.fromInt(0xFFFF0000),
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.TextSpan(
-                    text: 'STONE',
-                    style: pw.TextStyle(
-                      font: fonts.impactLikeBold,
-                      fontSize: 28,
-                      color: const PdfColor.fromInt(0xFFFF0000),
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                ],
+            pw.Text(
+              'RSTONE',
+              style: pw.TextStyle(
+                font: fonts.arialBold,
+                fontSize: 44,
+                color: const PdfColor.fromInt(0xFF9A3F10),
+                fontWeight: pw.FontWeight.bold,
               ),
             ),
             pw.Column(
@@ -152,12 +154,16 @@ class TdsPdfService {
               children: [
                 pw.Text(
                   '嘉兴锐石化工有限公司',
-                  style: pw.TextStyle(font: fonts.simheiBold, fontSize: 22, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(
+                    font: fonts.simheiBold,
+                    fontSize: 22,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
                 pw.SizedBox(height: 2),
                 pw.Text(
-                  'RSTONE (Jia Xing) Resins Company',
-                  style: pw.TextStyle(font: fonts.arialRegular, fontSize: 14),
+                  'RSTONE (Jia Xing) CHEMICAL CO., LTD.',
+                  style: pw.TextStyle(font: fonts.arialRegular, fontSize: 15),
                 ),
               ],
             ),
@@ -639,17 +645,17 @@ class _PdfFonts {
     required this.songtiRegular,
     required this.songtiBold,
     required this.arialRegular,
+    required this.arialBold,
     required this.simheiRegular,
     required this.simheiBold,
-    required this.impactLikeBold,
   });
 
   final pw.Font songtiRegular;
   final pw.Font songtiBold;
   final pw.Font arialRegular;
+  final pw.Font arialBold;
   final pw.Font simheiRegular;
   final pw.Font simheiBold;
-  final pw.Font impactLikeBold;
 }
 
 class _ParsedTds {
