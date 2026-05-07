@@ -432,29 +432,24 @@ PEEK -> 聚醚醚酮
     return map;
   }
 
-  /// 扩展关键词，包含自身以及同义词规则中的正向/反向映射。
+  /// 扩展关键词，包含自身以及同义词规则中的一层正向/反向映射。
+  ///
+  /// 这里刻意不做递归扩展：例如 `UV -> 双固化 -> PU` 的传递会导致
+  /// 搜索 UV 时误命中仅带 PU 标签的产品，反之亦然。
   Set<String> _expandedKeywords(String keyword) {
     final normalized = keyword.toLowerCase().trim();
     if (normalized.isEmpty) return <String>{};
 
+    // “双固化”本身应作为独立固化方式标签检索；它可以被 PU/UV 反向命中，
+    // 但搜索“双固化”不应放宽为所有 PU 或 UV 产品。
+    if (normalized == '双固化') return <String>{normalized};
+
     final expanded = <String>{normalized};
-    final queue = <String>[normalized];
-    final visited = <String>{};
+    expanded.addAll(_tagAliasRules[normalized] ?? const <String>{});
 
-    while (queue.isNotEmpty) {
-      final current = queue.removeLast();
-      if (!visited.add(current)) continue;
-
-      for (final alias in _tagAliasRules[current] ?? const <String>{}) {
-        if (expanded.add(alias)) {
-          queue.add(alias);
-        }
-      }
-
-      for (final entry in _tagAliasRules.entries) {
-        if (entry.value.contains(current) && expanded.add(entry.key)) {
-          queue.add(entry.key);
-        }
+    for (final entry in _tagAliasRules.entries) {
+      if (entry.value.contains(normalized)) {
+        expanded.add(entry.key);
       }
     }
 
