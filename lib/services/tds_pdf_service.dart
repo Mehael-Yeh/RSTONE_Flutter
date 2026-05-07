@@ -71,7 +71,7 @@ class TdsPdfService {
         candidates: const ['assets/fonts/Arial.ttf'],
         fallback: PdfGoogleFonts.robotoRegular,
       ),
-      headerLogoBold: await _loadFirstAvailableFont(
+      arialBold: await _loadFirstAvailableFont(
         candidates: const ['assets/fonts/ArialBold.ttf'],
         fallback: PdfGoogleFonts.robotoBold,
       ),
