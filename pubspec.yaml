@@ -42,6 +42,7 @@ flutter:
     - assets/产品TDS.json
     - assets/fonts/Arial.ttf
     - assets/fonts/MicrosoftYaHei.ttf
+    - assets/fonts/MicrosoftYaHeiBold.ttf
     - assets/fonts/SimHei.ttf
 
 flutter_launcher_icons:
