@@ -261,6 +261,7 @@ class TdsPdfService {
           block.text!,
           fonts: fonts,
           fontSize: 9,
+          enableMarkdownBold: !forceRegularParagraph,
         ),
       );
     }
