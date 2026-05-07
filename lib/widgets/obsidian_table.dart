@@ -368,6 +368,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
             onTap: () => ProductDetailSheet.show(
               context,
               item,
+              preferencesService: widget.preferencesService,
               formulas: widget.formulas,
               tdsContent: _tdsOf(item),
             ),
@@ -507,6 +508,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                       onTap: () => ProductDetailSheet.show(
                         context,
                         item,
+                        preferencesService: widget.preferencesService,
                         formulas: widget.formulas,
                         tdsContent: _tdsOf(item),
                       ),
