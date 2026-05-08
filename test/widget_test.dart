@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:rst_flutter/models/product_item.dart';
 import 'package:rst_flutter/services/obsidian_data_service.dart';
+import 'package:rst_flutter/services/tds_pdf_service.dart';
 import 'package:rst_flutter/utils/natural_sort.dart';
 import 'package:rst_flutter/widgets/product_detail/formula_content_parser.dart';
 
@@ -139,6 +140,30 @@ tags:
 
       expect(parsed.preTableContent, isEmpty);
       expect(parsed.postTableContent, isEmpty);
+    });
+  });
+
+  group('TdsPdfService', () {
+    test('inserts word joiners before line-start-forbidden punctuation', () {
+      const text = '这是一个很长的正文，包含括号（内容）、引号“内容”，以及英文 punctuation.';
+
+      final normalized =
+          TdsPdfService.preventLeadingPunctuationLineBreaks(text);
+
+      expect(normalized, contains('正文\u2060，'));
+      expect(normalized, contains('内容\u2060）'));
+      expect(normalized, contains('内容\u2060”\u2060，'));
+      expect(normalized, contains('punctuation\u2060.'));
+    });
+
+    test('does not add a word joiner before leading punctuation', () {
+      const text = '，开头标点保持原样';
+
+      final normalized =
+          TdsPdfService.preventLeadingPunctuationLineBreaks(text);
+
+      expect(normalized.startsWith('\u2060'), isFalse);
+      expect(normalized, '，开头标点保持原样');
     });
   });
 
