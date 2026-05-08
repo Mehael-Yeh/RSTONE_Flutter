@@ -3,6 +3,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -15,8 +16,35 @@ import '../models/product_item.dart';
 class TdsPdfService {
   static final RegExp _headingReg = RegExp(r'^(#{1,3})\s*(.+)$');
   static final RegExp _leadingPunctuationReg = RegExp(
-    r'^[，。！？；：、）》】』’”,.!?;:\)\]}>]',
+    r'^[，。！？；：、）》】』」’”,.!?;:\)\]}>]',
   );
+  static const String _wordJoiner = '\u2060';
+  static const Set<String> _lineStartForbiddenPunctuation = {
+    '，',
+    '。',
+    '！',
+    '？',
+    '；',
+    '：',
+    '、',
+    '》',
+    '）',
+    '】',
+    '』',
+    '」',
+    '’',
+    '”',
+    ',',
+    '.',
+    '!',
+    '?',
+    ';',
+    ':',
+    ')',
+    ']',
+    '}',
+    '>',
+  };
 
   static const List<String> _defaultDisclaimer = [
     '锐石为客户提供物料安全资料表，提供有关本产品的潜在健康影响、安全处理、贮存、使用和弃置的信息。锐石鼓励客户在使用锐石产品和其它原料之前先查阅物料安全资料表，以确保人身和环境安全。为了确保锐石的产品不被滥用于非指定用途或未经测试的用途，锐石的员工可帮助客户处理生态及产品安全方面的问题。您的锐石销售代表可安排适当联络。',
@@ -347,7 +375,7 @@ class TdsPdfService {
         ),
       ),
       child: pw.Text(
-        text.isEmpty ? ' ' : text,
+        text.isEmpty ? ' ' : (_normalizeTextForPdf(text) ?? ' '),
         textAlign: pw.TextAlign.center,
         style: isHeader
             ? _bodyBoldTextStyle(fonts, fontSize: 9.5)
@@ -777,12 +805,45 @@ class TdsPdfService {
     return normalized;
   }
 
+  @visibleForTesting
+  static String preventLeadingPunctuationLineBreaks(String text) =>
+      _preventLeadingPunctuationLineBreaks(text);
+
+  static String _preventLeadingPunctuationLineBreaks(String text) {
+    if (text.isEmpty) return text;
+
+    final buffer = StringBuffer();
+    var hasPreviousCharacter = false;
+    var previousCharacterWasJoiner = false;
+
+    for (final rune in text.runes) {
+      final char = String.fromCharCode(rune);
+      if (_lineStartForbiddenPunctuation.contains(char) &&
+          hasPreviousCharacter &&
+          !previousCharacterWasJoiner) {
+        // U+2060 WORD JOINER is zero-width and prevents a line break before
+        // punctuation without changing character spacing.
+        buffer.write(_wordJoiner);
+      }
+      buffer.write(char);
+      hasPreviousCharacter = true;
+      previousCharacterWasJoiner = char == _wordJoiner;
+    }
+    return buffer.toString();
+  }
+
   static String? _normalizeTextForPdf(String? text) {
     if (text == null || text.isEmpty) return text;
     var normalized = text;
-    normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)[ \t\n]+(\d{2,}[A-Za-z0-9-]*)'), (m) => '${m.group(1)}${m.group(2)}');
-    normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)(\d{2,})'), (m) => '${m.group(1)}${m.group(2)}');
-    return normalized;
+    normalized = normalized.replaceAllMapped(
+      RegExp(r'([A-Za-z]+)[ \t\n]+(\d{2,}[A-Za-z0-9-]*)'),
+      (m) => '${m.group(1)}${m.group(2)}',
+    );
+    normalized = normalized.replaceAllMapped(
+      RegExp(r'([A-Za-z]+)(\d{2,})'),
+      (m) => '${m.group(1)}${m.group(2)}',
+    );
+    return _preventLeadingPunctuationLineBreaks(normalized);
   }
 
   static Future<pw.Font> _loadFirstAvailableFont({
