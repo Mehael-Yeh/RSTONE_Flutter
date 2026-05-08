@@ -3,6 +3,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -15,8 +16,34 @@ import '../models/product_item.dart';
 class TdsPdfService {
   static final RegExp _headingReg = RegExp(r'^(#{1,3})\s*(.+)$');
   static final RegExp _leadingPunctuationReg = RegExp(
-    r'^[，。！？；：、）》】』’”,.!?;:\)\]}>]',
+    r'^[，。！？；：、）》】』」’”,.!?;:\)\]}>]',
   );
+  static const Set<String> _lineStartForbiddenPunctuation = {
+    '，',
+    '。',
+    '！',
+    '？',
+    '；',
+    '：',
+    '、',
+    '》',
+    '）',
+    '】',
+    '』',
+    '」',
+    '’',
+    '”',
+    ',',
+    '.',
+    '!',
+    '?',
+    ';',
+    ':',
+    ')',
+    ']',
+    '}',
+    '>',
+  };
 
   static const List<String> _defaultDisclaimer = [
     '锐石为客户提供物料安全资料表，提供有关本产品的潜在健康影响、安全处理、贮存、使用和弃置的信息。锐石鼓励客户在使用锐石产品和其它原料之前先查阅物料安全资料表，以确保人身和环境安全。为了确保锐石的产品不被滥用于非指定用途或未经测试的用途，锐石的员工可帮助客户处理生态及产品安全方面的问题。您的锐石销售代表可安排适当联络。',
@@ -346,12 +373,12 @@ class TdsPdfService {
           bottom: pw.BorderSide(width: bottomLineWidth),
         ),
       ),
-      child: pw.Text(
-        text.isEmpty ? ' ' : text,
-        textAlign: pw.TextAlign.center,
+      child: _buildNoLeadingPunctuationText(
+        text.isEmpty ? ' ' : (_normalizeTextForPdf(text) ?? ' '),
         style: isHeader
             ? _bodyBoldTextStyle(fonts, fontSize: 9.5)
             : _bodyTextStyle(fonts, fontSize: 9.3),
+        textAlign: pw.TextAlign.center,
       ),
     );
   }
@@ -385,7 +412,6 @@ class TdsPdfService {
     pw.TextAlign textAlign = pw.TextAlign.left,
     bool enableMarkdownBold = true,
   }) {
-    final spans = <pw.InlineSpan>[];
     final pattern = RegExp(r'\*\*(.+?)\*\*');
     var start = 0;
     final source = _normalizeTextForPdf(
@@ -398,15 +424,16 @@ class TdsPdfService {
         ) ??
         '';
 
+    final segments = <_StyledTextSegment>[];
     final boldMatches = enableMarkdownBold
         ? pattern.allMatches(source)
         : const <RegExpMatch>[];
     for (final match in boldMatches) {
       if (match.start > start) {
-        spans.add(
-          pw.TextSpan(
-            text: source.substring(start, match.start),
-            style: _bodyTextStyle(
+        segments.add(
+          _StyledTextSegment(
+            source.substring(start, match.start),
+            _bodyTextStyle(
               fonts,
               fontSize: fontSize,
               lineSpacing: lineSpacing,
@@ -415,10 +442,10 @@ class TdsPdfService {
         );
       }
       final boldText = match.group(1) ?? '';
-      spans.add(
-        pw.TextSpan(
-          text: boldText,
-          style: _bodyBoldTextStyle(
+      segments.add(
+        _StyledTextSegment(
+          boldText,
+          _bodyBoldTextStyle(
             fonts,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
@@ -429,10 +456,10 @@ class TdsPdfService {
     }
 
     if (start < source.length) {
-      spans.add(
-        pw.TextSpan(
-          text: source.substring(start),
-          style: _bodyTextStyle(
+      segments.add(
+        _StyledTextSegment(
+          source.substring(start),
+          _bodyTextStyle(
             fonts,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
@@ -441,22 +468,60 @@ class TdsPdfService {
       );
     }
 
-    if (spans.isEmpty) {
-      return pw.Text(
-        source,
-        textAlign: textAlign,
-        style: _bodyTextStyle(
-          fonts,
-          fontSize: fontSize,
-          lineSpacing: lineSpacing,
+    if (segments.isEmpty) {
+      segments.add(
+        _StyledTextSegment(
+          source,
+          _bodyTextStyle(
+            fonts,
+            fontSize: fontSize,
+            lineSpacing: lineSpacing,
+          ),
         ),
       );
     }
 
-    return pw.RichText(
-      textAlign: textAlign,
-      text: pw.TextSpan(children: spans),
+    return pw.Wrap(
+      alignment: _wrapAlignmentForTextAlign(textAlign),
+      runAlignment: _wrapAlignmentForTextAlign(textAlign),
+      spacing: 0,
+      runSpacing: lineSpacing,
+      children: [
+        for (final segment in segments)
+          for (final chunk
+              in _splitTextIntoNoLeadingPunctuationChunks(segment.text))
+            pw.Text(chunk, style: segment.style),
+      ],
     );
+  }
+
+  static pw.Widget _buildNoLeadingPunctuationText(
+    String text, {
+    required pw.TextStyle style,
+    pw.TextAlign textAlign = pw.TextAlign.left,
+    double lineSpacing = 0,
+  }) {
+    return pw.Wrap(
+      alignment: _wrapAlignmentForTextAlign(textAlign),
+      runAlignment: _wrapAlignmentForTextAlign(textAlign),
+      spacing: 0,
+      runSpacing: lineSpacing,
+      children: [
+        for (final chunk in _splitTextIntoNoLeadingPunctuationChunks(text))
+          pw.Text(chunk, style: style),
+      ],
+    );
+  }
+
+  static pw.WrapAlignment _wrapAlignmentForTextAlign(pw.TextAlign textAlign) {
+    switch (textAlign) {
+      case pw.TextAlign.center:
+        return pw.WrapAlignment.center;
+      case pw.TextAlign.right:
+        return pw.WrapAlignment.end;
+      default:
+        return pw.WrapAlignment.start;
+    }
   }
 
   static pw.Widget _buildDisclaimerSection(_PdfFonts fonts) {
@@ -777,11 +842,61 @@ class TdsPdfService {
     return normalized;
   }
 
+  @visibleForTesting
+  static List<String> splitTextIntoNoLeadingPunctuationChunks(String text) =>
+      _splitTextIntoNoLeadingPunctuationChunks(text);
+
+  static List<String> _splitTextIntoNoLeadingPunctuationChunks(String text) {
+    if (text.isEmpty) return const [];
+
+    final chunks = <String>[];
+    final pendingAscii = StringBuffer();
+
+    void flushPendingAscii() {
+      if (pendingAscii.isEmpty) return;
+      chunks.add(pendingAscii.toString());
+      pendingAscii.clear();
+    }
+
+    for (final rune in text.runes) {
+      final char = String.fromCharCode(rune);
+      if (_lineStartForbiddenPunctuation.contains(char)) {
+        flushPendingAscii();
+        if (chunks.isEmpty) {
+          chunks.add(char);
+        } else {
+          chunks[chunks.length - 1] = '${chunks.last}$char';
+        }
+        continue;
+      }
+
+      if (_isAsciiWordCharacter(char) || RegExp(r'\s').hasMatch(char)) {
+        pendingAscii.write(char);
+        continue;
+      }
+
+      flushPendingAscii();
+      chunks.add(char);
+    }
+
+    flushPendingAscii();
+    return chunks;
+  }
+
+  static bool _isAsciiWordCharacter(String char) =>
+      RegExp(r'[A-Za-z0-9_@/#%&+\-=]').hasMatch(char);
+
   static String? _normalizeTextForPdf(String? text) {
     if (text == null || text.isEmpty) return text;
     var normalized = text;
-    normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)[ \t\n]+(\d{2,}[A-Za-z0-9-]*)'), (m) => '${m.group(1)}${m.group(2)}');
-    normalized = normalized.replaceAllMapped(RegExp(r'([A-Za-z]+)(\d{2,})'), (m) => '${m.group(1)}${m.group(2)}');
+    normalized = normalized.replaceAllMapped(
+      RegExp(r'([A-Za-z]+)[ \t\n]+(\d{2,}[A-Za-z0-9-]*)'),
+      (m) => '${m.group(1)}${m.group(2)}',
+    );
+    normalized = normalized.replaceAllMapped(
+      RegExp(r'([A-Za-z]+)(\d{2,})'),
+      (m) => '${m.group(1)}${m.group(2)}',
+    );
     return normalized;
   }
 
@@ -819,6 +934,13 @@ class _PdfFonts {
   final pw.Font tdsHeaderArialBold;
   final pw.Font simheiRegular;
   final pw.Font simheiBold;
+}
+
+class _StyledTextSegment {
+  const _StyledTextSegment(this.text, this.style);
+
+  final String text;
+  final pw.TextStyle style;
 }
 
 class _ParsedTds {
