@@ -167,13 +167,24 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消', style: TextStyle(fontSize: 13)),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('保存', style: TextStyle(fontSize: 13)),
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: pasteFormulaTableFromClipboard,
+                icon: const Icon(Icons.content_paste, size: 16),
+                label: const Text('从剪切板获取', style: TextStyle(fontSize: 12)),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消', style: TextStyle(fontSize: 13)),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('保存', style: TextStyle(fontSize: 13)),
+              ),
+            ],
           ),
         ],
       ),
