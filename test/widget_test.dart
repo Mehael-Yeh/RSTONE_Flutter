@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rst_flutter/models/product_item.dart';
 import 'package:rst_flutter/services/obsidian_data_service.dart';
 import 'package:rst_flutter/services/tds_pdf_service.dart';
+import 'package:rst_flutter/utils/formula_table_clipboard_parser.dart';
 import 'package:rst_flutter/utils/natural_sort.dart';
 import 'package:rst_flutter/widgets/product_detail/formula_content_parser.dart';
 
@@ -124,6 +125,50 @@ tags:
         puResults.where((item) => hasTag(item, 'uv') && !hasDualCureTag(item)),
         isEmpty,
       );
+    });
+  });
+
+  group('FormulaTableClipboardParser', () {
+    test('accepts standard Markdown formula tables', () {
+      const clipboard = '''
+| 原料编号 | 投入数（g) | 百分比(%) | 供应商 | 备注 |
+|----------|------------|-----------|--------|------|
+| RS7930 | 75.00 | 75.000% | 锐石 | |
+| TPO | 1.00 | 1.000% | 巴斯夫 | 三者预溶 |
+''';
+
+      final result = FormulaTableClipboardParser.parse(clipboard);
+
+      expect(result.isValid, isTrue);
+      expect(result.markdown, contains('| 原料编号 | 投入数（g) | 百分比(%) | 供应商 | 备注 |'));
+      expect(result.markdown, contains('| TPO | 1.00 | 1.000% | 巴斯夫 | 三者预溶 |'));
+    });
+
+    test('converts Excel copied tab-separated formula tables to Markdown', () {
+      const clipboard = '原料编号\t投入数（g)\t百分比(%)\t供应商\n'
+          'RD919-23\t70.00 \t0.78 \t锐石 \n'
+          'TEGO 810\t0.10 \t0.00 \t德固赛 \n';
+
+      final result = FormulaTableClipboardParser.parse(clipboard);
+
+      expect(result.isValid, isTrue);
+      expect(result.markdown, '''
+| 原料编号 | 投入数（g) | 百分比(%) | 供应商 |
+| --- | --- | --- | --- |
+| RD919-23 | 70.00 | 0.78 | 锐石 |
+| TEGO 810 | 0.10 | 0.00 | 德固赛 |'''.trim());
+    });
+
+    test('rejects tables without required formula headers', () {
+      const clipboard = '''
+名称	供应商
+RS7930	锐石
+''';
+
+      final result = FormulaTableClipboardParser.parse(clipboard);
+
+      expect(result.isValid, isFalse);
+      expect(result.errorMessage, contains('表头无效'));
     });
   });
 
