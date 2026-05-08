@@ -261,7 +261,7 @@ class TdsPdfService {
           block.text!,
           fonts: fonts,
           fontSize: 9,
-          enableMarkdownBold: !forceRegularParagraph,
+          enableMarkdownBold: true,
         ),
       );
     }
@@ -274,6 +274,7 @@ class TdsPdfService {
       fontSize: 10.5,
       lineSpacing: 2,
       textAlign: centerParagraph ? pw.TextAlign.center : pw.TextAlign.left,
+      enableMarkdownBold: true,
     );
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 3),
