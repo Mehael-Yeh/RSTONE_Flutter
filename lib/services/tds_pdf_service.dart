@@ -306,7 +306,7 @@ class TdsPdfService {
 
     return pw.Table(
       columnWidths: columnWidths,
-      defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+      defaultVerticalAlignment: pw.TableCellVerticalAlignment.full,
       children: [
         for (var rowIndex = 0; rowIndex < normalizedRows.length; rowIndex++)
           pw.TableRow(
@@ -347,7 +347,7 @@ class TdsPdfService {
         ),
       ),
       child: pw.Text(
-        text,
+        text.isEmpty ? ' ' : text,
         textAlign: pw.TextAlign.center,
         style: isHeader
             ? _bodyBoldTextStyle(fonts, fontSize: 9.5)
