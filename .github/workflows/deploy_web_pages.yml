@@ -94,6 +94,9 @@ jobs:
             flutter create --platforms=web --project-name "$PROJECT_NAME" .
           fi
 
+      - name: Generate web icons
+        run: python3 scripts/generate_web_icons.py
+
       - name: Extract database version
         id: db_version
         run: |
