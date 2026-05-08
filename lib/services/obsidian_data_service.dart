@@ -53,6 +53,7 @@ PE -> 聚乙烯
 PP -> 聚丙烯
 PPS -> 聚苯硫醚
 PEEK -> 聚醚醚酮
+EPDM -> 三元乙丙橡胶
 ''';
   /// 标签同义词规则文档（用户新增，仅存储在应用私有目录）
   static const String _tagAliasCustomRulesFileName = 'tag_alias_rules.custom.txt';
