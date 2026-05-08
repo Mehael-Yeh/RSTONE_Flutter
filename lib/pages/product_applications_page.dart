@@ -134,25 +134,6 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                 decoration: _roundedInputDecoration(labelText: '名称'),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '配方 Markdown 表格',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: pasteFormulaTableFromClipboard,
-                    icon: const Icon(Icons.content_paste, size: 16),
-                    label: const Text('从剪切板获取', style: TextStyle(fontSize: 12)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
               TextField(
                 controller: tableController,
                 minLines: 8,
@@ -160,7 +141,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                 style: const TextStyle(fontSize: 13),
                 decoration: _roundedInputDecoration(
                   labelText: '配方 Markdown 表格',
-                  hintText: '支持粘贴 Markdown 表格，或点击上方按钮读取 Excel 复制的表格',
+                  hintText: '支持粘贴 Markdown 表格，或点击下方按钮读取 Excel 复制的表格',
                 ),
               ),
             ],
