@@ -1,7 +1,9 @@
 /// 产品应用列表页面，按场景展示配方与说明。
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/product_item.dart';
+import '../utils/formula_table_clipboard_parser.dart';
 import '../utils/natural_sort.dart';
 import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
@@ -86,8 +88,34 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     _closePullButtons();
     final nameController = TextEditingController();
     final tableController = TextEditingController(
-      text: '| 原料 | 百分比 |\n| --- | --- |\n| 示例原料A | |\n| 示例原料B | |',
+      text: '| 原料编号 | 投入数（g) | 百分比(%) | 供应商 | 备注 |\n'
+          '| --- | --- | --- | --- | --- |\n'
+          '| 示例原料A | 0.00 | 0.000% | | |\n'
+          '| 示例原料B | 0.00 | 0.000% | | |',
     );
+
+    Future<void> pasteFormulaTableFromClipboard() async {
+      final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+      if (!mounted) return;
+
+      final result = FormulaTableClipboardParser.parse(clipboardData?.text ?? '');
+      if (!result.isValid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.errorMessage ?? '剪切板表格无效')),
+        );
+        return;
+      }
+
+      final markdown = result.markdown!;
+      tableController.value = TextEditingValue(
+        text: markdown,
+        selection: TextSelection.collapsed(offset: markdown.length),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已从剪切板读取配方表格')),
+      );
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -117,13 +145,24 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消', style: TextStyle(fontSize: 13)),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('保存', style: TextStyle(fontSize: 13)),
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: pasteFormulaTableFromClipboard,
+                icon: const Icon(Icons.content_paste, size: 16),
+                label: const Text('从剪切板获取', style: TextStyle(fontSize: 12)),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消', style: TextStyle(fontSize: 13)),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('保存', style: TextStyle(fontSize: 13)),
+              ),
+            ],
           ),
         ],
       ),
