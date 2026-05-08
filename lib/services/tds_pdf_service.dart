@@ -18,7 +18,6 @@ class TdsPdfService {
   static final RegExp _leadingPunctuationReg = RegExp(
     r'^[，。！？；：、）》】』」’”,.!?;:\)\]}>]',
   );
-  static const String _wordJoiner = '\u2060';
   static const Set<String> _lineStartForbiddenPunctuation = {
     '，',
     '。',
@@ -374,12 +373,12 @@ class TdsPdfService {
           bottom: pw.BorderSide(width: bottomLineWidth),
         ),
       ),
-      child: pw.Text(
+      child: _buildNoLeadingPunctuationText(
         text.isEmpty ? ' ' : (_normalizeTextForPdf(text) ?? ' '),
-        textAlign: pw.TextAlign.center,
         style: isHeader
             ? _bodyBoldTextStyle(fonts, fontSize: 9.5)
             : _bodyTextStyle(fonts, fontSize: 9.3),
+        textAlign: pw.TextAlign.center,
       ),
     );
   }
@@ -413,7 +412,6 @@ class TdsPdfService {
     pw.TextAlign textAlign = pw.TextAlign.left,
     bool enableMarkdownBold = true,
   }) {
-    final spans = <pw.InlineSpan>[];
     final pattern = RegExp(r'\*\*(.+?)\*\*');
     var start = 0;
     final source = _normalizeTextForPdf(
@@ -426,15 +424,16 @@ class TdsPdfService {
         ) ??
         '';
 
+    final segments = <_StyledTextSegment>[];
     final boldMatches = enableMarkdownBold
         ? pattern.allMatches(source)
         : const <RegExpMatch>[];
     for (final match in boldMatches) {
       if (match.start > start) {
-        spans.add(
-          pw.TextSpan(
-            text: source.substring(start, match.start),
-            style: _bodyTextStyle(
+        segments.add(
+          _StyledTextSegment(
+            source.substring(start, match.start),
+            _bodyTextStyle(
               fonts,
               fontSize: fontSize,
               lineSpacing: lineSpacing,
@@ -443,10 +442,10 @@ class TdsPdfService {
         );
       }
       final boldText = match.group(1) ?? '';
-      spans.add(
-        pw.TextSpan(
-          text: boldText,
-          style: _bodyBoldTextStyle(
+      segments.add(
+        _StyledTextSegment(
+          boldText,
+          _bodyBoldTextStyle(
             fonts,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
@@ -457,10 +456,10 @@ class TdsPdfService {
     }
 
     if (start < source.length) {
-      spans.add(
-        pw.TextSpan(
-          text: source.substring(start),
-          style: _bodyTextStyle(
+      segments.add(
+        _StyledTextSegment(
+          source.substring(start),
+          _bodyTextStyle(
             fonts,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
@@ -469,22 +468,60 @@ class TdsPdfService {
       );
     }
 
-    if (spans.isEmpty) {
-      return pw.Text(
-        source,
-        textAlign: textAlign,
-        style: _bodyTextStyle(
-          fonts,
-          fontSize: fontSize,
-          lineSpacing: lineSpacing,
+    if (segments.isEmpty) {
+      segments.add(
+        _StyledTextSegment(
+          source,
+          _bodyTextStyle(
+            fonts,
+            fontSize: fontSize,
+            lineSpacing: lineSpacing,
+          ),
         ),
       );
     }
 
-    return pw.RichText(
-      textAlign: textAlign,
-      text: pw.TextSpan(children: spans),
+    return pw.Wrap(
+      alignment: _wrapAlignmentForTextAlign(textAlign),
+      runAlignment: _wrapAlignmentForTextAlign(textAlign),
+      spacing: 0,
+      runSpacing: lineSpacing,
+      children: [
+        for (final segment in segments)
+          for (final chunk
+              in _splitTextIntoNoLeadingPunctuationChunks(segment.text))
+            pw.Text(chunk, style: segment.style),
+      ],
     );
+  }
+
+  static pw.Widget _buildNoLeadingPunctuationText(
+    String text, {
+    required pw.TextStyle style,
+    pw.TextAlign textAlign = pw.TextAlign.left,
+    double lineSpacing = 0,
+  }) {
+    return pw.Wrap(
+      alignment: _wrapAlignmentForTextAlign(textAlign),
+      runAlignment: _wrapAlignmentForTextAlign(textAlign),
+      spacing: 0,
+      runSpacing: lineSpacing,
+      children: [
+        for (final chunk in _splitTextIntoNoLeadingPunctuationChunks(text))
+          pw.Text(chunk, style: style),
+      ],
+    );
+  }
+
+  static pw.WrapAlignment _wrapAlignmentForTextAlign(pw.TextAlign textAlign) {
+    switch (textAlign) {
+      case pw.TextAlign.center:
+        return pw.WrapAlignment.center;
+      case pw.TextAlign.right:
+        return pw.WrapAlignment.end;
+      default:
+        return pw.WrapAlignment.start;
+    }
   }
 
   static pw.Widget _buildDisclaimerSection(_PdfFonts fonts) {
@@ -806,31 +843,48 @@ class TdsPdfService {
   }
 
   @visibleForTesting
-  static String preventLeadingPunctuationLineBreaks(String text) =>
-      _preventLeadingPunctuationLineBreaks(text);
+  static List<String> splitTextIntoNoLeadingPunctuationChunks(String text) =>
+      _splitTextIntoNoLeadingPunctuationChunks(text);
 
-  static String _preventLeadingPunctuationLineBreaks(String text) {
-    if (text.isEmpty) return text;
+  static List<String> _splitTextIntoNoLeadingPunctuationChunks(String text) {
+    if (text.isEmpty) return const [];
 
-    final buffer = StringBuffer();
-    var hasPreviousCharacter = false;
-    var previousCharacterWasJoiner = false;
+    final chunks = <String>[];
+    final pendingAscii = StringBuffer();
+
+    void flushPendingAscii() {
+      if (pendingAscii.isEmpty) return;
+      chunks.add(pendingAscii.toString());
+      pendingAscii.clear();
+    }
 
     for (final rune in text.runes) {
       final char = String.fromCharCode(rune);
-      if (_lineStartForbiddenPunctuation.contains(char) &&
-          hasPreviousCharacter &&
-          !previousCharacterWasJoiner) {
-        // U+2060 WORD JOINER is zero-width and prevents a line break before
-        // punctuation without changing character spacing.
-        buffer.write(_wordJoiner);
+      if (_lineStartForbiddenPunctuation.contains(char)) {
+        flushPendingAscii();
+        if (chunks.isEmpty) {
+          chunks.add(char);
+        } else {
+          chunks[chunks.length - 1] = '${chunks.last}$char';
+        }
+        continue;
       }
-      buffer.write(char);
-      hasPreviousCharacter = true;
-      previousCharacterWasJoiner = char == _wordJoiner;
+
+      if (_isAsciiWordCharacter(char) || RegExp(r'\s').hasMatch(char)) {
+        pendingAscii.write(char);
+        continue;
+      }
+
+      flushPendingAscii();
+      chunks.add(char);
     }
-    return buffer.toString();
+
+    flushPendingAscii();
+    return chunks;
   }
+
+  static bool _isAsciiWordCharacter(String char) =>
+      RegExp(r'[A-Za-z0-9_@/#%&+\-=]').hasMatch(char);
 
   static String? _normalizeTextForPdf(String? text) {
     if (text == null || text.isEmpty) return text;
@@ -843,7 +897,7 @@ class TdsPdfService {
       RegExp(r'([A-Za-z]+)(\d{2,})'),
       (m) => '${m.group(1)}${m.group(2)}',
     );
-    return _preventLeadingPunctuationLineBreaks(normalized);
+    return normalized;
   }
 
   static Future<pw.Font> _loadFirstAvailableFont({
@@ -880,6 +934,13 @@ class _PdfFonts {
   final pw.Font tdsHeaderArialBold;
   final pw.Font simheiRegular;
   final pw.Font simheiBold;
+}
+
+class _StyledTextSegment {
+  const _StyledTextSegment(this.text, this.style);
+
+  final String text;
+  final pw.TextStyle style;
 }
 
 class _ParsedTds {

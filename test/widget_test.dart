@@ -144,26 +144,27 @@ tags:
   });
 
   group('TdsPdfService', () {
-    test('inserts word joiners before line-start-forbidden punctuation', () {
-      const text = '这是一个很长的正文，包含括号（内容）、引号“内容”，以及英文 punctuation.';
+    test('groups punctuation with the previous render chunk', () {
+      const text = '正文，包含括号（内容）、引号“内容”，以及 punctuation.';
 
-      final normalized =
-          TdsPdfService.preventLeadingPunctuationLineBreaks(text);
+      final chunks =
+          TdsPdfService.splitTextIntoNoLeadingPunctuationChunks(text);
 
-      expect(normalized, contains('正文\u2060，'));
-      expect(normalized, contains('内容\u2060）'));
-      expect(normalized, contains('内容\u2060”\u2060，'));
-      expect(normalized, contains('punctuation\u2060.'));
+      expect(chunks, contains('文，'));
+      expect(chunks, contains('容）'));
+      expect(chunks, contains('容”'));
+      expect(chunks, contains('punctuation.'));
+      expect(chunks.join(), text);
     });
 
-    test('does not add a word joiner before leading punctuation', () {
+    test('keeps leading punctuation as its own first render chunk', () {
       const text = '，开头标点保持原样';
 
-      final normalized =
-          TdsPdfService.preventLeadingPunctuationLineBreaks(text);
+      final chunks =
+          TdsPdfService.splitTextIntoNoLeadingPunctuationChunks(text);
 
-      expect(normalized.startsWith('\u2060'), isFalse);
-      expect(normalized, '，开头标点保持原样');
+      expect(chunks.first, '，');
+      expect(chunks.join(), text);
     });
   });
 
