@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:rst_flutter/models/product_item.dart';
 import 'package:rst_flutter/services/obsidian_data_service.dart';
+import 'package:rst_flutter/services/tds_pdf_service.dart';
 import 'package:rst_flutter/utils/natural_sort.dart';
 import 'package:rst_flutter/widgets/product_detail/formula_content_parser.dart';
 
@@ -139,6 +140,31 @@ tags:
 
       expect(parsed.preTableContent, isEmpty);
       expect(parsed.postTableContent, isEmpty);
+    });
+  });
+
+  group('TdsPdfService', () {
+    test('groups punctuation with the previous render chunk', () {
+      const text = '正文，包含括号（内容）、引号“内容”，以及 punctuation.';
+
+      final chunks =
+          TdsPdfService.splitTextIntoNoLeadingPunctuationChunks(text);
+
+      expect(chunks, contains('文，'));
+      expect(chunks, contains('容）'));
+      expect(chunks, contains('容”'));
+      expect(chunks, contains('punctuation.'));
+      expect(chunks.join(), text);
+    });
+
+    test('keeps leading punctuation as its own first render chunk', () {
+      const text = '，开头标点保持原样';
+
+      final chunks =
+          TdsPdfService.splitTextIntoNoLeadingPunctuationChunks(text);
+
+      expect(chunks.first, '，');
+      expect(chunks.join(), text);
     });
   });
 
