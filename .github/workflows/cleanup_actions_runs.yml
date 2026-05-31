@@ -1,0 +1,75 @@
+name: Cleanup GitHub Actions Runs
+
+on:
+  schedule:
+    # GitHub Actions cron uses UTC. 20:00 UTC = 04:00 UTC+8 the next day.
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: cleanup-actions-runs
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete workflow runs older than 3 days
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RETENTION_DAYS: 3
+        run: |
+          set -euo pipefail
+
+          cutoff_epoch=$(date -u -d "${RETENTION_DAYS} days ago" +%s)
+          echo "Deleting workflow runs in ${REPO} created before $(date -u -d "@${cutoff_epoch}" --iso-8601=seconds)."
+
+          page=1
+          deleted=0
+          runs_to_delete=$(mktemp)
+
+          while :; do
+            response=$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "/repos/${REPO}/actions/runs?per_page=100&page=${page}")
+
+            run_count=$(jq '.workflow_runs | length' <<< "${response}")
+            if [ "${run_count}" -eq 0 ]; then
+              break
+            fi
+
+            while IFS= read -r run; do
+              created_at=$(jq -r '.created_at' <<< "${run}")
+              created_epoch=$(date -u -d "${created_at}" +%s)
+
+              if [ "${created_epoch}" -lt "${cutoff_epoch}" ]; then
+                printf '%s\n' "${run}" >> "${runs_to_delete}"
+              fi
+            done < <(jq -c '.workflow_runs[] | {id, created_at, html_url}' <<< "${response}")
+
+            page=$((page + 1))
+          done
+
+          while IFS= read -r run; do
+            run_id=$(jq -r '.id' <<< "${run}")
+            created_at=$(jq -r '.created_at' <<< "${run}")
+            html_url=$(jq -r '.html_url' <<< "${run}")
+
+            echo "Deleting run ${run_id} from ${created_at}: ${html_url}"
+            gh api \
+              --method DELETE \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "/repos/${REPO}/actions/runs/${run_id}"
+            deleted=$((deleted + 1))
+          done < "${runs_to_delete}"
+
+          rm -f "${runs_to_delete}"
+
+          echo "Deleted ${deleted} workflow run(s) older than ${RETENTION_DAYS} days."
