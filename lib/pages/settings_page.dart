@@ -4,6 +4,7 @@ library;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import '../utils/compat_color.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -150,8 +151,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _pickCustomThemeColor() async {
     Color workingColor = _selectedThemeSeedColor;
-    final initialHex =
-        workingColor.toARGB32().toRadixString(16).toUpperCase().padLeft(8, '0');
+    final initialHex = workingColor.compatArgb32
+        .toRadixString(16)
+        .toUpperCase()
+        .padLeft(8, '0');
     final controller =
         TextEditingController(text: '#${initialHex.substring(2)}');
     final picked = await showDialog<Color>(
@@ -190,8 +193,7 @@ class _SettingsPageState extends State<SettingsPage> {
             }
 
             void syncHexFromColor() {
-              final hex = workingColor
-                  .toARGB32()
+              final hex = workingColor.compatArgb32
                   .toRadixString(16)
                   .toUpperCase()
                   .padLeft(8, '0');
@@ -219,7 +221,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 10),
                     buildChannelSlider(
                       label: 'R',
-                      value: (workingColor.r * 255).round(),
+                      value: workingColor.compatRed,
                       onChanged: (newValue) {
                         setDialogState(() {
                           workingColor = workingColor.withRed(newValue);
@@ -229,7 +231,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     buildChannelSlider(
                       label: 'G',
-                      value: (workingColor.g * 255).round(),
+                      value: workingColor.compatGreen,
                       onChanged: (newValue) {
                         setDialogState(() {
                           workingColor = workingColor.withGreen(newValue);
@@ -239,7 +241,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     buildChannelSlider(
                       label: 'B',
-                      value: (workingColor.b * 255).round(),
+                      value: workingColor.compatBlue,
                       onChanged: (newValue) {
                         setDialogState(() {
                           workingColor = workingColor.withBlue(newValue);
@@ -362,15 +364,16 @@ class _SettingsPageState extends State<SettingsPage> {
                     ..._presetThemeColors.map(
                       (color) => _buildColorSwatch(
                         color: color,
-                        selected: _selectedThemeSeedColor.toARGB32() ==
-                            color.toARGB32(),
+                        selected: _selectedThemeSeedColor.compatArgb32 ==
+                            color.compatArgb32,
                         onTap: () => _onThemeSeedColorChanged(color),
                       ),
                     ),
                     _buildColorSwatch(
                       color: _selectedThemeSeedColor,
                       selected: !_presetThemeColors.any((c) =>
-                          c.toARGB32() == _selectedThemeSeedColor.toARGB32()),
+                          c.compatArgb32 ==
+                          _selectedThemeSeedColor.compatArgb32),
                       onTap: _pickCustomThemeColor,
                       icon: Icons.palette_outlined,
                       tooltip: '自定义主题色',
@@ -590,7 +593,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ? const Icon(Icons.check, size: 18, color: Colors.white)
               : icon != null
                   ? Icon(icon,
-                      size: 16, color: Colors.white.withValues(alpha: 0.95))
+                      size: 16, color: Colors.white.withCompatOpacity(0.95))
                   : null,
         ),
       ),

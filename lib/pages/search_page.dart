@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../utils/compat_color.dart';
 import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
@@ -37,12 +38,16 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
   /// 搜索输入控制器。
   final TextEditingController _searchController = TextEditingController();
+
   /// 搜索框焦点控制（用于生命周期时主动收起键盘）。
   final FocusNode _searchFocusNode = FocusNode();
+
   /// 当前搜索结果集合。
   List<ProductItem> _results = [];
+
   /// 搜索框中是否存在关键词。
   bool _isSearching = false;
+
   /// 是否展示结果区域（仅在有输入时展示）。
   bool _showResults = false;
   int _noteResetSignal = 0;
@@ -52,13 +57,15 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
       context: context,
       builder: (context) => NoteEditorDialog(
         title: item.displayName,
-        initialValue: widget.preferencesService.getProductNote(item.displayName),
+        initialValue:
+            widget.preferencesService.getProductNote(item.displayName),
       ),
     );
     if (note == null) return;
     await widget.preferencesService.saveProductNote(item.displayName, note);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已保存')));
     }
   }
 
@@ -81,7 +88,8 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
       _searchFocusNode.unfocus();
     }
   }
@@ -161,72 +169,77 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              onTapOutside: (_) => _searchFocusNode.unfocus(),
+              decoration: InputDecoration(
+                // Web 端聚焦时偶发 hint 重影，聚焦后隐藏占位符可规避双层绘制观感。
+                hintText: _searchFocusNode.hasFocus ? null : '搜索产品、标签...',
+                hintStyle: TextStyle(
+                  color: _searchFocusNode.hasFocus
+                      ? cs.onSurfaceVariant.withCompatOpacity(0.55)
+                      : cs.onSurfaceVariant,
+                ),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _isSearching
+                    ? IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _showResults = false;
+                            _results = [];
+                          });
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: cs.surfaceContainerHigh,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: BorderSide(
+                      color: cs.outlineVariant.withCompatOpacity(0.5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: BorderSide(
+                      color: cs.outlineVariant.withCompatOpacity(0.5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide:
+                      BorderSide(color: cs.primary.withCompatOpacity(0.5)),
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                isDense: true,
+              ),
+            ),
+          ),
+          if (_isSearching && _results.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-              child: TextField(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                onTapOutside: (_) => _searchFocusNode.unfocus(),
-                decoration: InputDecoration(
-                  // Web 端聚焦时偶发 hint 重影，聚焦后隐藏占位符可规避双层绘制观感。
-                  hintText: _searchFocusNode.hasFocus ? null : '搜索产品、标签...',
-                  hintStyle: TextStyle(
-                    color: _searchFocusNode.hasFocus
-                        ? cs.onSurfaceVariant.withValues(alpha: 0.55)
-                        : cs.onSurfaceVariant,
-                  ),
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _isSearching
-                      ? IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {
-                              _showResults = false;
-                              _results = [];
-                            });
-                          },
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: cs.surfaceContainerHigh,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  isDense: true,
-                ),
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '找到 ${_results.length} 个结果',
+                style: TextStyle(color: Colors.grey[500], fontSize: 12),
               ),
             ),
-            if (_isSearching && _results.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  '找到 ${_results.length} 个结果',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                ),
-              ),
-            Expanded(
-              child: _showResults
-                  ? _results.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.builder(
-                          padding: EdgeInsets.zero,
-                          itemCount: _results.length,
-                          itemBuilder: (context, index) => _buildResultItem(_results[index]),
-                        )
-                  : _buildIdleState(),
-            ),
-          ],
+          Expanded(
+            child: _showResults
+                ? _results.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                        padding: EdgeInsets.zero,
+                        itemCount: _results.length,
+                        itemBuilder: (context, index) =>
+                            _buildResultItem(_results[index]),
+                      )
+                : _buildIdleState(),
+          ),
+        ],
       ),
     );
   }
@@ -244,7 +257,8 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
           const SizedBox(height: 16),
           Text('输入关键词搜索', style: style.titleMedium),
           const SizedBox(height: 6),
-          Text('支持产品名称、标签等', style: style.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+          Text('支持产品名称、标签等',
+              style: style.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
         ],
       ),
     );
@@ -261,7 +275,8 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
         children: [
           Icon(Icons.search_off, size: 56, color: cs.outline),
           const SizedBox(height: 12),
-          Text('未找到相关结果', style: style.titleMedium?.copyWith(color: cs.onSurfaceVariant)),
+          Text('未找到相关结果',
+              style: style.titleMedium?.copyWith(color: cs.onSurfaceVariant)),
         ],
       ),
     );
@@ -299,5 +314,4 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     }
     return item.tags.toList();
   }
-
 }
