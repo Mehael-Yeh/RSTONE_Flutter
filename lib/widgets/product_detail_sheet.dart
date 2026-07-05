@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import '../utils/compat_color.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
@@ -1334,7 +1335,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: folderAccent.withValues(alpha: 0.16),
+                          color: folderAccent.withCompatOpacity(0.16),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
