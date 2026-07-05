@@ -2,7 +2,7 @@ name: rst_flutter
 description: "锐石 RSTONE - Flutter多平台应用"
 publish_to: 'none'
 
-version: 0.0.258+29721128
+version: 0.0.259+29721137
 
 environment:
   sdk: ^3.5.0
