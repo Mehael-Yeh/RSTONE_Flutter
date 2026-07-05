@@ -5,6 +5,7 @@ import 'package:rst_flutter/services/obsidian_data_service.dart';
 import 'package:rst_flutter/services/tds_pdf_service.dart';
 import 'package:rst_flutter/utils/formula_table_clipboard_parser.dart';
 import 'package:rst_flutter/utils/natural_sort.dart';
+import 'package:rst_flutter/utils/obsidian_tag_validator.dart';
 import 'package:rst_flutter/widgets/product_detail/formula_content_parser.dart';
 
 void main() {
@@ -39,7 +40,8 @@ tags:
 | A | B |
 ''';
 
-      final item = ProductItem.fromMdContent('assets/产品配方/RS1001-银.md', content);
+      final item =
+          ProductItem.fromMdContent('assets/产品配方/RS1001-银.md', content);
 
       expect(item.folder, '产品配方');
       expect(item.getTableFields(), {'名称': 'RS1001-银'});
@@ -94,7 +96,8 @@ tags:
 [[RS8214-银]] [[RS8214-黑]]
 ''';
 
-      final item = ProductItem.fromMdContent('assets/产品应用/水性PU2涂哑光-1.md', content);
+      final item =
+          ProductItem.fromMdContent('assets/产品应用/水性PU2涂哑光-1.md', content);
 
       expect(item.linkedWikiReferences, ['RS8214-银', 'RS8214-黑']);
       expect(item.searchText, contains('rs8214-黑'.toLowerCase()));
@@ -102,11 +105,24 @@ tags:
   });
 
   group('ObsidianDataService.search', () {
-    test('keeps PU and UV curing-mode tags mutually exclusive except dual cure', () async {
+    test('keeps PU and UV curing-mode tags mutually exclusive except dual cure',
+        () async {
       TestWidgetsFlutterBinding.ensureInitialized();
       final service = ObsidianDataService();
 
       await service.initialize();
+      service.setItemsForTesting(
+        products: [
+          ProductItem.fromMdContent(
+            'assets/产品列表/RD1001.md',
+            service.buildProductMarkdownTemplate(tags: ['UV']),
+          ),
+          ProductItem.fromMdContent(
+            'assets/产品列表/RD1002.md',
+            service.buildProductMarkdownTemplate(tags: ['PU']),
+          ),
+        ],
+      );
 
       bool hasTag(ProductItem item, String tag) =>
           item.tags.any((candidate) => candidate.toLowerCase() == tag);
@@ -140,7 +156,8 @@ tags:
       final result = FormulaTableClipboardParser.parse(clipboard);
 
       expect(result.isValid, isTrue);
-      expect(result.markdown, contains('| 原料编号 | 投入数（g) | 百分比(%) | 供应商 | 备注 |'));
+      expect(
+          result.markdown, contains('| 原料编号 | 投入数（g) | 百分比(%) | 供应商 | 备注 |'));
       expect(result.markdown, contains('| TPO | 1.00 | 1.000% | 巴斯夫 | 三者预溶 |'));
     });
 
@@ -152,11 +169,14 @@ tags:
       final result = FormulaTableClipboardParser.parse(clipboard);
 
       expect(result.isValid, isTrue);
-      expect(result.markdown, '''
+      expect(
+          result.markdown,
+          '''
 | 原料编号 | 投入数（g) | 百分比(%) | 供应商 |
 | --- | --- | --- | --- |
 | RD919-23 | 70.00 | 0.78 | 锐石 |
-| TEGO 810 | 0.10 | 0.00 | 德固赛 |'''.trim());
+| TEGO 810 | 0.10 | 0.00 | 德固赛 |'''
+              .trim());
     });
 
     test('rejects tables without required formula headers', () {
@@ -169,6 +189,31 @@ RS7930	锐石
 
       expect(result.isValid, isFalse);
       expect(result.errorMessage, contains('表头无效'));
+    });
+  });
+
+  group('ObsidianTagValidator', () {
+    test('accepts space-separated Obsidian tags', () {
+      final tags = ObsidianTagValidator.validateAndNormalizeTags(
+        ObsidianTagValidator.splitSpaceSeparated('水性 #高光 底漆/UV snake_case'),
+      );
+
+      expect(tags, ['水性', '高光', '底漆/UV', 'snake_case']);
+    });
+
+    test('rejects invalid Obsidian tag formats', () {
+      expect(
+        () => ObsidianTagValidator.validateAndNormalizeTags(['1984']),
+        throwsArgumentError,
+      );
+      expect(
+        () => ObsidianTagValidator.validateAndNormalizeTags(['水性,高光']),
+        throwsArgumentError,
+      );
+      expect(
+        () => ObsidianTagValidator.validateAndNormalizeTags(['底漆/']),
+        throwsArgumentError,
+      );
     });
   });
 
@@ -196,9 +241,8 @@ RS7930	锐石
           TdsPdfService.splitTextIntoNoLeadingPunctuationChunks(text);
 
       expect(chunks, contains('文，'));
-      expect(chunks, contains('容）'));
-      expect(chunks, contains('容”'));
-      expect(chunks, contains('punctuation.'));
+      expect(chunks, contains('容）、'));
+      expect(chunks, contains('容”，'));
       expect(chunks.join(), text);
     });
 

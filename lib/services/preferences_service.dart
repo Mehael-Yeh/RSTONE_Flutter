@@ -1,4 +1,5 @@
 /// 本地偏好与轻量数据持久化服务。
+library;
 
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';

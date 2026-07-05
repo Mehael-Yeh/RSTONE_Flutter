@@ -1,4 +1,5 @@
 /// 可侧滑的笔记条目组件，支持编辑与删除动作。
+library;
 
 import 'package:flutter/material.dart';
 
@@ -121,10 +122,6 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
                       height: double.infinity,
                       child: FilledButton(
                         onPressed: _handleNoteTap,
-                        child: Transform.translate(
-                          offset: Offset(-2, 0),
-                          child: Icon(Icons.note_alt_outlined, size: 24),
-                        ),
                         style: FilledButton.styleFrom(
                           backgroundColor: cs.primaryContainer,
                           foregroundColor: cs.onPrimaryContainer,
@@ -134,6 +131,10 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
                           shape: RoundedRectangleBorder(
                             borderRadius: widget.noteButtonBorderRadius,
                           ),
+                        ),
+                        child: Transform.translate(
+                          offset: const Offset(-2, 0),
+                          child: const Icon(Icons.note_alt_outlined, size: 24),
                         ),
                       ),
                     ),
@@ -151,10 +152,6 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
                       height: double.infinity,
                       child: FilledButton(
                         onPressed: _handleDeleteTap,
-                        child: Transform.translate(
-                          offset: Offset(2, 0),
-                          child: Icon(Icons.delete_outline, size: 24),
-                        ),
                         style: FilledButton.styleFrom(
                           backgroundColor: cs.errorContainer,
                           foregroundColor: cs.onErrorContainer,
@@ -164,6 +161,10 @@ class _NoteSwipeTileState extends State<NoteSwipeTile> {
                           shape: RoundedRectangleBorder(
                             borderRadius: widget.deleteButtonBorderRadius,
                           ),
+                        ),
+                        child: Transform.translate(
+                          offset: const Offset(2, 0),
+                          child: const Icon(Icons.delete_outline, size: 24),
                         ),
                       ),
                     ),

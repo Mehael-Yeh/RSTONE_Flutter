@@ -1,4 +1,5 @@
 /// 全局搜索页面，支持产品、应用和标签联动检索。
+library;
 
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
@@ -171,7 +172,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                   hintText: _searchFocusNode.hasFocus ? null : '搜索产品、标签...',
                   hintStyle: TextStyle(
                     color: _searchFocusNode.hasFocus
-                        ? cs.onSurfaceVariant.withOpacity(0.55)
+                        ? cs.onSurfaceVariant.withValues(alpha: 0.55)
                         : cs.onSurfaceVariant,
                   ),
                   prefixIcon: const Icon(Icons.search),
@@ -191,15 +192,15 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                   fillColor: cs.surfaceContainerHigh,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                    borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                    borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                    borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   isDense: true,

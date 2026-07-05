@@ -1,4 +1,5 @@
 /// 产品应用列表页面，按场景展示配方与说明。
+library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -272,9 +273,9 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
       labelText: labelText,
       hintText: hintText,
       filled: true,
-      fillColor: cs.surfaceContainerHighest.withOpacity(0.35),
+      fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.35),
       labelStyle: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-      hintStyle: TextStyle(fontSize: 12, color: cs.onSurfaceVariant.withOpacity(0.85)),
+      hintStyle: TextStyle(fontSize: 12, color: cs.onSurfaceVariant.withValues(alpha: 0.85)),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: cs.outlineVariant),

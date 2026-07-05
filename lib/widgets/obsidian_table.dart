@@ -1,4 +1,5 @@
 /// Obsidian 风格表格组件，支持多行头与横向滚动。
+library;
 
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
@@ -52,12 +53,16 @@ class ObsidianTable extends StatefulWidget {
 class _ObsidianTableState extends State<ObsidianTable> {
   /// 当前可见列顺序（可拖拽重排）。
   late List<String> _columns;
+
   /// 全部可配置列（用于编辑显示/隐藏）。
   late List<String> _columnOptions;
+
   /// 当前显示列集合。
   late Set<String> _visibleColumns;
+
   /// 桌面端各列宽。
   final Map<String, double> _columnWidths = {};
+
   /// 是否进入列编辑模式。
   bool _isEditingColumns = false;
 
@@ -132,9 +137,11 @@ class _ObsidianTableState extends State<ObsidianTable> {
     for (final col in _columns) {
       _columnWidths[col] = (estimated[col]! * scale).clamp(90.0, 420.0);
     }
-    final adjustedSum = _columns.fold<double>(0, (a, c) => a + _columnWidths[c]!);
+    final adjustedSum =
+        _columns.fold<double>(0, (a, c) => a + _columnWidths[c]!);
     final diff = tableWidth - adjustedSum;
-    _columnWidths[_columns.last] = (_columnWidths[_columns.last]! + diff).clamp(90.0, 500.0);
+    _columnWidths[_columns.last] =
+        (_columnWidths[_columns.last]! + diff).clamp(90.0, 500.0);
   }
 
   void _resizeColumn(int index, double delta) {
@@ -174,7 +181,8 @@ class _ObsidianTableState extends State<ObsidianTable> {
     return item.tags.any((t) => t.contains('水性'));
   }
 
-  List<String> _buildMobileSubtitleTokens(ProductItem item, Map<String, String> fields) {
+  List<String> _buildMobileSubtitleTokens(
+      ProductItem item, Map<String, String> fields) {
     if (item.folder == '产品列表') {
       return item.tags;
     }
@@ -250,13 +258,15 @@ class _ObsidianTableState extends State<ObsidianTable> {
       context: context,
       builder: (context) => NoteEditorDialog(
         title: item.displayName,
-        initialValue: widget.preferencesService.getProductNote(item.displayName),
+        initialValue:
+            widget.preferencesService.getProductNote(item.displayName),
       ),
     );
     if (note == null) return;
     await widget.preferencesService.saveProductNote(item.displayName, note);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已保存')));
     }
   }
 
@@ -305,12 +315,12 @@ class _ObsidianTableState extends State<ObsidianTable> {
           child: ReorderableListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: _columnOptions.length,
-            onReorder: (oldIndex, newIndex) {
+            onReorderItem: (oldIndex, newIndex) {
               setState(() {
-                if (newIndex > oldIndex) newIndex--;
                 final item = _columnOptions.removeAt(oldIndex);
                 _columnOptions.insert(newIndex, item);
-                _columns = _columnOptions.where(_visibleColumns.contains).toList();
+                _columns =
+                    _columnOptions.where(_visibleColumns.contains).toList();
               });
             },
             itemBuilder: (context, index) {
@@ -330,7 +340,9 @@ class _ObsidianTableState extends State<ObsidianTable> {
                         } else {
                           _visibleColumns.remove(col);
                         }
-                        _columns = _columnOptions.where(_visibleColumns.contains).toList();
+                        _columns = _columnOptions
+                            .where(_visibleColumns.contains)
+                            .toList();
                       });
                     },
                   ),
@@ -362,9 +374,13 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
           return SwipeNoteItemCard(
             title: fields[_columns.first] ?? item.displayName,
-            subtitleTokens: _columns.length > 1 ? _buildMobileSubtitleTokens(item, fields) : const [],
+            subtitleTokens: _columns.length > 1
+                ? _buildMobileSubtitleTokens(item, fields)
+                : const [],
             indicatorColor: item.folder == '产品列表'
-                ? (_isWaterBased(item) ? Colors.blue.shade400 : Colors.orange.shade400)
+                ? (_isWaterBased(item)
+                    ? Colors.blue.shade400
+                    : Colors.orange.shade400)
                 : cs.primary,
             onTap: () => ProductDetailSheet.show(
               context,
@@ -409,13 +425,15 @@ class _ObsidianTableState extends State<ObsidianTable> {
                           InkWell(
                             onTap: () {
                               if (isSorted) {
-                                widget.onSortDirectionChanged(!widget.sortDescending);
+                                widget.onSortDirectionChanged(
+                                    !widget.sortDescending);
                               } else {
                                 widget.onSortChanged(col);
                               }
                             },
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 12, horizontal: 4),
                               child: Center(
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -424,7 +442,9 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                       col,
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        color: isSorted ? cs.primary : cs.onSurface,
+                                        color: isSorted
+                                            ? cs.primary
+                                            : cs.onSurface,
                                         fontWeight: FontWeight.w600,
                                       ),
                                       overflow: TextOverflow.ellipsis,
@@ -455,7 +475,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                   child: Icon(
                                     Icons.drag_indicator,
                                     size: 14,
-                                    color: cs.outline.withOpacity(0.7),
+                                    color: cs.outline.withValues(alpha: 0.7),
                                   ),
                                 ),
                               ),
@@ -484,7 +504,8 @@ class _ObsidianTableState extends State<ObsidianTable> {
                   SizedBox(
                     width: 44,
                     child: IconButton(
-                      icon: Icon(Icons.edit, color: cs.onSurfaceVariant, size: 20),
+                      icon: Icon(Icons.edit,
+                          color: cs.onSurfaceVariant, size: 20),
                       onPressed: _showColumnEditor,
                       tooltip: '编辑列',
                     ),
@@ -502,7 +523,8 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
                   return NoteSwipeTile(
                     onNoteTap: () => _openNoteEditor(item),
-                    onDeleteTap: _isManual(item) ? () => _deleteManualItem(item) : null,
+                    onDeleteTap:
+                        _isManual(item) ? () => _deleteManualItem(item) : null,
                     resetSignal: widget.noteResetSignal,
                     child: InkWell(
                       onTap: () => ProductDetailSheet.show(
@@ -512,10 +534,14 @@ class _ObsidianTableState extends State<ObsidianTable> {
                         tdsContent: _tdsOf(item),
                       ),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 12),
                         decoration: BoxDecoration(
-                          color: index.isEven ? cs.surface : cs.surfaceContainerLowest,
-                          border: Border(bottom: BorderSide(color: cs.outlineVariant)),
+                          color: index.isEven
+                              ? cs.surface
+                              : cs.surfaceContainerLowest,
+                          border: Border(
+                              bottom: BorderSide(color: cs.outlineVariant)),
                         ),
                         child: Row(
                           children: [
@@ -524,10 +550,12 @@ class _ObsidianTableState extends State<ObsidianTable> {
                               return SizedBox(
                                 width: _columnWidths[col] ?? 120,
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 4),
                                   child: Center(
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Flexible(
@@ -535,16 +563,20 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                             val,
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
-                                              color: val.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
+                                              color: val.isEmpty
+                                                  ? cs.onSurfaceVariant
+                                                  : cs.onSurface,
                                             ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
-                                        if (col == _columns.first && _isManual(item))
+                                        if (col == _columns.first &&
+                                            _isManual(item))
                                           Container(
                                             width: 8,
                                             height: 8,
-                                            margin: const EdgeInsets.only(left: 6),
+                                            margin:
+                                                const EdgeInsets.only(left: 6),
                                             decoration: const BoxDecoration(
                                               color: Colors.redAccent,
                                               shape: BoxShape.circle,

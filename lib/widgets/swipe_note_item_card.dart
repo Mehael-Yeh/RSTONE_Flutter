@@ -1,4 +1,5 @@
 /// 笔记卡片组件，封装滑动操作与笔记摘要展示。
+library;
 
 import 'package:flutter/material.dart';
 
