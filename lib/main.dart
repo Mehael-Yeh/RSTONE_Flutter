@@ -8,6 +8,7 @@ import 'services/preferences_service.dart';
 import 'pages/search_page.dart';
 import 'pages/product_list_page.dart';
 import 'pages/product_applications_page.dart';
+import 'utils/compat_color.dart';
 
 /// 应用入口函数
 void main() async {
@@ -91,7 +92,7 @@ class _RstoneAppState extends State<RstoneApp> {
 
   Future<void> _updateThemeSeedColor(Color color) async {
     setState(() => _themeSeedColor = color);
-    await widget.preferencesService.saveThemeSeedColorValue(color.toARGB32());
+    await widget.preferencesService.saveThemeSeedColorValue(color.compatArgb32);
   }
 
   ThemeData _buildTheme(Brightness brightness) {
@@ -118,13 +119,7 @@ class _RstoneAppState extends State<RstoneApp> {
           color: colorScheme.onSurface,
         ),
       ),
-      cardTheme: CardThemeData(
-        elevation: 0,
-        color: colorScheme.surfaceContainer,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
+      cardTheme: _buildCompatCardTheme(colorScheme),
       navigationBarTheme: NavigationBarThemeData(
         // 底部导航使用低层级容器色，保证与内容区域层级分离。
         backgroundColor: colorScheme.surfaceContainerLow,
@@ -142,6 +137,16 @@ class _RstoneAppState extends State<RstoneApp> {
         behavior: SnackBarBehavior.floating,
         backgroundColor: colorScheme.inverseSurface,
         contentTextStyle: TextStyle(color: colorScheme.onInverseSurface),
+      ),
+    );
+  }
+
+  dynamic _buildCompatCardTheme(ColorScheme colorScheme) {
+    return CardTheme(
+      elevation: 0,
+      color: colorScheme.surfaceContainer,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
       ),
     );
   }

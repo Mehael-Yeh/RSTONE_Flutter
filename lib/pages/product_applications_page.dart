@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../utils/compat_color.dart';
 import 'package:flutter/services.dart';
 import '../models/product_item.dart';
 import '../utils/formula_table_clipboard_parser.dart';
@@ -25,12 +26,19 @@ class ProductApplicationsPage extends StatefulWidget {
   });
 
   @override
-  State<ProductApplicationsPage> createState() => _ProductApplicationsPageState();
+  State<ProductApplicationsPage> createState() =>
+      _ProductApplicationsPageState();
 }
 
 class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   // 默认列（移动端）
-  static const List<String> _mobileDefaultColumns = ['名称', '标签', '底漆', '中漆', '面漆'];
+  static const List<String> _mobileDefaultColumns = [
+    '名称',
+    '标签',
+    '底漆',
+    '中漆',
+    '面漆'
+  ];
   // 默认列（桌面端）
   static const List<String> _desktopDefaultColumns = [
     '名称',
@@ -99,7 +107,8 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
       final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
       if (!mounted) return;
 
-      final result = FormulaTableClipboardParser.parse(clipboardData?.text ?? '');
+      final result =
+          FormulaTableClipboardParser.parse(clipboardData?.text ?? '');
       if (!result.isValid) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result.errorMessage ?? '剪切板表格无效')),
@@ -182,10 +191,12 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
         markdown: markdown,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('产品配方已新增')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('产品配方已新增')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('新增失败：$e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('新增失败：$e')));
     }
   }
 
@@ -257,10 +268,12 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
       );
       if (!mounted) return;
       setState(() => _noteResetSignal++);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('产品应用已新增')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('产品应用已新增')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('新增失败：$e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('新增失败：$e')));
     }
   }
 
@@ -273,9 +286,10 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
       labelText: labelText,
       hintText: hintText,
       filled: true,
-      fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+      fillColor: cs.surfaceContainerHighest.withCompatOpacity(0.35),
       labelStyle: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-      hintStyle: TextStyle(fontSize: 12, color: cs.onSurfaceVariant.withValues(alpha: 0.85)),
+      hintStyle: TextStyle(
+          fontSize: 12, color: cs.onSurfaceVariant.withCompatOpacity(0.85)),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: cs.outlineVariant),
@@ -338,10 +352,12 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
       await widget.dataService.deleteManualItem(item);
       if (!mounted) return;
       setState(() => _noteResetSignal++);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已删除新增项目')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已删除新增项目')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('删除失败：$e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('删除失败：$e')));
     }
   }
 
@@ -385,7 +401,8 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
 
   void _onSortDirectionChanged(bool descending) {
     ProductDetailSheet.hideIfOpen(context);
-    final fallbackColumn = _sortColumn ?? (_columns.isNotEmpty ? _columns.first : null);
+    final fallbackColumn =
+        _sortColumn ?? (_columns.isNotEmpty ? _columns.first : null);
     if (fallbackColumn != null && _sortColumn == null) {
       widget.preferencesService.saveApplicationSort(fallbackColumn);
     }
@@ -410,19 +427,19 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
 
   List<ProductItem> _getSortedItems() {
     if (_sortColumn == null) return widget.dataService.applications;
-    
+
     final sorted = List<ProductItem>.from(widget.dataService.applications);
     sorted.sort((a, b) {
       final aFields = a.getTableFields();
       final bFields = b.getTableFields();
-      
+
       final aVal = aFields[_sortColumn] ?? '';
       final bVal = bFields[_sortColumn] ?? '';
-      
+
       final result = compareNaturalText(aVal, bVal);
       return _sortDescending ? -result : result;
     });
-    
+
     return sorted;
   }
 
@@ -486,7 +503,8 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
-                    height: _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
+                    height:
+                        _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
                     padding: const EdgeInsets.fromLTRB(8, 3, 8, 3),
                     alignment: Alignment.center,
                     child: _pullExtent <= 0
@@ -494,16 +512,20 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                         : AnimatedOpacity(
                             duration: const Duration(milliseconds: 160),
                             curve: Curves.easeOut,
-                            opacity: (_pullExtent / _pullButtonHeight).clamp(0.0, 1.0),
+                            opacity: (_pullExtent / _pullButtonHeight)
+                                .clamp(0.0, 1.0),
                             child: Card(
                               margin: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                               clipBehavior: Clip.antiAlias,
                               child: Row(
                                 children: [
                                   Expanded(
                                     child: Material(
-                                      color: Theme.of(context).colorScheme.primaryContainer,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primaryContainer,
                                       child: InkWell(
                                         onTap: _showAddFormulaDialog,
                                         child: Center(
@@ -511,7 +533,9 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                                             '新增产品配方',
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
-                                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onPrimaryContainer,
                                             ),
                                           ),
                                         ),
@@ -521,7 +545,9 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                                   const VerticalDivider(width: 1),
                                   Expanded(
                                     child: Material(
-                                      color: Theme.of(context).colorScheme.secondaryContainer,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondaryContainer,
                                       child: InkWell(
                                         onTap: _showAddApplicationDialog,
                                         child: Center(
@@ -529,7 +555,9 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                                             '新增产品应用',
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
-                                              color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSecondaryContainer,
                                             ),
                                           ),
                                         ),
@@ -544,11 +572,13 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                   Expanded(
                     child: NotificationListener<ScrollNotification>(
                       onNotification: (notification) {
-                        if (notification.metrics.pixels > notification.metrics.minScrollExtent + 0.5) {
+                        if (notification.metrics.pixels >
+                            notification.metrics.minScrollExtent + 0.5) {
                           _closePullButtons();
                         }
                         if (notification is OverscrollNotification &&
-                            notification.metrics.pixels <= notification.metrics.minScrollExtent &&
+                            notification.metrics.pixels <=
+                                notification.metrics.minScrollExtent &&
                             notification.overscroll < 0) {
                           _updatePullByOverscroll(-notification.overscroll);
                         } else if (notification is ScrollEndNotification) {
@@ -561,7 +591,9 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                         formulas: widget.dataService.formulas,
                         tdsByProduct: widget.dataService.tdsByProduct,
                         defaultColumns: _columns,
-                        availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
+                        availableColumns: isMobile
+                            ? _mobileDefaultColumns
+                            : _desktopDefaultColumns,
                         isMobile: isMobile,
                         onColumnsChanged: _onColumnsChanged,
                         onSortChanged: _onSortChanged,
