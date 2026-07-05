@@ -1,4 +1,5 @@
 /// 紧凑标签行组件，用于展示可折叠 token 列表。
+library;
 
 import 'package:flutter/material.dart';
 
@@ -80,9 +81,9 @@ class CompactTokenRow extends StatelessWidget {
     if (accent == null) return cs.surfaceContainerHighest;
     final isDark = cs.brightness == Brightness.dark;
     if (isDark) {
-      return Color.alphaBlend(accent.withOpacity(0.26), cs.surfaceContainerHighest);
+      return Color.alphaBlend(accent.withValues(alpha: 0.26), cs.surfaceContainerHighest);
     }
-    return Color.alphaBlend(accent.withOpacity(0.14), cs.surface);
+    return Color.alphaBlend(accent.withValues(alpha: 0.14), cs.surface);
   }
 
   Color _chipBorderColor(ColorScheme cs, String token) {
@@ -90,8 +91,8 @@ class CompactTokenRow extends StatelessWidget {
     if (accent == null) return cs.outlineVariant;
     final isDark = cs.brightness == Brightness.dark;
     return isDark
-        ? Color.alphaBlend(accent.withOpacity(0.72), cs.outlineVariant)
-        : Color.alphaBlend(accent.withOpacity(0.54), cs.outlineVariant);
+        ? Color.alphaBlend(accent.withValues(alpha: 0.72), cs.outlineVariant)
+        : Color.alphaBlend(accent.withValues(alpha: 0.54), cs.outlineVariant);
   }
 
   Color _chipTextColor(ColorScheme cs, String token) {
@@ -99,8 +100,8 @@ class CompactTokenRow extends StatelessWidget {
     if (accent == null) return cs.onSurfaceVariant;
     final isDark = cs.brightness == Brightness.dark;
     return isDark
-        ? Color.alphaBlend(accent.withOpacity(0.92), cs.onSurface)
-        : Color.alphaBlend(accent.withOpacity(0.72), cs.onSurface);
+        ? Color.alphaBlend(accent.withValues(alpha: 0.92), cs.onSurface)
+        : Color.alphaBlend(accent.withValues(alpha: 0.72), cs.onSurface);
   }
 
   Color? _tokenAccentColor(String token) {

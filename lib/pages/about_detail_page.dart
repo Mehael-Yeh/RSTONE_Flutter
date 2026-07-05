@@ -1,4 +1,5 @@
 /// 关于页详情，展示版本信息、更新检查与项目链接。
+library;
 
 import 'dart:convert';
 import 'dart:io';
@@ -221,20 +222,20 @@ class AboutDetailPage extends StatelessWidget {
             title: '应用信息',
             child: Column(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.diamond_outlined),
-                  title: const Text('应用名称'),
-                  trailing: const Text('锐石 / RSTONE'),
+                const ListTile(
+                  leading: Icon(Icons.diamond_outlined),
+                  title: Text('应用名称'),
+                  trailing: Text('锐石 / RSTONE'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.info_outline),
                   title: const Text('当前版本'),
                   trailing: Text(appVersion),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.code),
-                  title: const Text('技术栈'),
-                  trailing: const Text('Flutter'),
+                const ListTile(
+                  leading: Icon(Icons.code),
+                  title: Text('技术栈'),
+                  trailing: Text('Flutter'),
                 ),
               ],
             ),
@@ -273,8 +274,8 @@ class AboutDetailPage extends StatelessWidget {
           _buildSectionCard(
             context,
             title: '说明',
-            child: Column(
-              children: const [
+            child: const Column(
+              children: [
                 ListTile(
                   leading: Icon(Icons.lightbulb_outline),
                   title: Text('定位'),

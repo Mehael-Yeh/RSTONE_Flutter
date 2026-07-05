@@ -1,8 +1,10 @@
 /// 产品列表主页，支持筛选、收藏与详情入口。
+library;
 
 import 'package:flutter/material.dart';
 import '../models/product_item.dart';
 import '../utils/natural_sort.dart';
+import '../utils/obsidian_tag_validator.dart';
 import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
 import '../widgets/obsidian_table.dart';
@@ -139,17 +141,23 @@ class _ProductListPageState extends State<ProductListPage> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                _buildTwoFieldRow(engineerController, '工程师', expCodeController, '实验牌号'),
+                _buildTwoFieldRow(
+                    engineerController, '工程师', expCodeController, '实验牌号'),
                 const SizedBox(height: 10),
-                _buildTwoFieldRow(solidController, '固含', hydroxylController, '羟值'),
+                _buildTwoFieldRow(
+                    solidController, '固含', hydroxylController, '羟值'),
                 const SizedBox(height: 10),
-                _buildTwoFieldRow(functionalityController, '官能度', hardnessController, '硬度'),
+                _buildTwoFieldRow(
+                    functionalityController, '官能度', hardnessController, '硬度'),
                 const SizedBox(height: 10),
-                _buildTwoFieldRow(glossController, '光泽(60°)', boilController, '水煮'),
+                _buildTwoFieldRow(
+                    glossController, '光泽(60°)', boilController, '水煮'),
                 const SizedBox(height: 10),
-                _buildTwoFieldRow(contactAngleController, '水接触角', sourceController, '技术源'),
+                _buildTwoFieldRow(
+                    contactAngleController, '水接触角', sourceController, '技术源'),
                 const SizedBox(height: 10),
-                _buildTwoFieldRow(benchmarkController, '对标', viscosityController, '粘度'),
+                _buildTwoFieldRow(
+                    benchmarkController, '对标', viscosityController, '粘度'),
               ],
             ),
           ),
@@ -169,13 +177,12 @@ class _ProductListPageState extends State<ProductListPage> {
     if (confirmed != true) return;
 
     try {
-      final tags = tagsController.text
-          .split(RegExp(r'[\s,，]+'))
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
+      final tags =
+          ObsidianTagValidator.splitSpaceSeparated(tagsController.text);
+      final normalizedTags =
+          ObsidianTagValidator.validateAndNormalizeTags(tags);
       final markdown = widget.dataService.buildProductMarkdownTemplate(
-        tags: tags,
+        tags: normalizedTags,
         engineer: engineerController.text.trim(),
         experimentalCode: expCodeController.text.trim(),
         solidContent: solidController.text.trim(),
@@ -195,10 +202,12 @@ class _ProductListPageState extends State<ProductListPage> {
       );
       if (!mounted) return;
       setState(() => _noteResetSignal++);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('产品信息已新增')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('产品信息已新增')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('新增失败：$e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('新增失败：$e')));
     }
   }
 
@@ -211,9 +220,10 @@ class _ProductListPageState extends State<ProductListPage> {
       labelText: labelText,
       hintText: hintText,
       filled: true,
-      fillColor: cs.surfaceContainerHighest.withOpacity(0.35),
+      fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.35),
       labelStyle: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-      hintStyle: TextStyle(fontSize: 12, color: cs.onSurfaceVariant.withOpacity(0.85)),
+      hintStyle: TextStyle(
+          fontSize: 12, color: cs.onSurfaceVariant.withValues(alpha: 0.85)),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: cs.outlineVariant),
@@ -250,9 +260,13 @@ class _ProductListPageState extends State<ProductListPage> {
   ) {
     return Row(
       children: [
-        Expanded(child: _buildRoundedField(controller: leftController, label: leftLabel)),
+        Expanded(
+            child: _buildRoundedField(
+                controller: leftController, label: leftLabel)),
         const SizedBox(width: 10),
-        Expanded(child: _buildRoundedField(controller: rightController, label: rightLabel)),
+        Expanded(
+            child: _buildRoundedField(
+                controller: rightController, label: rightLabel)),
       ],
     );
   }
@@ -293,7 +307,8 @@ class _ProductListPageState extends State<ProductListPage> {
 
   void _onSortDirectionChanged(bool descending) {
     ProductDetailSheet.hideIfOpen(context);
-    final fallbackColumn = _sortColumn ?? (_columns.isNotEmpty ? _columns.first : null);
+    final fallbackColumn =
+        _sortColumn ?? (_columns.isNotEmpty ? _columns.first : null);
     if (fallbackColumn != null && _sortColumn == null) {
       widget.preferencesService.saveProductListSort(fallbackColumn);
     }
@@ -328,10 +343,12 @@ class _ProductListPageState extends State<ProductListPage> {
       await widget.dataService.deleteManualItem(item);
       if (!mounted) return;
       setState(() => _noteResetSignal++);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已删除新增项目')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已删除新增项目')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('删除失败：$e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('删除失败：$e')));
     }
   }
 
@@ -363,14 +380,14 @@ class _ProductListPageState extends State<ProductListPage> {
     sorted.sort((a, b) {
       final aFields = a.getTableFields();
       final bFields = b.getTableFields();
-      
+
       final aVal = aFields[_sortColumn] ?? '';
       final bVal = bFields[_sortColumn] ?? '';
-      
+
       final result = compareNaturalText(aVal, bVal);
       return _sortDescending ? -result : result;
     });
-    
+
     return sorted;
   }
 
@@ -432,7 +449,8 @@ class _ProductListPageState extends State<ProductListPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[700]),
+                  Icon(Icons.inventory_2_outlined,
+                      size: 64, color: Colors.grey[700]),
                   const SizedBox(height: 16),
                   Text(
                     '暂无产品数据',
@@ -462,7 +480,8 @@ class _ProductListPageState extends State<ProductListPage> {
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
-                    height: _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
+                    height:
+                        _pullExtent.clamp(0.0, _pullButtonHeight).toDouble(),
                     padding: const EdgeInsets.fromLTRB(8, 3, 8, 3),
                     alignment: Alignment.center,
                     child: _pullExtent <= 0
@@ -470,11 +489,15 @@ class _ProductListPageState extends State<ProductListPage> {
                         : AnimatedOpacity(
                             duration: const Duration(milliseconds: 160),
                             curve: Curves.easeOut,
-                            opacity: (_pullExtent / _pullButtonHeight).clamp(0.0, 1.0),
+                            opacity: (_pullExtent / _pullButtonHeight)
+                                .clamp(0.0, 1.0),
                             child: Card(
                               margin: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              color: Theme.of(context).colorScheme.secondaryContainer,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .secondaryContainer,
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(12),
                                 onTap: _showAddProductDialog,
@@ -483,7 +506,9 @@ class _ProductListPageState extends State<ProductListPage> {
                                     '新增产品信息',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSecondaryContainer,
                                     ),
                                   ),
                                 ),
@@ -494,11 +519,13 @@ class _ProductListPageState extends State<ProductListPage> {
                   Expanded(
                     child: NotificationListener<ScrollNotification>(
                       onNotification: (notification) {
-                        if (notification.metrics.pixels > notification.metrics.minScrollExtent + 0.5) {
+                        if (notification.metrics.pixels >
+                            notification.metrics.minScrollExtent + 0.5) {
                           _closePullButton();
                         }
                         if (notification is OverscrollNotification &&
-                            notification.metrics.pixels <= notification.metrics.minScrollExtent &&
+                            notification.metrics.pixels <=
+                                notification.metrics.minScrollExtent &&
                             notification.overscroll < 0) {
                           _updatePullByOverscroll(-notification.overscroll);
                         } else if (notification is ScrollEndNotification) {
@@ -511,7 +538,9 @@ class _ProductListPageState extends State<ProductListPage> {
                         formulas: widget.dataService.formulas,
                         tdsByProduct: widget.dataService.tdsByProduct,
                         defaultColumns: _columns,
-                        availableColumns: isMobile ? _mobileDefaultColumns : _desktopDefaultColumns,
+                        availableColumns: isMobile
+                            ? _mobileDefaultColumns
+                            : _desktopDefaultColumns,
                         isMobile: isMobile,
                         onColumnsChanged: _onColumnsChanged,
                         onSortChanged: _onSortChanged,

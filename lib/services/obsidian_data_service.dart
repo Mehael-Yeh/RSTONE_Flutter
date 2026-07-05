@@ -1,8 +1,8 @@
 /// Obsidian 数据聚合服务，负责索引、搜索与缓存管理。
+library;
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:archive/archive.dart';
@@ -11,23 +11,29 @@ import '../models/product_item.dart';
 import '../utils/natural_sort.dart';
 
 /// Obsidian 数据服务
-/// 
+///
 /// 负责从 Flutter Asset 加载产品列表、产品应用、产品配方三类数据。
 /// 数据来源为内置的 assets 目录下的 JSON 索引文件和 Markdown 文件。
 /// 同时提供搜索功能和日志记录。
 class ObsidianDataService {
   /// 产品列表 Asset 索引文件路径
   static const String _productsAssetIndex = 'assets/产品列表.json';
+
   /// 产品应用 Asset 索引文件路径
   static const String _applicationsAssetIndex = 'assets/产品应用.json';
+
   /// 产品列表 Asset 目录路径
   static const String _productsAssetPath = 'assets/产品列表';
+
   /// 产品应用 Asset 目录路径
   static const String _applicationsAssetPath = 'assets/产品应用';
+
   /// TDS Asset 索引文件路径
   static const String _tdsAssetIndex = 'assets/产品TDS.json';
+
   /// TDS Asset 目录路径（文件名格式：产品名称.TDS.md）
   static const String _tdsAssetPath = 'assets/产品TDS';
+
   /// 标签同义词规则（代码内置，不依赖可替换 Asset 文件）
   static const String _builtInTagAliasRulesDefault = '''
 # 标签同义词规则：格式 `左侧标签 -> 右侧扩展词`
@@ -55,37 +61,48 @@ PPS -> 聚苯硫醚
 PEEK -> 聚醚醚酮
 EPDM -> 三元乙丙橡胶
 ''';
+
   /// 标签同义词规则文档（用户新增，仅存储在应用私有目录）
-  static const String _tagAliasCustomRulesFileName = 'tag_alias_rules.custom.txt';
+  static const String _tagAliasCustomRulesFileName =
+      'tag_alias_rules.custom.txt';
   static const String _manualItemsMetaFileName = 'manual_items.json';
-  
+
   /// 产品列表数据
-  List<ProductItem> _products = [];
+  final List<ProductItem> _products = [];
+
   /// 产品应用数据
-  List<ProductItem> _applications = [];
+  final List<ProductItem> _applications = [];
+
   /// 产品配方数据
-  List<ProductItem> _formulas = [];
+  final List<ProductItem> _formulas = [];
+
   /// 内置标签同义词规则（来自 assets，不允许外部修改）
   String _builtInTagAliasRulesRaw = '';
+
   /// 用户自定义新增规则（来自应用私有目录）
   String _customTagAliasRulesRaw = '';
+
   /// 合并后的规则文本（用于展示）
   String _combinedTagAliasRulesRaw = '';
+
   /// TDS 文档缓存（key: 产品名称，value: 对应 .TDS.md 文本）
-  Map<String, String> _tdsByProduct = {};
+  final Map<String, String> _tdsByProduct = {};
+
   /// 归一化索引（key: 归一化产品名，value: 对应 .TDS.md 文本）
-  Map<String, String> _tdsByNormalizedProduct = {};
+  final Map<String, String> _tdsByNormalizedProduct = {};
+
   /// 标签同义词映射（key -> 可匹配词）
   Map<String, Set<String>> _tagAliasRules = {};
+
   /// 是否已完成初始化
   bool _initialized = false;
   final Set<String> _manualProductNames = <String>{};
   final Set<String> _manualApplicationNames = <String>{};
   final Set<String> _manualFormulaNames = <String>{};
-  
+
   /// 日志记录（最近 100 条）
   final List<String> _logs = [];
-  
+
   List<ProductItem> get products => _products;
   List<ProductItem> get applications => _applications;
   List<ProductItem> get formulas => _formulas;
@@ -96,6 +113,24 @@ EPDM -> 三元乙丙橡胶
   Map<String, String> get tdsByProduct => Map.unmodifiable(_tdsByProduct);
   bool get isInitialized => _initialized;
   List<String> get logs => List.unmodifiable(_logs);
+
+  @visibleForTesting
+  void setItemsForTesting({
+    List<ProductItem> products = const <ProductItem>[],
+    List<ProductItem> applications = const <ProductItem>[],
+    List<ProductItem> formulas = const <ProductItem>[],
+  }) {
+    _products
+      ..clear()
+      ..addAll(products);
+    _applications
+      ..clear()
+      ..addAll(applications);
+    _formulas
+      ..clear()
+      ..addAll(formulas);
+  }
+
   String? tdsForProduct(String productName) {
     final direct = _tdsByProduct[productName];
     if (direct != null) return direct;
@@ -162,7 +197,7 @@ EPDM -> 三元乙丙橡胶
   }
 
   /// 初始化数据加载
-  /// 
+  ///
   /// 加载顺序：
   /// 1. 直接从 Asset 加载（最可靠的内置数据）
   /// 2. 如果 Asset 为空，从私有目录加载（备用方案）
@@ -172,9 +207,9 @@ EPDM -> 三元乙丙橡胶
       _addLog('DataService: Already initialized, skipping');
       return;
     }
-    
+
     _addLog('DataService: Starting initialization');
-    
+
     try {
       // 第一步：直接从Asset加载（最可靠）
       _addLog('DataService: Loading from assets...');
@@ -182,8 +217,9 @@ EPDM -> 三元乙丙橡胶
       await _loadTagAliasRules();
       await _loadManualItemMeta();
       await _loadManualMarkdownItems();
-      _addLog('DataService: Asset load complete. Products: ${_products.length}, Applications: ${_applications.length}');
-      
+      _addLog(
+          'DataService: Asset load complete. Products: ${_products.length}, Applications: ${_applications.length}');
+
       // 第二步：如果Asset加载失败，从私有目录加载
       if (_products.isEmpty && _applications.isEmpty) {
         _addLog('DataService: Asset load failed, trying private directory...');
@@ -191,9 +227,10 @@ EPDM -> 三元乙丙橡胶
         if (dataDir != null) {
           await _loadFromPrivateDir(dataDir);
         }
-        _addLog('DataService: Private dir load complete. Products: ${_products.length}, Applications: ${_applications.length}');
+        _addLog(
+            'DataService: Private dir load complete. Products: ${_products.length}, Applications: ${_applications.length}');
       }
-      
+
       // 第三步：如果还是空的，从Asset复制到私有目录
       if (_products.isEmpty && _applications.isEmpty) {
         _addLog('DataService: All loads failed, product list is empty!');
@@ -206,9 +243,10 @@ EPDM -> 三元乙丙橡胶
           await _copyAssetsToPrivateDir(dataDir);
         }
       }
-      
+
       _initialized = true;
-      _addLog('DataService: Initialization complete. Total: ${_products.length + _applications.length} items');
+      _addLog(
+          'DataService: Initialization complete. Total: ${_products.length + _applications.length} items');
     } catch (e, stack) {
       _addLog('DataService: ERROR during initialization: $e');
       _addLog('DataService: Stack trace: $stack');
@@ -223,31 +261,36 @@ EPDM -> 三元乙丙橡胶
       final productsDir = Directory('${dataDir.path}/产品列表');
       if (await productsDir.exists()) {
         final files = await productsDir.list().toList();
-        _addLog('DataService: Found ${files.length} product files in private dir');
+        _addLog(
+            'DataService: Found ${files.length} product files in private dir');
         for (var entity in files) {
           if (entity is File && entity.path.endsWith('.md')) {
             try {
               final content = await entity.readAsString();
               _products.add(ProductItem.fromMdContent(entity.path, content));
             } catch (e) {
-              _addLog('DataService: Error reading product file: ${entity.path}');
+              _addLog(
+                  'DataService: Error reading product file: ${entity.path}');
             }
           }
         }
       }
-      
+
       // 加载产品应用
       final appsDir = Directory('${dataDir.path}/产品应用');
       if (await appsDir.exists()) {
         final files = await appsDir.list().toList();
-        _addLog('DataService: Found ${files.length} application files in private dir');
+        _addLog(
+            'DataService: Found ${files.length} application files in private dir');
         for (var entity in files) {
           if (entity is File && entity.path.endsWith('.md')) {
             try {
               final content = await entity.readAsString();
-              _applications.add(ProductItem.fromMdContent(entity.path, content));
+              _applications
+                  .add(ProductItem.fromMdContent(entity.path, content));
             } catch (e) {
-              _addLog('DataService: Error reading application file: ${entity.path}');
+              _addLog(
+                  'DataService: Error reading application file: ${entity.path}');
             }
           }
         }
@@ -260,17 +303,20 @@ EPDM -> 三元乙丙橡胶
   /// 只从Asset加载（不保存到私有目录）
   Future<void> _loadFromAssetsOnly() async {
     _addLog('DataService: Loading products from assets...');
-    
+
     // 加载产品列表索引
     try {
       final indexContent = await rootBundle.loadString(_productsAssetIndex);
       final List<dynamic> productFiles = jsonDecode(indexContent);
-      _addLog('DataService: Found ${productFiles.length} product files in index');
-      
+      _addLog(
+          'DataService: Found ${productFiles.length} product files in index');
+
       for (final fileName in productFiles) {
         try {
-          final content = await rootBundle.loadString('$_productsAssetPath/$fileName');
-          _products.add(ProductItem.fromMdContent('$_productsAssetPath/$fileName', content));
+          final content =
+              await rootBundle.loadString('$_productsAssetPath/$fileName');
+          _products.add(ProductItem.fromMdContent(
+              '$_productsAssetPath/$fileName', content));
         } catch (e) {
           _addLog('DataService: Error loading product $fileName: $e');
         }
@@ -278,18 +324,21 @@ EPDM -> 三元乙丙橡胶
     } catch (e) {
       _addLog('DataService: Error loading product index: $e');
     }
-    
+
     // 加载产品应用索引
     _addLog('DataService: Loading applications from assets...');
     try {
       final indexContent = await rootBundle.loadString(_applicationsAssetIndex);
       final List<dynamic> appFiles = jsonDecode(indexContent);
-      _addLog('DataService: Found ${appFiles.length} application files in index');
-      
+      _addLog(
+          'DataService: Found ${appFiles.length} application files in index');
+
       for (final fileName in appFiles) {
         try {
-          final content = await rootBundle.loadString('$_applicationsAssetPath/$fileName');
-          _applications.add(ProductItem.fromMdContent('$_applicationsAssetPath/$fileName', content));
+          final content =
+              await rootBundle.loadString('$_applicationsAssetPath/$fileName');
+          _applications.add(ProductItem.fromMdContent(
+              '$_applicationsAssetPath/$fileName', content));
         } catch (e) {
           _addLog('DataService: Error loading application $fileName: $e');
         }
@@ -297,20 +346,22 @@ EPDM -> 三元乙丙橡胶
     } catch (e) {
       _addLog('DataService: Error loading application index: $e');
     }
-    
+
     // 加载产品配方（通过 assets/产品配方.json 索引逐个加载）
     _addLog('DataService: Loading formulas from assets...');
     try {
-      final formulaAssetPath = 'assets/产品配方';
+      const formulaAssetPath = 'assets/产品配方';
       // 配方文件无 frontmatter，直接用文件名作为配方名称，body 即为 markdown 表格
       final formulaContent = await rootBundle.loadString('assets/产品配方.json');
       final List<dynamic> formulaFiles = jsonDecode(formulaContent);
       _addLog('DataService: Found ${formulaFiles.length} formula files');
-      
+
       for (final fileName in formulaFiles) {
         try {
-          final content = await rootBundle.loadString('$formulaAssetPath/$fileName');
-          _formulas.add(ProductItem.fromMdContent('$formulaAssetPath/$fileName', content));
+          final content =
+              await rootBundle.loadString('$formulaAssetPath/$fileName');
+          _formulas.add(ProductItem.fromMdContent(
+              '$formulaAssetPath/$fileName', content));
         } catch (e) {
           _addLog('DataService: Error loading formula $fileName: $e');
         }
@@ -329,7 +380,8 @@ EPDM -> 三元乙丙橡胶
       for (final fileNameDynamic in tdsFiles) {
         final fileName = fileNameDynamic.toString();
         try {
-          final content = await rootBundle.loadString('$_tdsAssetPath/$fileName');
+          final content =
+              await rootBundle.loadString('$_tdsAssetPath/$fileName');
           final productName = fileName.replaceAll('.TDS.md', '');
           _tdsByProduct[productName] = content;
           final normalized = _normalizeProductKey(productName);
@@ -355,18 +407,21 @@ EPDM -> 三元乙丙橡胶
 
     final dataDir = await _getPrivateDataDirectory();
     if (dataDir != null) {
-      final customRuleFile = File('${dataDir.path}/$_tagAliasCustomRulesFileName');
+      final customRuleFile =
+          File('${dataDir.path}/$_tagAliasCustomRulesFileName');
 
       if (await customRuleFile.exists()) {
         try {
           _customTagAliasRulesRaw = await customRuleFile.readAsString();
-          _addLog('DataService: Loaded custom tag alias rules from private dir');
+          _addLog(
+              'DataService: Loaded custom tag alias rules from private dir');
         } catch (e) {
           _addLog('DataService: Failed to read custom tag alias rules: $e');
         }
       }
     } else {
-      _addLog('DataService: Private dir unavailable for custom tag alias rules');
+      _addLog(
+          'DataService: Private dir unavailable for custom tag alias rules');
     }
 
     _tagAliasRules = _parseTagAliasRules(_builtInTagAliasRulesRaw);
@@ -380,11 +435,13 @@ EPDM -> 三元乙丙橡胶
   Future<void> saveTagAliasRules(String rawContent) async {
     final dataDir = await _getPrivateDataDirectory();
     if (dataDir == null) {
-      _addLog('DataService: Skip saving custom tag alias rules on this platform');
+      _addLog(
+          'DataService: Skip saving custom tag alias rules on this platform');
       return;
     }
     await dataDir.create(recursive: true);
-    final customRuleFile = File('${dataDir.path}/$_tagAliasCustomRulesFileName');
+    final customRuleFile =
+        File('${dataDir.path}/$_tagAliasCustomRulesFileName');
     await customRuleFile.writeAsString(rawContent);
     _customTagAliasRulesRaw = rawContent;
     _tagAliasRules = _parseTagAliasRules(_builtInTagAliasRulesRaw);
@@ -396,7 +453,9 @@ EPDM -> 三元乙丙橡胶
 
   void _mergeTagAliasRules(Map<String, Set<String>> additionalRules) {
     for (final entry in additionalRules.entries) {
-      _tagAliasRules.putIfAbsent(entry.key, () => <String>{}).addAll(entry.value);
+      _tagAliasRules
+          .putIfAbsent(entry.key, () => <String>{})
+          .addAll(entry.value);
     }
   }
 
@@ -461,18 +520,19 @@ EPDM -> 三元乙丙橡胶
   Future<void> _copyAssetsToPrivateDir(Directory dataDir) async {
     try {
       await dataDir.create(recursive: true);
-      
+
       // 复制产品列表
       try {
         final indexContent = await rootBundle.loadString(_productsAssetIndex);
         final List<dynamic> productFiles = jsonDecode(indexContent);
-        
+
         final productsDir = Directory('${dataDir.path}/产品列表');
         await productsDir.create(recursive: true);
-        
+
         for (final fileName in productFiles) {
           try {
-            final content = await rootBundle.loadString('$_productsAssetPath/$fileName');
+            final content =
+                await rootBundle.loadString('$_productsAssetPath/$fileName');
             final file = File('${productsDir.path}/$fileName');
             if (!await file.exists()) {
               await file.writeAsString(content);
@@ -481,22 +541,25 @@ EPDM -> 三元乙丙橡胶
             // 忽略单个文件错误
           }
         }
-        _addLog('DataService: Copied ${productFiles.length} products to private dir');
+        _addLog(
+            'DataService: Copied ${productFiles.length} products to private dir');
       } catch (e) {
         _addLog('DataService: Error copying products: $e');
       }
-      
+
       // 复制产品应用
       try {
-        final indexContent = await rootBundle.loadString(_applicationsAssetIndex);
+        final indexContent =
+            await rootBundle.loadString(_applicationsAssetIndex);
         final List<dynamic> appFiles = jsonDecode(indexContent);
-        
+
         final appsDir = Directory('${dataDir.path}/产品应用');
         await appsDir.create(recursive: true);
-        
+
         for (final fileName in appFiles) {
           try {
-            final content = await rootBundle.loadString('$_applicationsAssetPath/$fileName');
+            final content = await rootBundle
+                .loadString('$_applicationsAssetPath/$fileName');
             final file = File('${appsDir.path}/$fileName');
             if (!await file.exists()) {
               await file.writeAsString(content);
@@ -505,27 +568,31 @@ EPDM -> 三元乙丙橡胶
             // 忽略单个文件错误
           }
         }
-        _addLog('DataService: Copied ${appFiles.length} applications to private dir');
+        _addLog(
+            'DataService: Copied ${appFiles.length} applications to private dir');
       } catch (e) {
         _addLog('DataService: Error copying applications: $e');
       }
 
       // 复制产品配方
       try {
-        final formulaIndexContent = await rootBundle.loadString('assets/产品配方.json');
+        final formulaIndexContent =
+            await rootBundle.loadString('assets/产品配方.json');
         final List<dynamic> formulaFiles = jsonDecode(formulaIndexContent);
         final formulasDir = Directory('${dataDir.path}/产品配方');
         await formulasDir.create(recursive: true);
         for (final fileName in formulaFiles) {
           try {
-            final content = await rootBundle.loadString('assets/产品配方/$fileName');
+            final content =
+                await rootBundle.loadString('assets/产品配方/$fileName');
             final file = File('${formulasDir.path}/$fileName');
             if (!await file.exists()) {
               await file.writeAsString(content);
             }
           } catch (_) {}
         }
-        _addLog('DataService: Copied ${formulaFiles.length} formulas to private dir');
+        _addLog(
+            'DataService: Copied ${formulaFiles.length} formulas to private dir');
       } catch (e) {
         _addLog('DataService: Error copying formulas: $e');
       }
@@ -535,7 +602,8 @@ EPDM -> 三元乙丙橡胶
   }
 
   String _joinTagsToYamlList(List<String> tags) {
-    final normalized = tags.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    final normalized =
+        tags.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     if (normalized.isEmpty) return 'tags: []';
     final lines = normalized.map((tag) => '  - $tag').join('\n');
     return 'tags:\n$lines';
@@ -572,7 +640,8 @@ ${_joinTagsToYamlList(tags)}
 对标: $benchmark
 粘度: $viscosity
 ---
-'''.trim();
+'''
+        .trim();
   }
 
   String buildApplicationMarkdownTemplate({
@@ -588,7 +657,8 @@ ${_joinTagsToYamlList(tags)}
 中漆: $midCoat
 面漆: $topCoat
 ---
-'''.trim();
+'''
+        .trim();
   }
 
   String buildFormulaMarkdownTemplate({required String tableMarkdown}) {
@@ -613,7 +683,8 @@ ${_joinTagsToYamlList(tags)}
     await productDir.create(recursive: true);
     final file = File('${productDir.path}/$normalizedCode.md');
     await file.writeAsString(markdown.trim());
-    _products.removeWhere((item) => item.fileName.toUpperCase() == normalizedCode);
+    _products
+        .removeWhere((item) => item.fileName.toUpperCase() == normalizedCode);
     _products.add(ProductItem.fromMdContent(file.path, markdown));
     _products.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
     _manualProductNames.add(normalizedCode);
@@ -696,15 +767,19 @@ ${_joinTagsToYamlList(tags)}
       await file.delete();
     }
 
-    _products.removeWhere((entry) => entry.folder == item.folder && entry.fileName == item.fileName);
-    _applications.removeWhere((entry) => entry.folder == item.folder && entry.fileName == item.fileName);
-    _formulas.removeWhere((entry) => entry.folder == item.folder && entry.fileName == item.fileName);
+    _products.removeWhere((entry) =>
+        entry.folder == item.folder && entry.fileName == item.fileName);
+    _applications.removeWhere((entry) =>
+        entry.folder == item.folder && entry.fileName == item.fileName);
+    _formulas.removeWhere((entry) =>
+        entry.folder == item.folder && entry.fileName == item.fileName);
     _manualProductNames.remove(item.fileName.toUpperCase());
     _manualApplicationNames.remove(item.fileName);
     _manualFormulaNames.remove(item.fileName);
     await _tryRestoreBundledItem(item.folder, item.fileName);
     await _saveManualItemMeta();
-    _addLog('DataService: Deleted manual item ${item.folder}/${item.fileName}.md');
+    _addLog(
+        'DataService: Deleted manual item ${item.folder}/${item.fileName}.md');
   }
 
   Future<int> clearAllManualMarkdownData() async {
@@ -725,9 +800,12 @@ ${_joinTagsToYamlList(tags)}
       if (await file.exists()) {
         await file.delete();
       }
-      _products.removeWhere((item) => item.folder == entry.$1 && item.fileName == entry.$2);
-      _applications.removeWhere((item) => item.folder == entry.$1 && item.fileName == entry.$2);
-      _formulas.removeWhere((item) => item.folder == entry.$1 && item.fileName == entry.$2);
+      _products.removeWhere(
+          (item) => item.folder == entry.$1 && item.fileName == entry.$2);
+      _applications.removeWhere(
+          (item) => item.folder == entry.$1 && item.fileName == entry.$2);
+      _formulas.removeWhere(
+          (item) => item.folder == entry.$1 && item.fileName == entry.$2);
       await _tryRestoreBundledItem(entry.$1, entry.$2);
       deletedCount++;
     }
@@ -736,11 +814,13 @@ ${_joinTagsToYamlList(tags)}
     _manualApplicationNames.clear();
     _manualFormulaNames.clear();
     await _saveManualItemMeta();
-    _addLog('DataService: Cleared all manual markdown data, removed $deletedCount item(s)');
+    _addLog(
+        'DataService: Cleared all manual markdown data, removed $deletedCount item(s)');
     return deletedCount;
   }
 
-  Future<void> _tryRestoreBundledItem(String folderName, String fileName) async {
+  Future<void> _tryRestoreBundledItem(
+      String folderName, String fileName) async {
     String? assetPath;
     if (folderName == '产品列表') {
       assetPath = '$_productsAssetPath/$fileName.md';
@@ -761,7 +841,8 @@ ${_joinTagsToYamlList(tags)}
       } else if (folderName == '产品应用') {
         _applications.removeWhere((item) => item.fileName == fileName);
         _applications.add(restored);
-        _applications.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
+        _applications
+            .sort((a, b) => compareNaturalText(a.fileName, b.fileName));
       } else if (folderName == '产品配方') {
         _formulas.removeWhere((item) => item.fileName == fileName);
         _formulas.add(restored);
@@ -781,7 +862,8 @@ ${_joinTagsToYamlList(tags)}
     if (dataDir == null) return null;
 
     final archive = Archive();
-    Future<void> addMdFiles(String folderName, Iterable<String> fileNames) async {
+    Future<void> addMdFiles(
+        String folderName, Iterable<String> fileNames) async {
       final folder = Directory('${dataDir.path}/$folderName');
       if (!await folder.exists()) return;
       for (final name in fileNames) {
@@ -799,7 +881,8 @@ ${_joinTagsToYamlList(tags)}
     await addMdFiles('产品配方', _manualFormulaNames);
 
     if (archive.isEmpty) {
-      _addLog('DataService: Export archive skipped because no markdown file found');
+      _addLog(
+          'DataService: Export archive skipped because no markdown file found');
       return null;
     }
 
@@ -813,7 +896,8 @@ ${_joinTagsToYamlList(tags)}
     final file = File('${tmpDir.path}/RSTONE_Obsidian_MD_$timestamp.zip');
     final zipBytes = ZipEncoder().encode(archive);
     if (zipBytes == null) {
-      _addLog('DataService: Export archive failed due to zip encoder returning null');
+      _addLog(
+          'DataService: Export archive failed due to zip encoder returning null');
       return null;
     }
     await file.writeAsBytes(Uint8List.fromList(zipBytes), flush: true);
@@ -865,7 +949,8 @@ ${_joinTagsToYamlList(tags)}
       bool normalizeUppercaseName = false,
     }) async {
       for (final rawName in fileNames) {
-        final resolvedName = normalizeUppercaseName ? rawName.toUpperCase() : rawName;
+        final resolvedName =
+            normalizeUppercaseName ? rawName.toUpperCase() : rawName;
         final file = File('${dataDir.path}/$folderName/$resolvedName.md');
         if (!await file.exists()) {
           continue;
@@ -876,7 +961,8 @@ ${_joinTagsToYamlList(tags)}
           target.removeWhere((item) => item.fileName == parsed.fileName);
           target.add(parsed);
         } catch (e) {
-          _addLog('DataService: Failed to load manual markdown $folderName/$resolvedName.md: $e');
+          _addLog(
+              'DataService: Failed to load manual markdown $folderName/$resolvedName.md: $e');
         }
       }
       target.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
@@ -911,22 +997,23 @@ ${_joinTagsToYamlList(tags)}
       'applications': _manualApplicationNames.toList()..sort(),
       'formulas': _manualFormulaNames.toList()..sort(),
     };
-    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(payload));
+    await file
+        .writeAsString(const JsonEncoder.withIndent('  ').convert(payload));
   }
 
   /// 搜索产品和应用
-  /// 
+  ///
   /// 搜索规则：
   /// 1) 单关键词：搜索范围包括文件名（产品牌号/应用名称）、实验牌号、标签。
   /// 2) 混合关键词（空格分词或自动分段后>=2个关键词）：仅在标签内进行 AND 匹配。
-  /// 
+  ///
   /// [query] 搜索关键词，支持空格分隔多个关键词
   /// 返回匹配的产品和应用列表
   List<ProductItem> search(String query) {
     if (query.isEmpty) return [];
     final normalizedQuery = query.toLowerCase().trim();
 
-    Set<String> _buildSearchableTags(ProductItem item) {
+    Set<String> buildSearchableTags(ProductItem item) {
       final searchable = <String>{};
       for (final rawTag in item.tags) {
         final normalizedTag = rawTag.toLowerCase();
@@ -937,7 +1024,7 @@ ${_joinTagsToYamlList(tags)}
       return searchable;
     }
 
-    bool _shouldExcludePudResults(List<String> segmentedKeywords) {
+    bool shouldExcludePudResults(List<String> segmentedKeywords) {
       final rawLowerQuery = query.toLowerCase();
       final compact = normalizedQuery.replaceAll(RegExp(r'\s+'), '');
       if (compact.contains('pud')) return false;
@@ -966,15 +1053,15 @@ ${_joinTagsToYamlList(tags)}
       return segmentedKeywords.any(puLockedTerms.contains);
     }
 
-    bool _containsAnyTerm(Set<String> searchableTags, Set<String> terms) {
+    bool containsAnyTerm(Set<String> searchableTags, Set<String> terms) {
       return searchableTags.any((tag) => terms.contains(tag));
     }
 
-    Set<String> _buildKnownTagTerms() {
+    Set<String> buildKnownTagTerms() {
       final knownTerms = <String>{};
 
       void addFromItem(ProductItem item) {
-        knownTerms.addAll(_buildSearchableTags(item));
+        knownTerms.addAll(buildSearchableTags(item));
       }
 
       for (final product in _products) {
@@ -992,13 +1079,16 @@ ${_joinTagsToYamlList(tags)}
       return knownTerms.where((term) => term.isNotEmpty).toSet();
     }
 
-    List<String> _segmentByKnownTerms(String input, Set<String> knownTerms) {
+    List<String> segmentByKnownTerms(String input, Set<String> knownTerms) {
       final source = input.toLowerCase().trim();
       if (source.isEmpty) return const <String>[];
 
-      final matchesAt = List<List<String>>.generate(source.length + 1, (_) => <String>[]);
+      final matchesAt =
+          List<List<String>>.generate(source.length + 1, (_) => <String>[]);
       for (final term in knownTerms) {
-        if (term.isEmpty || term == source || term.length > source.length) continue;
+        if (term.isEmpty || term == source || term.length > source.length) {
+          continue;
+        }
         var start = source.indexOf(term);
         while (start != -1) {
           matchesAt[start].add(term);
@@ -1034,8 +1124,9 @@ ${_joinTagsToYamlList(tags)}
         .toList();
 
     if (keywords.length <= 1) {
-      final knownTerms = _buildKnownTagTerms();
-      final segmentedByKnownTerms = _segmentByKnownTerms(normalizedQuery, knownTerms);
+      final knownTerms = buildKnownTagTerms();
+      final segmentedByKnownTerms =
+          segmentByKnownTerms(normalizedQuery, knownTerms);
       if (segmentedByKnownTerms.length > 1) {
         keywords
           ..clear()
@@ -1059,21 +1150,21 @@ ${_joinTagsToYamlList(tags)}
     }
 
     if (keywords.length == 1) {
-      final knownTerms = _buildKnownTagTerms();
-      final segmented = _segmentByKnownTerms(keywords.first, knownTerms);
+      final knownTerms = buildKnownTagTerms();
+      final segmented = segmentByKnownTerms(keywords.first, knownTerms);
       if (segmented.length > 1) {
         keywords
           ..clear()
           ..addAll(segmented);
       }
     }
-    
+
     if (keywords.isEmpty) return [];
-    
-    final excludePudResults = _shouldExcludePudResults(keywords);
+
+    final excludePudResults = shouldExcludePudResults(keywords);
     final pudTerms = _expandedKeywords('pud');
     final results = <ProductItem>[];
-    
+
     _addLog('DataService: Searching for keywords: $keywords');
 
     bool isDigitsOnly(String keyword) => RegExp(r'^\d+$').hasMatch(keyword);
@@ -1091,8 +1182,8 @@ ${_joinTagsToYamlList(tags)}
     }
 
     bool containsKeyword(ProductItem item, String keyword) {
-      final searchableTags = _buildSearchableTags(item);
-      if (excludePudResults && _containsAnyTerm(searchableTags, pudTerms)) {
+      final searchableTags = buildSearchableTags(item);
+      if (excludePudResults && containsAnyTerm(searchableTags, pudTerms)) {
         return false;
       }
       final linkedRefText = item.linkedWikiReferences.join(' ');
@@ -1112,8 +1203,8 @@ ${_joinTagsToYamlList(tags)}
     }
 
     bool matchesMixedKeywordsInTagsOnly(ProductItem item) {
-      final searchableTags = _buildSearchableTags(item);
-      if (excludePudResults && _containsAnyTerm(searchableTags, pudTerms)) {
+      final searchableTags = buildSearchableTags(item);
+      if (excludePudResults && containsAnyTerm(searchableTags, pudTerms)) {
         return false;
       }
       final tagsText = searchableTags.join(' ').toLowerCase();
@@ -1140,7 +1231,7 @@ ${_joinTagsToYamlList(tags)}
         results.add(app);
       }
     }
-    
+
     _addLog('DataService: Search found ${results.length} results');
     return results;
   }
@@ -1164,7 +1255,7 @@ ${_joinTagsToYamlList(tags)}
       _addLog('DataService: Error clearing data: $e');
     }
   }
-  
+
   /// 清除日志
   void clearLogs() {
     _logs.clear();

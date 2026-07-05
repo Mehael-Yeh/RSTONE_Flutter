@@ -1,4 +1,5 @@
 /// 日志查看页，用于展示运行期数据加载日志。
+library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
