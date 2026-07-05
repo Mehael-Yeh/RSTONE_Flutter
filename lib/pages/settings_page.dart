@@ -1,4 +1,5 @@
 /// 设置中心页面：主题、数据同步、备份恢复与入口导航。
+library;
 
 import 'dart:io';
 
@@ -37,9 +38,12 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  static final Uri _projectUrl = Uri.parse('https://github.com/Mehael-Yeh/RSTONE_Flutter');
-  static final Uri _webAppUrl = Uri.parse('https://mehael-yeh.github.io/RSTONE_Flutter/');
-  static final Uri _releaseUrl = Uri.parse('https://github.com/Mehael-Yeh/RSTONE_Flutter/releases');
+  static final Uri _projectUrl =
+      Uri.parse('https://github.com/Mehael-Yeh/RSTONE_Flutter');
+  static final Uri _webAppUrl =
+      Uri.parse('https://mehael-yeh.github.io/RSTONE_Flutter/');
+  static final Uri _releaseUrl =
+      Uri.parse('https://github.com/Mehael-Yeh/RSTONE_Flutter/releases');
   String _appVersion = '...';
   String _appVersionName = '0.0.0';
   String _databaseVersion = '未注入';
@@ -89,7 +93,9 @@ class _SettingsPageState extends State<SettingsPage> {
     final asInt = int.tryParse(value);
     if (asInt != null && asInt > 0) {
       try {
-        final maybeEpochMinutes = DateTime.fromMillisecondsSinceEpoch(asInt * 60 * 1000, isUtc: true).add(const Duration(hours: 8));
+        final maybeEpochMinutes =
+            DateTime.fromMillisecondsSinceEpoch(asInt * 60 * 1000, isUtc: true)
+                .add(const Duration(hours: 8));
         if (maybeEpochMinutes.year >= 2020 && maybeEpochMinutes.year <= 2100) {
           final y = maybeEpochMinutes.year.toString().padLeft(4, '0');
           final m = maybeEpochMinutes.month.toString().padLeft(2, '0');
@@ -107,8 +113,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _loadVersion() async {
     final pkg = await PackageInfo.fromPlatform();
-    const databaseVersionFromDefine = String.fromEnvironment('DB_VERSION', defaultValue: '');
-    const buildTimeFromDefine = String.fromEnvironment('APP_BUILD_TIME', defaultValue: '');
+    const databaseVersionFromDefine =
+        String.fromEnvironment('DB_VERSION', defaultValue: '');
+    const buildTimeFromDefine =
+        String.fromEnvironment('APP_BUILD_TIME', defaultValue: '');
     final buildTime = buildTimeFromDefine.trim().isNotEmpty
         ? _formatBuildTimeLabel(buildTimeFromDefine)
         : pkg.buildNumber.trim();
@@ -142,8 +150,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _pickCustomThemeColor() async {
     Color workingColor = _selectedThemeSeedColor;
-    final initialHex = workingColor.value.toRadixString(16).toUpperCase().padLeft(8, '0');
-    final controller = TextEditingController(text: '#${initialHex.substring(2)}');
+    final initialHex =
+        workingColor.toARGB32().toRadixString(16).toUpperCase().padLeft(8, '0');
+    final controller =
+        TextEditingController(text: '#${initialHex.substring(2)}');
     final picked = await showDialog<Color>(
       context: context,
       builder: (context) => AlertDialog(
@@ -180,7 +190,11 @@ class _SettingsPageState extends State<SettingsPage> {
             }
 
             void syncHexFromColor() {
-              final hex = workingColor.value.toRadixString(16).toUpperCase().padLeft(8, '0');
+              final hex = workingColor
+                  .toARGB32()
+                  .toRadixString(16)
+                  .toUpperCase()
+                  .padLeft(8, '0');
               controller.text = '#${hex.substring(2)}';
             }
 
@@ -205,7 +219,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 10),
                     buildChannelSlider(
                       label: 'R',
-                      value: workingColor.red,
+                      value: (workingColor.r * 255).round(),
                       onChanged: (newValue) {
                         setDialogState(() {
                           workingColor = workingColor.withRed(newValue);
@@ -215,7 +229,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     buildChannelSlider(
                       label: 'G',
-                      value: workingColor.green,
+                      value: (workingColor.g * 255).round(),
                       onChanged: (newValue) {
                         setDialogState(() {
                           workingColor = workingColor.withGreen(newValue);
@@ -225,7 +239,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     buildChannelSlider(
                       label: 'B',
-                      value: workingColor.blue,
+                      value: (workingColor.b * 255).round(),
                       onChanged: (newValue) {
                         setDialogState(() {
                           workingColor = workingColor.withBlue(newValue);
@@ -281,7 +295,8 @@ class _SettingsPageState extends State<SettingsPage> {
     final cs = Theme.of(context).colorScheme;
     final totalProducts = widget.dataService.products.length;
     final coveredProducts = widget.dataService.products
-        .where((product) => widget.dataService.tdsForProduct(product.fileName) != null)
+        .where((product) =>
+            widget.dataService.tdsForProduct(product.fileName) != null)
         .length;
     final coveragePercent = totalProducts == 0
         ? 0
@@ -347,13 +362,15 @@ class _SettingsPageState extends State<SettingsPage> {
                     ..._presetThemeColors.map(
                       (color) => _buildColorSwatch(
                         color: color,
-                        selected: _selectedThemeSeedColor.value == color.value,
+                        selected: _selectedThemeSeedColor.toARGB32() ==
+                            color.toARGB32(),
                         onTap: () => _onThemeSeedColorChanged(color),
                       ),
                     ),
                     _buildColorSwatch(
                       color: _selectedThemeSeedColor,
-                      selected: !_presetThemeColors.any((c) => c.value == _selectedThemeSeedColor.value),
+                      selected: !_presetThemeColors.any((c) =>
+                          c.toARGB32() == _selectedThemeSeedColor.toARGB32()),
                       onTap: _pickCustomThemeColor,
                       icon: Icons.palette_outlined,
                       tooltip: '自定义主题色',
@@ -373,7 +390,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: const Text('数据库版本'),
                   trailing: Text(
                     _databaseVersion,
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ),
                 ListTile(
@@ -381,7 +399,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: const Text('产品数量'),
                   trailing: Text(
                     '${widget.dataService.products.length}',
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ),
                 ListTile(
@@ -389,7 +408,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: const Text('应用数量'),
                   trailing: Text(
                     '${widget.dataService.applications.length}',
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ),
                 ListTile(
@@ -397,7 +417,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: const Text('TDS数量'),
                   trailing: Text(
                     '${widget.dataService.tdsByProduct.length}',
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ),
                 ListTile(
@@ -405,7 +426,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: const Text('TDS覆盖率'),
                   trailing: Text(
                     '$coveredProducts/$totalProducts ($coveragePercent%)',
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ),
               ],
@@ -478,7 +500,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => LogViewerPage(dataService: widget.dataService),
+                        builder: (context) =>
+                            LogViewerPage(dataService: widget.dataService),
                       ),
                     );
                   },
@@ -566,7 +589,8 @@ class _SettingsPageState extends State<SettingsPage> {
           child: selected
               ? const Icon(Icons.check, size: 18, color: Colors.white)
               : icon != null
-                  ? Icon(icon, size: 16, color: Colors.white.withOpacity(0.95))
+                  ? Icon(icon,
+                      size: 16, color: Colors.white.withValues(alpha: 0.95))
                   : null,
         ),
       ),
@@ -575,7 +599,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _openTagAliasRuleEditor() async {
     final builtInRules = widget.dataService.builtInTagAliasRulesRaw;
-    final controller = TextEditingController(text: widget.dataService.customTagAliasRulesRaw);
+    final controller =
+        TextEditingController(text: widget.dataService.customTagAliasRulesRaw);
     final saved = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -583,7 +608,8 @@ class _SettingsPageState extends State<SettingsPage> {
         content: SizedBox(
           width: 680,
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.72),
+            constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.72),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -602,13 +628,20 @@ class _SettingsPageState extends State<SettingsPage> {
                       constraints: const BoxConstraints(maxHeight: 180),
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                        border: Border.all(
+                            color:
+                                Theme.of(context).colorScheme.outlineVariant),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: SingleChildScrollView(
                         child: SelectableText(
-                          builtInRules.trim().isEmpty ? '（暂无内置规则）' : builtInRules,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                          builtInRules.trim().isEmpty
+                              ? '（暂无内置规则）'
+                              : builtInRules,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(fontFamily: 'monospace'),
                         ),
                       ),
                     ),
@@ -685,8 +718,12 @@ class _SettingsPageState extends State<SettingsPage> {
         title: const Text('确认清除'),
         content: const Text('确定要清除所有日志吗？'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('清除')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('清除')),
         ],
       ),
     );
@@ -694,7 +731,8 @@ class _SettingsPageState extends State<SettingsPage> {
     if (confirmed == true) {
       widget.dataService.clearLogs();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('日志已清除')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('日志已清除')));
       }
     }
   }
@@ -713,9 +751,8 @@ class _SettingsPageState extends State<SettingsPage> {
     await file.writeAsString(markdownContent);
 
     await Share.shareXFiles(
-      [XFile(file.path)],
+      [XFile(file.path, mimeType: 'text/markdown', name: '产品笔记.md')],
       subject: '产品笔记',
-      text: '产品笔记导出文件（Markdown）',
     );
   }
 
@@ -759,12 +796,17 @@ class _SettingsPageState extends State<SettingsPage> {
         title: const Text('确认删除新增 Markdown'),
         content: const Text('将删除所有通过“新增产品信息/新增产品配方/新增产品应用”创建的数据，是否继续？'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('继续')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('继续')),
         ],
       ),
     );
     if (confirmed != true) return;
+    if (!mounted) return;
 
     final reconfirmed = await showDialog<bool>(
       context: context,
@@ -772,8 +814,12 @@ class _SettingsPageState extends State<SettingsPage> {
         title: const Text('二次确认'),
         content: const Text('请再次确认：删除后不可恢复。'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('返回')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('确认删除')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('返回')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('确认删除')),
         ],
       ),
     );
@@ -783,11 +829,15 @@ class _SettingsPageState extends State<SettingsPage> {
       final count = await widget.dataService.clearAllManualMarkdownData();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(count == 0 ? '暂无新增 Markdown 数据' : '已删除 $count 条新增 Markdown 数据')),
+        SnackBar(
+            content: Text(count == 0
+                ? '暂无新增 Markdown 数据'
+                : '已删除 $count 条新增 Markdown 数据')),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('删除失败：$e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('删除失败：$e')));
     }
   }
 
@@ -815,12 +865,17 @@ class _SettingsPageState extends State<SettingsPage> {
         title: const Text('确认清除笔记'),
         content: const Text('该操作将删除所有产品笔记，是否继续？'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('继续')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('继续')),
         ],
       ),
     );
     if (confirmed != true) return;
+    if (!mounted) return;
 
     final reconfirmed = await showDialog<bool>(
       context: context,
@@ -828,8 +883,12 @@ class _SettingsPageState extends State<SettingsPage> {
         title: const Text('二次确认'),
         content: const Text('请再次确认：清除后不可恢复。'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('返回')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('确认清除')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('返回')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('确认清除')),
         ],
       ),
     );
@@ -837,8 +896,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
     await widget.preferencesService.clearAllProductNotes();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已清除所有产品笔记')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已清除所有产品笔记')));
     }
   }
-
 }

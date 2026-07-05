@@ -1,4 +1,5 @@
 /// 产品详情底部弹层，整合 Markdown、配方表与 TDS 预览。
+library;
 
 import 'dart:io';
 import 'dart:math' as math;
@@ -6,7 +7,6 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
@@ -16,7 +16,7 @@ import 'product_detail/formula_content_parser.dart';
 import 'product_detail/markdown_table_parser.dart';
 
 /// 产品详情底部弹窗
-/// 
+///
 /// 从屏幕底部滑出的半屏弹窗，用于展示产品/应用的完整信息。
 /// 支持：
 /// - Markdown 内容渲染
@@ -46,6 +46,7 @@ class ProductDetailSheet extends StatefulWidget {
     if (_isShowing) {
       hideIfOpen(context);
       await Future<void>.delayed(const Duration(milliseconds: 120));
+      if (!context.mounted) return;
     }
 
     _isShowing = true;
@@ -74,6 +75,7 @@ class ProductDetailSheet extends StatefulWidget {
 
 class _ProductDetailSheetState extends State<ProductDetailSheet> {
   static const double _kPdfMinScaleSnapThreshold = 1.05;
+
   /// 多配方时下拉选择的索引
   int _selectedFormulaIndex = 0;
   String? _selectedApplicationFormulaName;
@@ -82,7 +84,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   int _pdfPageCount = 0;
   double? _singlePageHeightRatio;
   bool _isRasterizingPdf = false;
-  final TransformationController _pdfTransformationController = TransformationController();
+  final TransformationController _pdfTransformationController =
+      TransformationController();
   bool _isSyncingPdfTransform = false;
   final ValueNotifier<int> _pdfPreviewVersion = ValueNotifier<int>(0);
 
@@ -118,7 +121,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       // 首屏优先：先展示第一页，减少用户感知等待时间。
       if (pages.length == 1) {
         final firstPageImage = await _decodeImage(pageBytes);
-        final firstPageHeightRatio = firstPageImage.height / firstPageImage.width;
+        final firstPageHeightRatio =
+            firstPageImage.height / firstPageImage.width;
         firstPageImage.dispose();
 
         if (!mounted) return;
@@ -175,9 +179,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       final scaledHeights = decodedPages
           .map((img) => img.height * (maxWidth / img.width))
           .toList();
-      final totalHeight =
-          scaledHeights.fold<double>(0, (sum, h) => sum + h) +
-              gap * (decodedPages.length - 1);
+      final totalHeight = scaledHeights.fold<double>(0, (sum, h) => sum + h) +
+          gap * (decodedPages.length - 1);
 
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
@@ -200,8 +203,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       }
 
       final picture = recorder.endRecording();
-      final longImage = await picture.toImage(maxWidth.ceil(), totalHeight.ceil());
-      final byteData = await longImage.toByteData(format: ui.ImageByteFormat.png);
+      final longImage =
+          await picture.toImage(maxWidth.ceil(), totalHeight.ceil());
+      final byteData =
+          await longImage.toByteData(format: ui.ImageByteFormat.png);
       longImage.dispose();
       return byteData?.buffer.asUint8List();
     } finally {
@@ -310,7 +315,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }
 
   Future<void> _handlePreviewTds() async {
-    if (_isGeneratingTds || widget.product.folder != '产品列表' || widget.tdsContent == null) {
+    if (_isGeneratingTds ||
+        widget.product.folder != '产品列表' ||
+        widget.tdsContent == null) {
       return;
     }
 
@@ -331,14 +338,17 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           final cs = Theme.of(dialogContext).colorScheme;
           final mediaSize = MediaQuery.sizeOf(dialogContext);
           const defaultPageHeightRatio = 1.4142;
-          final pageHeightRatio = _singlePageHeightRatio ?? defaultPageHeightRatio;
+          final pageHeightRatio =
+              _singlePageHeightRatio ?? defaultPageHeightRatio;
           final maxDialogWidth = mediaSize.width - 24;
           final maxDialogHeight = mediaSize.height - 32;
-          final dialogWidth = math.min(maxDialogWidth, maxDialogHeight / pageHeightRatio);
+          final dialogWidth =
+              math.min(maxDialogWidth, maxDialogHeight / pageHeightRatio);
           final dialogHeight = dialogWidth * pageHeightRatio;
 
           return Dialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             backgroundColor: cs.surfaceContainerHigh,
             surfaceTintColor: cs.surfaceTint,
             shape: RoundedRectangleBorder(
@@ -361,9 +371,12 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                       return Center(
                         child: Text(
                           'PDF 预览加载失败',
-                          style: Theme.of(dialogContext).textTheme.bodyLarge?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
+                          style: Theme.of(dialogContext)
+                              .textTheme
+                              .bodyLarge
+                              ?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                         ),
                       );
                     }
@@ -386,15 +399,18 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         SnackBar(content: Text('TDS 生成失败：$e')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isGeneratingTds = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isGeneratingTds = false;
+        });
+      }
     }
   }
 
   Future<void> _handleShareTds() async {
-    if (_isGeneratingTds || widget.product.folder != '产品列表' || widget.tdsContent == null) {
+    if (_isGeneratingTds ||
+        widget.product.folder != '产品列表' ||
+        widget.tdsContent == null) {
       return;
     }
 
@@ -417,10 +433,11 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         SnackBar(content: Text('TDS 分享失败：$e')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isGeneratingTds = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isGeneratingTds = false;
+        });
+      }
     }
   }
 
@@ -449,7 +466,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       case '固含':
         return trimmed.contains('%') ? trimmed : '$trimmed%';
       case '羟值':
-        return trimmed.toLowerCase().contains('mgkoh/g') ? trimmed : '$trimmed mgKOH/g';
+        return trimmed.toLowerCase().contains('mgkoh/g')
+            ? trimmed
+            : '$trimmed mgKOH/g';
       default:
         return trimmed;
     }
@@ -460,7 +479,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     super.initState();
     final linked = _getApplicationLinkedFormulas();
     if (linked.isNotEmpty) {
-      _selectedApplicationFormulaName = linked.first.fileName.replaceAll('.md', '');
+      _selectedApplicationFormulaName =
+          linked.first.fileName.replaceAll('.md', '');
     }
   }
 
@@ -470,7 +490,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   /// 解析 markdown 表格数据
   /// [rawContent] 传入的完整 markdown 内容（可能包含多张表格和非表格文字）
   /// 返回解析后的表格行列表；同时通过 [nonTableContent] 输出不在表格内的文字（如 blockquote 等）
-  List<List<String>> _parseTable(String rawContent, [List<String>? nonTableContent]) {
+  List<List<String>> _parseTable(String rawContent,
+      [List<String>? nonTableContent]) {
     return MarkdownTableParser.parseTable(rawContent, nonTableContent);
   }
 
@@ -517,7 +538,12 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       double titleHeight = 0;
       if (title.isNotEmpty) {
         final tp = TextPainter(
-          text: TextSpan(text: title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: titleColor)),
+          text: TextSpan(
+              text: title,
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: titleColor)),
           textDirection: TextDirection.ltr,
         );
         tp.layout(maxWidth: totalWidth - 24);
@@ -527,7 +553,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       double extraHeight = 0;
       if (extraContent != null && extraContent.trim().isNotEmpty) {
         final tp = TextPainter(
-          text: TextSpan(text: extraContent, style: TextStyle(fontSize: 12, height: 1.5, color: extraTextColor)),
+          text: TextSpan(
+              text: extraContent,
+              style:
+                  TextStyle(fontSize: 12, height: 1.5, color: extraTextColor)),
           textDirection: TextDirection.ltr,
         );
         tp.layout(maxWidth: totalWidth - 24);
@@ -549,11 +578,16 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       // 绘制标题（wiki 链接已转换为普通文字）
       if (title.isNotEmpty) {
         final titlePainter = TextPainter(
-          text: TextSpan(text: title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: titleColor)),
+          text: TextSpan(
+              text: title,
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: titleColor)),
           textDirection: TextDirection.ltr,
         );
         titlePainter.layout(maxWidth: totalWidth - 24);
-        titlePainter.paint(canvas, Offset(12, 8));
+        titlePainter.paint(canvas, const Offset(12, 8));
       }
 
       // 表头背景（表格从 titleHeight 开始）
@@ -586,8 +620,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         }
         x = 0;
         for (int i = 0; i < colCount; i++) {
-          _drawCell(canvas, i < row.length ? row[i] : '',
-              x, y, colWidths[i], rowHeight, bodyTextColor, false);
+          _drawCell(canvas, i < row.length ? row[i] : '', x, y, colWidths[i],
+              rowHeight, bodyTextColor, false);
           x += colWidths[i];
         }
       }
@@ -629,7 +663,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
       final pngBytes = byteData.buffer.asUint8List();
       final tempDir = await getTemporaryDirectory();
-      final safeTitle = title.replaceAll('配方：', '').replaceAll(RegExp(r'[\\/:*?"<>|\\s]+'), '_');
+      final safeTitle = title
+          .replaceAll('配方：', '')
+          .replaceAll(RegExp(r'[\\/:*?"<>|\\s]+'), '_');
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = '${safeTitle}_$timestamp.png';
       final file = File('${tempDir.path}/$fileName');
@@ -648,8 +684,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     }
   }
 
-  void _drawCell(Canvas canvas, String text, double x, double y,
-      double w, double h, Color color, bool bold) {
+  void _drawCell(Canvas canvas, String text, double x, double y, double w,
+      double h, Color color, bool bold) {
     final tp = TextPainter(
       text: TextSpan(
         text: text,
@@ -696,14 +732,23 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     List<double> colWidths = List.filled(colCount, minColWidth);
     void measureCol(int col, String text) {
       final w = _textWidth(text, 12) + cellHPadding * 2;
-      if (w > colWidths[col]) colWidths[col] = w.clamp(minColWidth, maxColWidth);
+      if (w > colWidths[col]) {
+        colWidths[col] = w.clamp(minColWidth, maxColWidth);
+      }
     }
-    for (int i = 0; i < colCount; i++) measureCol(i, header[i]);
+
+    for (int i = 0; i < colCount; i++) {
+      measureCol(i, header[i]);
+    }
     for (final row in dataRows) {
-      for (int i = 0; i < row.length; i++) measureCol(i, row[i]);
+      for (int i = 0; i < row.length; i++) {
+        measureCol(i, row[i]);
+      }
     }
     // 填充空列
-    while (colWidths.length < colCount) colWidths.add(minColWidth);
+    while (colWidths.length < colCount) {
+      colWidths.add(minColWidth);
+    }
     final totalTableWidth = colWidths.reduce((a, b) => a + b);
 
     final borderColor = cs.outlineVariant;
@@ -729,16 +774,24 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 表头行
-                _buildTableRow(header, colWidths, headerHeight, true, cellHPadding,
-                    headerBg, headerText, borderColor),
+                _buildTableRow(header, colWidths, headerHeight, true,
+                    cellHPadding, headerBg, headerText, borderColor),
                 // 数据行
                 for (int ri = 0; ri < dataRows.length; ri++)
                   _buildTableRow(
                     dataRows[ri].length >= colCount
                         ? dataRows[ri].take(colCount).toList()
-                        : List.generate(colCount, (i) => i < dataRows[ri].length ? dataRows[ri][i] : ''),
-                    colWidths, rowHeight, false, cellHPadding,
-                    ri.isOdd ? rowAlt : rowBg, cellText, borderColor,
+                        : List.generate(
+                            colCount,
+                            (i) =>
+                                i < dataRows[ri].length ? dataRows[ri][i] : ''),
+                    colWidths,
+                    rowHeight,
+                    false,
+                    cellHPadding,
+                    ri.isOdd ? rowAlt : rowBg,
+                    cellText,
+                    borderColor,
                   ),
               ],
             ),
@@ -767,8 +820,15 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     );
   }
 
-  Widget _buildTableRow(List<String> cells, List<double> colWidths, double height,
-      bool isHeader, double hPadding, Color bg, Color textColor, Color borderColor) {
+  Widget _buildTableRow(
+      List<String> cells,
+      List<double> colWidths,
+      double height,
+      bool isHeader,
+      double hPadding,
+      Color bg,
+      Color textColor,
+      Color borderColor) {
     double totalWidth = colWidths.reduce((a, b) => a + b);
     return Container(
       width: totalWidth,
@@ -785,7 +845,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               alignment: Alignment.centerLeft,
               padding: EdgeInsets.symmetric(horizontal: hPadding),
               decoration: BoxDecoration(
-                border: i > 0 ? Border(left: BorderSide(color: borderColor, width: 0.5)) : null,
+                border: i > 0
+                    ? Border(left: BorderSide(color: borderColor, width: 0.5))
+                    : null,
               ),
               child: Text(
                 cells[i],
@@ -810,11 +872,15 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       data: converted,
       styleSheet: MarkdownStyleSheet(
         p: TextStyle(color: cs.onSurfaceVariant, fontSize: 14, height: 1.6),
-        h1: TextStyle(color: cs.onSurface, fontSize: 20, fontWeight: FontWeight.bold),
-        h2: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
-        h3: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
+        h1: TextStyle(
+            color: cs.onSurface, fontSize: 20, fontWeight: FontWeight.bold),
+        h2: TextStyle(
+            color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+        h3: TextStyle(
+            color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
         listBullet: TextStyle(color: cs.onSurfaceVariant),
-        code: TextStyle(color: cs.secondary, backgroundColor: cs.surfaceContainerHighest),
+        code: TextStyle(
+            color: cs.secondary, backgroundColor: cs.surfaceContainerHighest),
         codeblockDecoration: BoxDecoration(
           color: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
@@ -839,7 +905,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final cs = Theme.of(context).colorScheme;
     final fields = <MapEntry<String, String>>[];
     final linkedByName = {
-      for (final f in _getApplicationLinkedFormulas()) f.fileName.replaceAll('.md', ''): f,
+      for (final f in _getApplicationLinkedFormulas())
+        f.fileName.replaceAll('.md', ''): f,
     };
 
     void add(String label, String? value) {
@@ -886,24 +953,29 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               return TableRow(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
                       e.key,
-                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                      style:
+                          TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: linkedByName.containsKey(e.value)
                         ? InkWell(
-                            onTap: () => setState(() => _selectedApplicationFormulaName = e.value),
+                            onTap: () => setState(() =>
+                                _selectedApplicationFormulaName = e.value),
                             borderRadius: BorderRadius.circular(4),
                             child: Text(
                               e.value,
                               style: TextStyle(
-                                color: _selectedApplicationFormulaName == e.value
-                                    ? cs.primary
-                                    : cs.secondary,
+                                color:
+                                    _selectedApplicationFormulaName == e.value
+                                        ? cs.primary
+                                        : cs.secondary,
                                 fontSize: 13,
                                 decoration: TextDecoration.underline,
                               ),
@@ -988,20 +1060,26 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
             ),
           ),
           Table(
-            columnWidths: const {0: FixedColumnWidth(90), 1: FlexColumnWidth(1)},
+            columnWidths: const {
+              0: FixedColumnWidth(90),
+              1: FlexColumnWidth(1)
+            },
             defaultVerticalAlignment: TableCellVerticalAlignment.middle,
             children: entries.map((e) {
               return TableRow(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
                       e.key,
-                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                      style:
+                          TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
                       _withUnit(e.key, e.value),
                       style: TextStyle(color: cs.onSurface, fontSize: 13),
@@ -1020,25 +1098,31 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   List<ProductItem> _getApplicationLinkedFormulas() {
     if (widget.product.folder != '产品应用') return const [];
     final keys = <String>{
-      if (widget.product.primer != null && widget.product.primer!.isNotEmpty) widget.product.primer!,
-      if (widget.product.midCoat != null && widget.product.midCoat!.isNotEmpty) widget.product.midCoat!,
-      if (widget.product.topCoat != null && widget.product.topCoat!.isNotEmpty) widget.product.topCoat!,
+      if (widget.product.primer != null && widget.product.primer!.isNotEmpty)
+        widget.product.primer!,
+      if (widget.product.midCoat != null && widget.product.midCoat!.isNotEmpty)
+        widget.product.midCoat!,
+      if (widget.product.topCoat != null && widget.product.topCoat!.isNotEmpty)
+        widget.product.topCoat!,
     };
-    final linked = widget.formulas.where((f) => keys.contains(f.fileName.replaceAll('.md', ''))).toList();
+    final linked = widget.formulas
+        .where((f) => keys.contains(f.fileName.replaceAll('.md', '')))
+        .toList();
     return _deduplicateFormulasByFileName(linked);
   }
 
   /// 查找并渲染关联的产品配方（文件名以产品牌号开头，如 RS7767-银.md 对应 RS7767）
   Widget _buildLinkedFormulas() {
     final cs = Theme.of(context).colorScheme;
-    final matchedFormulas = _deduplicateFormulasByFileName(widget.formulas.where((f) {
+    final matchedFormulas =
+        _deduplicateFormulasByFileName(widget.formulas.where((f) {
       // 精确匹配：配方文件名以产品牌号+"-"开头（如 RS7767-银.md 匹配产品 RS7767）
       // experimentalCode 可能指向另一个系列的产品牌号，仅在非空且有明确匹配时才使用
       final hasExperimentalCodeMatch =
           widget.product.experimentalCode != null &&
-          widget.product.experimentalCode!.isNotEmpty &&
-          f.fileName.startsWith(widget.product.experimentalCode!);
-      return f.fileName.startsWith(widget.product.fileName + '-') ||
+              widget.product.experimentalCode!.isNotEmpty &&
+              f.fileName.startsWith(widget.product.experimentalCode!);
+      return f.fileName.startsWith('${widget.product.fileName}-') ||
           hasExperimentalCodeMatch;
     }).toList());
 
@@ -1064,7 +1148,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       );
     }).toList();
 
-    final selectedFormula = matchedFormulas[_selectedFormulaIndex.clamp(0, matchedFormulas.length - 1)];
+    final selectedFormula = matchedFormulas[
+        _selectedFormulaIndex.clamp(0, matchedFormulas.length - 1)];
     final title = '配方：${selectedFormula.fileName.replaceAll('.md', '')}';
 
     return Column(
@@ -1148,15 +1233,18 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.share_outlined, color: cs.onSurfaceVariant, size: 18),
+                  icon: Icon(Icons.share_outlined,
+                      color: cs.onSurfaceVariant, size: 18),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints:
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
                   tooltip: '分享配方图片',
                   onPressed: () => _shareTableAsImage(
                     context,
                     title,
                     tableBodyRows,
-                    extraContent: fullExtraContent.isNotEmpty ? fullExtraContent : null,
+                    extraContent:
+                        fullExtraContent.isNotEmpty ? fullExtraContent : null,
                   ),
                 ),
               ],
@@ -1217,7 +1305,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
           return Container(
             decoration: BoxDecoration(
               color: cs.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: ListView(
               controller: scrollController,
@@ -1242,9 +1331,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: folderAccent.withOpacity(0.16),
+                          color: folderAccent.withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -1268,15 +1358,18 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (widget.product.folder == '产品列表' && widget.tdsContent != null)
+                      if (widget.product.folder == '产品列表' &&
+                          widget.tdsContent != null)
                         Padding(
                           padding: const EdgeInsets.only(right: 4),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(8),
                             onTap: _isGeneratingTds ? null : _handlePreviewTds,
-                            onLongPress: _isGeneratingTds ? null : _handleShareTds,
+                            onLongPress:
+                                _isGeneratingTds ? null : _handleShareTds,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: cs.secondaryContainer,
                                 borderRadius: BorderRadius.circular(8),
@@ -1318,7 +1411,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                       runSpacing: 8,
                       children: widget.product.tags.map((tag) {
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: cs.secondaryContainer,
                             borderRadius: BorderRadius.circular(12),
@@ -1339,8 +1433,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                 // 产品详情字段表格（位于配方区块之前）
                 if (widget.product.folder == '产品列表') _buildProductMetaTable(),
                 // 产品配方 section：文件名以当前产品牌号+"-"开头时显示
-                if (widget.product.folder == '产品列表')
-                  _buildLinkedFormulas(),
+                if (widget.product.folder == '产品列表') _buildLinkedFormulas(),
                 // MD 内容（不含 frontmatter）
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
