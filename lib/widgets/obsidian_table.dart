@@ -316,8 +316,10 @@ class _ObsidianTableState extends State<ObsidianTable> {
           child: ReorderableListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: _columnOptions.length,
-            onReorderItem: (oldIndex, newIndex) {
+            // ignore: deprecated_member_use
+            onReorder: (oldIndex, newIndex) {
               setState(() {
+                if (newIndex > oldIndex) newIndex--;
                 final item = _columnOptions.removeAt(oldIndex);
                 _columnOptions.insert(newIndex, item);
                 _columns =
