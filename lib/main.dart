@@ -1,4 +1,5 @@
 /// 应用入口与全局主题/数据服务初始化。
+library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -90,7 +91,7 @@ class _RstoneAppState extends State<RstoneApp> {
 
   Future<void> _updateThemeSeedColor(Color color) async {
     setState(() => _themeSeedColor = color);
-    await widget.preferencesService.saveThemeSeedColorValue(color.value);
+    await widget.preferencesService.saveThemeSeedColorValue(color.toARGB32());
   }
 
   ThemeData _buildTheme(Brightness brightness) {
@@ -117,8 +118,7 @@ class _RstoneAppState extends State<RstoneApp> {
           color: colorScheme.onSurface,
         ),
       ),
-      // Flutter 3.24 使用 CardTheme（而非 CardThemeData）。
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         color: colorScheme.surfaceContainer,
         shape: RoundedRectangleBorder(
