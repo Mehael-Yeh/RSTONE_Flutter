@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../utils/compat_color.dart';
 import '../models/product_item.dart';
 import '../utils/natural_sort.dart';
 import '../services/preferences_service.dart';
@@ -475,7 +476,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                   child: Icon(
                                     Icons.drag_indicator,
                                     size: 14,
-                                    color: cs.outline.withValues(alpha: 0.7),
+                                    color: cs.outline.withCompatOpacity(0.7),
                                   ),
                                 ),
                               ),

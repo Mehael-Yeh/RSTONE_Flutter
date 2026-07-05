@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../utils/compat_color.dart';
 import '../models/product_item.dart';
 import '../utils/natural_sort.dart';
 import '../utils/obsidian_tag_validator.dart';
@@ -220,10 +221,10 @@ class _ProductListPageState extends State<ProductListPage> {
       labelText: labelText,
       hintText: hintText,
       filled: true,
-      fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+      fillColor: cs.surfaceContainerHighest.withCompatOpacity(0.35),
       labelStyle: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
       hintStyle: TextStyle(
-          fontSize: 12, color: cs.onSurfaceVariant.withValues(alpha: 0.85)),
+          fontSize: 12, color: cs.onSurfaceVariant.withCompatOpacity(0.85)),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: cs.outlineVariant),
