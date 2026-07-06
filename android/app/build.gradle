@@ -14,7 +14,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.rstone.rstone_flutter"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -56,17 +56,85 @@ android {
         }
     }
 
-    // 仅按 ABI 产出 APK，可显著降低单个安装包体积（推荐通过 AAB 分发）。
-    splits {
-        abi {
-            enable true
-            reset()
-            include "armeabi-v7a", "arm64-v8a", "x86_64"
-            universalApk false
+    flavorDimensions "edition"
+    productFlavors {
+        full {
+            dimension "edition"
+        }
+        lite {
+            dimension "edition"
+            applicationIdSuffix ".lite"
+            versionNameSuffix "-Lite"
+            resValue "string", "app_name", "RSTONE Lite"
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+afterEvaluate {
+    android.applicationVariants.all { variant ->
+        def variantTaskName =
+            variant.name.substring(0, 1).toUpperCase() + variant.name.substring(1)
+        def buildTypeTaskName =
+            variant.buildType.name.substring(0, 1).toUpperCase() + variant.buildType.name.substring(1)
+        def compileFlutterTask =
+            tasks.findByName("compileFlutterBuild${variantTaskName}")
+
+        if (compileFlutterTask != null) {
+            compileFlutterTask.doNotTrackState(
+                "Flutter build task may expose unreadable outputs on mapped network drives."
+            )
+
+            tasks.matching { it.name == "merge${variantTaskName}Shaders" }.configureEach {
+                dependsOn(compileFlutterTask)
+            }
+
+            tasks.matching { it.name == "check${variantTaskName}AarMetadata" }.configureEach {
+                dependsOn(compileFlutterTask)
+            }
+
+            rootProject.subprojects.each { subproject ->
+                subproject.tasks.matching {
+                    it.name == "merge${buildTypeTaskName}Shaders"
+                }.configureEach {
+                    dependsOn(compileFlutterTask)
+                }
+            }
+
+            if (variant.flavorName == "lite") {
+                def liteFontNames = [
+                    "MicrosoftYaHei.ttf",
+                    "MicrosoftYaHeiBold.ttf",
+                    "SimHei.ttf",
+                ]
+
+                tasks.matching { it.name == "merge${variantTaskName}Assets" }.configureEach {
+                    dependsOn(compileFlutterTask)
+                    doLast {
+                        liteFontNames.each { fontName ->
+                            delete(
+                                "${buildDir}/intermediates/flutter/${variant.name}/flutter_assets/assets/fonts/${fontName}"
+                            )
+                            delete(
+                                "${buildDir}/intermediates/assets/${variant.name}/merge${variantTaskName}Assets/flutter_assets/assets/fonts/${fontName}"
+                            )
+                        }
+                    }
+                }
+
+                tasks.matching { it.name == "compress${variantTaskName}Assets" }.configureEach {
+                    doLast {
+                        liteFontNames.each { fontName ->
+                            delete(
+                                "${buildDir}/intermediates/compressed_assets/${variant.name}/compress${variantTaskName}Assets/out/assets/flutter_assets/assets/fonts/${fontName}"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
