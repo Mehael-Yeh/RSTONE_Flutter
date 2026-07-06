@@ -141,15 +141,29 @@ jobs:
 
       - name: Build Release APK (Android)
         run: |
-          flutter build apk --release --split-per-abi --dart-define=APP_BUILD_TIME=${{ steps.build_meta.outputs.build_time }} --dart-define=DB_VERSION=${{ steps.db_version.outputs.db_version }}
+          flutter build apk --release --split-per-abi --flavor full --dart-define=APP_BUILD_TIME=${{ steps.build_meta.outputs.build_time }} --dart-define=DB_VERSION=${{ steps.db_version.outputs.db_version }} --dart-define=RSTONE_LITE=false
           cd build/app/outputs/flutter-apk
           for apk in app-*-release.apk; do
             case "$apk" in
-              app-armeabi-v7a-release.apk)  ABI=armeabi-v7a ;;
-              app-arm64-v8a-release.apk)    ABI=arm64-v8a ;;
-              app-x86_64-release.apk)       ABI=x86_64 ;;
+              *armeabi-v7a*)  ABI=armeabi-v7a ;;
+              *arm64-v8a*)    ABI=arm64-v8a ;;
+              *x86_64*)       ABI=x86_64 ;;
+              *) continue ;;
             esac
             mv "$apk" "RSTONE-${{ steps.version.outputs.tag }}-${ABI}-release.apk"
+          done
+
+          cd -
+          flutter build apk --release --split-per-abi --flavor lite --dart-define=APP_BUILD_TIME=${{ steps.build_meta.outputs.build_time }} --dart-define=DB_VERSION=${{ steps.db_version.outputs.db_version }} --dart-define=RSTONE_LITE=true
+          cd build/app/outputs/flutter-apk
+          for apk in app-*-release.apk; do
+            case "$apk" in
+              *armeabi-v7a*)  ABI=armeabi-v7a ;;
+              *arm64-v8a*)    ABI=arm64-v8a ;;
+              *x86_64*)       ABI=x86_64 ;;
+              *) continue ;;
+            esac
+            mv "$apk" "RSTONE-${{ steps.version.outputs.tag }}-Lite-${ABI}-release.apk"
           done
           ls -la
 
@@ -169,6 +183,9 @@ jobs:
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-armeabi-v7a-release.apk
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-arm64-v8a-release.apk
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-x86_64-release.apk
+            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-Lite-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-Lite-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-Lite-x86_64-release.apk
           prerelease: false
           generate_release_notes: true
         env:
