@@ -63,9 +63,6 @@ android {
         }
         lite {
             dimension "edition"
-            applicationIdSuffix ".lite"
-            versionNameSuffix "-Lite"
-            resValue "string", "app_name", "RSTONE Lite"
         }
     }
 }

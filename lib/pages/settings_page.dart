@@ -39,6 +39,7 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  static const bool _isLiteBuild = bool.fromEnvironment('RSTONE_LITE');
   static final Uri _projectUrl =
       Uri.parse('https://github.com/Mehael-Yeh/RSTONE_Flutter');
   static final Uri _webAppUrl =
@@ -125,9 +126,10 @@ class _SettingsPageState extends State<SettingsPage> {
         .replaceAll('UTC+08', '')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
+    final versionLabel = _isLiteBuild ? '${pkg.version}-Lite' : pkg.version;
     final displayVersion = normalizedBuildTime.isNotEmpty
-        ? 'v${pkg.version} ($normalizedBuildTime)'
-        : 'v${pkg.version}';
+        ? 'v$versionLabel ($normalizedBuildTime)'
+        : 'v$versionLabel';
     if (mounted) {
       setState(() {
         _appVersion = displayVersion;
