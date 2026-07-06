@@ -15,6 +15,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/product_item.dart';
 
 class TdsPdfService {
+  static const bool _isLiteBuild = bool.fromEnvironment('RSTONE_LITE');
   static final RegExp _headingReg = RegExp(r'^(#{1,3})\s*(.+)$');
   static final RegExp _leadingPunctuationReg = RegExp(
     r'^[，。！？；：、）》】』」’”,.!?;:\)\]}>]',
@@ -95,14 +96,8 @@ class TdsPdfService {
         fallback: PdfGoogleFonts.notoSansSCBold,
       ),
       headerLogoBold: pw.Font.helveticaBold(),
-      arialRegular: await _loadFirstAvailableFont(
-        candidates: const ['assets/fonts/Arial.ttf'],
-        fallback: PdfGoogleFonts.robotoRegular,
-      ),
-      tdsHeaderArialBold: await _loadFirstAvailableFont(
-        candidates: const ['assets/fonts/ArialBold.ttf'],
-        fallback: PdfGoogleFonts.robotoBold,
-      ),
+      arialRegular: await PdfGoogleFonts.robotoRegular(),
+      tdsHeaderArialBold: pw.Font.helveticaBold(),
       simheiRegular: await _loadFirstAvailableFont(
         candidates: const ['assets/fonts/SimHei.ttf', 'assets/fonts/simhei.ttf'],
         fallback: PdfGoogleFonts.notoSansSCRegular,
@@ -905,6 +900,10 @@ class TdsPdfService {
     required List<String> candidates,
     required Future<pw.Font> Function() fallback,
   }) async {
+    if (_isLiteBuild) {
+      return fallback();
+    }
+
     for (final path in candidates) {
       try {
         final data = await rootBundle.load(path);
