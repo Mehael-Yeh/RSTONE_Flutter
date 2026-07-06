@@ -186,11 +186,11 @@ jobs:
             - 构建日期: `${{ steps.build_meta.outputs.build_time }}`
             - 数据库版本: `${{ steps.db_version.outputs.db_version }}`
           files: |
-            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-armeabi-v7a-release.apk
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-armeabi-v7a-release.apk
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-x86_64-release.apk
-            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-Lite-armeabi-v7a-release.apk
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-Lite-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-Lite-armeabi-v7a-release.apk
             build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-Lite-x86_64-release.apk
           prerelease: true
           generate_release_notes: true
