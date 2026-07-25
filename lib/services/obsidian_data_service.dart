@@ -672,8 +672,9 @@ ${_joinTagsToYamlList(tags)}
     required String markdown,
   }) async {
     final normalizedCode = code.trim().toUpperCase();
-    if (!RegExp(r'^R[DS]\d{3,}$').hasMatch(normalizedCode)) {
-      throw ArgumentError('文件名需符合 RDXXX 或 RSXXX 格式');
+    // 仅校验前两个字符为 RD 或 RS，后续内容不作限制。
+    if (!normalizedCode.startsWith('RD') && !normalizedCode.startsWith('RS')) {
+      throw ArgumentError('文件名需以 RD 或 RS 开头');
     }
     final dataDir = await _getPrivateDataDirectory();
     if (dataDir == null) {
@@ -1004,8 +1005,13 @@ ${_joinTagsToYamlList(tags)}
   /// 搜索产品和应用
   ///
   /// 搜索规则：
-  /// 1) 单关键词：搜索范围包括文件名（产品牌号/应用名称）、实验牌号、标签。
+  /// 1) 单关键词：搜索范围包括文件名（产品牌号/应用名称）、实验牌号、标签、引用。
   /// 2) 混合关键词（空格分词或自动分段后>=2个关键词）：仅在标签内进行 AND 匹配。
+  ///
+  /// 空格仅作为分词符；标签匹配按 Obsidian“标签不含空格”的约定处理：
+  /// - 关键词本身是完整标签（含一层同义词）时，只做整词命中，
+  ///   因此“聚碳”不命中“聚碳酸酯”（PC），“耐水”不命中“耐水煮”；
+  /// - 否则按子串匹配，输入途中的片段（如“聚”“P”）也能命中更长的标签。
   ///
   /// [query] 搜索关键词，支持空格分隔多个关键词
   /// 返回匹配的产品和应用列表
@@ -1161,6 +1167,9 @@ ${_joinTagsToYamlList(tags)}
 
     if (keywords.isEmpty) return [];
 
+    // 已知完整标签（含同义词）集合：关键词命中它时按整词匹配标签，
+    // 否则视为输入途中或普通文本，保持子串匹配。
+    final knownTagTerms = buildKnownTagTerms();
     final excludePudResults = shouldExcludePudResults(keywords);
     final pudTerms = _expandedKeywords('pud');
     final results = <ProductItem>[];
@@ -1181,6 +1190,21 @@ ${_joinTagsToYamlList(tags)}
       return numericBody.startsWith(normalizedKeyword);
     }
 
+    /// 判断 [keyword] 是否整词命中条目的某个标签。
+    ///
+    /// [searchableTags] 已包含条目标签的一层正向同义词扩展；
+    /// 额外检查条目原始标签是否落在 [expanded]（关键词的一层正/反向扩展）内，
+    /// 以覆盖条目直接使用同义词作标签的场景（如标注“聚氨酯”，搜“PU”）。
+    bool matchesExactTag(
+      ProductItem item,
+      Set<String> searchableTags,
+      String keyword,
+      Set<String> expanded,
+    ) {
+      if (searchableTags.contains(keyword)) return true;
+      return item.tags.any((rawTag) => expanded.contains(rawTag.toLowerCase()));
+    }
+
     bool containsKeyword(ProductItem item, String keyword) {
       final searchableTags = buildSearchableTags(item);
       if (excludePudResults && containsAnyTerm(searchableTags, pudTerms)) {
@@ -1199,6 +1223,18 @@ ${_joinTagsToYamlList(tags)}
             item.linkedWikiReferences
                 .any((ref) => startsWithNumericBody(ref, numericKeyword));
       }
+      if (knownTagTerms.contains(keyword)) {
+        // 关键词本身是完整标签（Obsidian 标签不含空格，词边界即标签边界）：
+        // 标签只做整词命中，因此“聚碳”不命中“聚碳酸酯”（PC）、
+        // “耐水”不命中“耐水煮”；文件名、实验牌号和引用仍保持子串匹配。
+        final nonTagSearchText =
+            '${item.fileName} ${item.experimentalCode ?? ''} $linkedRefText'
+                .toLowerCase();
+        return matchesExactTag(item, searchableTags, keyword, expanded) ||
+            expanded.any(nonTagSearchText.contains);
+      }
+      // 非完整标签（输入途中或普通文本）：保持子串匹配，
+      // 例如“聚”可命中“聚碳酸酯”（PC），“P”可命中“PC”。
       return expanded.any(singleKeywordSearchText.contains);
     }
 
@@ -1210,6 +1246,11 @@ ${_joinTagsToYamlList(tags)}
       final tagsText = searchableTags.join(' ').toLowerCase();
       return keywords.every((keyword) {
         final expanded = _expandedKeywords(keyword);
+        // 完整标签整词命中（“聚碳”不带出“聚碳酸酯”）；
+        // 非完整标签的片段保持子串匹配（“水性 聚”可命中带 PC 标签的产品）。
+        if (knownTagTerms.contains(keyword)) {
+          return matchesExactTag(item, searchableTags, keyword, expanded);
+        }
         return expanded.any(tagsText.contains);
       });
     }

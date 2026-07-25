@@ -142,6 +142,116 @@ tags:
         isEmpty,
       );
     });
+
+    test('matches tags as whole words so 聚碳 does not hit 聚碳酸酯 (PC)',
+        () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final service = ObsidianDataService();
+
+      await service.initialize();
+      service.setItemsForTesting(
+        products: [
+          ProductItem.fromMdContent(
+            'assets/产品列表/RD2001.md',
+            service.buildProductMarkdownTemplate(tags: ['PC']),
+          ),
+          ProductItem.fromMdContent(
+            'assets/产品列表/RD2002.md',
+            service.buildProductMarkdownTemplate(tags: ['聚碳']),
+          ),
+        ],
+      );
+
+      bool hasTag(ProductItem item, String tag) =>
+          item.tags.any((candidate) => candidate.toLowerCase() == tag);
+
+      // 空格是 Obsidian 标签的天然边界：带不带结尾空格，标签都按整词匹配。
+      for (final query in ['聚碳', '聚碳 ']) {
+        final results = service.search(query);
+        expect(results.where((item) => hasTag(item, '聚碳')), isNotEmpty,
+            reason: 'query: "$query"');
+        expect(results.where((item) => hasTag(item, 'pc')), isEmpty,
+            reason: 'query: "$query"');
+      }
+
+      final pcResults = service.search('PC');
+      expect(pcResults.where((item) => hasTag(item, 'pc')), isNotEmpty);
+    });
+
+    test('matches tags as whole words so 耐水 does not hit 耐水煮', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final service = ObsidianDataService();
+
+      await service.initialize();
+      service.setItemsForTesting(
+        products: [
+          ProductItem.fromMdContent(
+            'assets/产品列表/RD3001.md',
+            service.buildProductMarkdownTemplate(tags: ['耐水']),
+          ),
+          ProductItem.fromMdContent(
+            'assets/产品列表/RD3002.md',
+            service.buildProductMarkdownTemplate(tags: ['耐水煮']),
+          ),
+        ],
+      );
+
+      bool hasTag(ProductItem item, String tag) =>
+          item.tags.any((candidate) => candidate.toLowerCase() == tag);
+
+      final waterResults = service.search('耐水');
+      expect(waterResults.where((item) => hasTag(item, '耐水')), isNotEmpty);
+      expect(waterResults.where((item) => hasTag(item, '耐水煮')), isEmpty);
+
+      final boilResults = service.search('耐水煮');
+      expect(boilResults.where((item) => hasTag(item, '耐水煮')), isNotEmpty);
+      expect(boilResults.where((item) => hasTag(item, '耐水')), isEmpty);
+    });
+
+    test('keeps substring matching for partial keywords between spaces',
+        () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final service = ObsidianDataService();
+
+      await service.initialize();
+      service.setItemsForTesting(
+        products: [
+          ProductItem.fromMdContent(
+            'assets/产品列表/RD4001.md',
+            service.buildProductMarkdownTemplate(tags: ['水性', 'PC']),
+          ),
+          ProductItem.fromMdContent(
+            'assets/产品列表/RD4002.md',
+            service.buildProductMarkdownTemplate(tags: ['水性', '聚碳']),
+          ),
+          ProductItem.fromMdContent(
+            'assets/产品列表/RD4003.md',
+            service.buildProductMarkdownTemplate(tags: ['油性', 'PC']),
+          ),
+        ],
+      );
+
+      bool hasTag(ProductItem item, String tag) =>
+          item.tags.any((candidate) => candidate.toLowerCase() == tag);
+
+      // “聚”不是完整标签：子串可命中“聚碳酸酯”（PC）与“聚碳”，带不带结尾空格都一样。
+      for (final query in ['水性 聚', '水性 聚 ']) {
+        final results = service.search(query);
+        expect(results.where((item) => hasTag(item, 'pc')), isNotEmpty,
+            reason: 'query: "$query"');
+        expect(results.where((item) => hasTag(item, '聚碳')), isNotEmpty,
+            reason: 'query: "$query"');
+      }
+
+      // “P”不是完整标签：子串可命中“PC”。
+      final pResults = service.search('油性 P');
+      expect(pResults.where((item) => hasTag(item, 'pc')), isNotEmpty);
+
+      // “聚碳”是完整标签：多关键词下同样只整词命中，不带出 PC。
+      final exactResults = service.search('水性 聚碳');
+      expect(exactResults.where((item) => hasTag(item, '聚碳')), isNotEmpty);
+      expect(exactResults.where((item) => hasTag(item, 'pc')), isEmpty);
+    });
   });
 
   group('FormulaTableClipboardParser', () {

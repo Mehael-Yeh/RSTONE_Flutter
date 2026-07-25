@@ -130,7 +130,7 @@ class _ProductListPageState extends State<ProductListPage> {
                 _buildRoundedField(
                   controller: codeController,
                   label: '文件名',
-                  hint: 'RD001 或 RS001',
+                  hint: '以 RD 或 RS 开头',
                 ),
                 const SizedBox(height: 10),
                 TextField(
