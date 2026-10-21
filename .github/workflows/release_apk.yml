@@ -67,6 +67,9 @@ jobs:
           flutter test --no-pub --dart-define=RUN_PRODUCTION_INTEROP=true test/production_interop_test.dart --reporter expanded
 
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
 
       - name: Restore signing configuration
         env:
