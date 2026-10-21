@@ -229,5 +229,8 @@ Android NDK 对齐到 `28.2.13676358`，满足当前 Flutter SDK 的原生集成
 早期 1.0.0 外壳的双源联调快照见 [原正式联调证据](DATA_SYNC_LIVE_VERIFICATION.json)；
 本机 `build/data_sync_verification.json` 也是早期快照，不代表当前 2.0 发布包。
 
-生产数据与 [2.0.0-alpha](https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/tag/v2.0.0-alpha) 均已上线。
+生产数据与 [2.0.1 正式版](https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/tag/v2.0.1) 均已上线。
+2.0.1 正式版于 2026-10-21 17:37（北京时间）发布，直接使用已成功构建的六个签名包，
+包含首次下载提速、同步设置精简与边距优化；按用户要求停止剩余安装验证，不再追加发布验证。
+包来源、发布资产和后续发包策略见 [2.0.1 发布记录](RELEASE_2_0_1_PUBLISH.json)。
 Android 安装验证在 CI 专用模拟器执行；ARM 包已核对签名及元数据，物理断电和实体手机长期运行不作通过声明。
