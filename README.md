@@ -2,12 +2,14 @@
 
 <div align="center">
 
-![Flutter](https://img.shields.io/badge/Flutter-3.24+-02569B?logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?logo=dart&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-3.32.8-02569B?logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-3.8-0175C2?logo=dart&logoColor=white)
 ![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20Web-6C63FF)
 
 **锐石内部产品资料检索应用**  
 搜索管理产品、应用场景、配方信息，并支持现场笔记记录与导出。
+
+📱 **Android 2.0.0-alpha 下载**：[Full / Lite 安装包](https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/tag/v2.0.0-alpha)，支持 Android 10 及以上，可覆盖安装旧版。
 
 🌐 **静态网页（GitHub Pages）**：  
 https://Mehael-Yeh.github.io/RSTONE_Flutter/
@@ -39,7 +41,7 @@ RSTONE 是一个基于 Flutter 的跨平台检索工具，用于集中管理和�
 
 ### 支持平台
 
-- Android
+- Android 10 及以上
 - iOS
 - Windows
 - Web

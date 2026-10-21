@@ -195,17 +195,21 @@ Android NDK 对齐到 `28.2.13676358`，满足当前 Flutter SDK 的原生集成
 - GitHub 公开模拟分发站点真实 HTTPS 联调通过：5 个文件验签安装，重复同步 0 字节对象下载。
 - 正式 Pages/raw 双源真实客户端联调通过：各 187 文件、84,388 字节原始对象载荷；重复同步 0 个对象，原生持久化断网重开及个人资料保护通过。
 - 发布与 APK 检查脚本共 17 项测试通过，覆盖 2.0 大版本、已有版本递增、频道版本下限、数值排序、Full/Lite 资产、跨工具元数据解析、应用身份读取和直接升级的签名/版本码/最低系统约束。
-- 共用发包流程通过 actionlint 检查；Android 覆盖安装实测以本次 Actions 结果为准。
+- 共用发包流程通过 actionlint 检查；[2.0 发包流程](https://github.com/Mehael-Yeh/RSTONE_Flutter/actions/runs/39561149330)全部通过。
+- `2.0.0+29876120` Full/Lite 六个签名 APK 已公开发布，最低 Android API 均为 29；下载后的 SHA-256 与发布资产摘要一致，签名与九个历史包一致。
+- Android 10/API 29 和 Android 15/API 35 共八种真实覆盖安装测试通过，两次安装之间没有卸载或清数据；UID、笔记、个人 Markdown、规则、主题及排序保留，旧个人文件原件仍在。
 - Windows Release、Web Release、Android Full/Lite Debug 已构建成功。
 - Windows 2.0.0+29876067 Release 已重新构建，随包 SQLite DLL 在隔离内存数据库中完成 BLOB 写入与读取。
 - 真实 Chromium IndexedDB 测试通过，覆盖事务、重开、损坏修复、删除及个人资料保留。
   本机预发布 Flutter 的 Windows CanvasKit 测试路径返回 404，测试时映射到同一 SDK 原始资源后执行；没有改产品数据或存储实现。
-- Android Full/Lite 原生集成已在 GitHub Actions 的专用 API 35 模拟器通过，覆盖事务、离线重开、损坏修复和个人资料保护；见 [CI 运行](https://github.com/Mehael-Yeh/RSTONE_Flutter/actions/runs/39557837023)。
+- Android Full/Lite 原生集成已在 GitHub Actions 的专用 API 35 模拟器通过，覆盖事务、离线重开、损坏修复和个人资料保护；见 [CI 运行](https://github.com/Mehael-Yeh/RSTONE_Flutter/actions/runs/39561149158)。
 - Web Release 1.0.0 正式数据冷启动复核通过：首次下载 187 个对象，在线重复同步 0 个；34 个程序资源经哈希校验后缓存，断网刷新仍能检索 RS-LIVE-WEB 个人资料，version.json 在线请求为 0，无页面异常。
 - 线上 Web 2.0.0 已部署并重新验收：首次下载 187 个对象，重复同步 0 个；33 个程序资源完整缓存，断网冷刷新仍可检索合成个人资料，两源全部对象的浏览器跨域请求、签名与哈希通过，无页面异常或 version.json 请求。
 - 生产站点配置与真实产品数据联调已完成；真实 Chromium 从本地 Web 外壳跨域获取两源全部 187 个对象，签名、大小及 SHA-256 均通过。
 
-双源请求计数、清单与源提交、Web 实测及成品配置检查见 [本次正式联调证据](DATA_SYNC_LIVE_VERIFICATION.json)。
-构建产物与完整源文件哈希另存于本机 `build/data_sync_verification.json`。
+2.0 发布的包信息、校验值、源码提交、八种覆盖安装与线上 Web 复核见 [2.0 发布验收证据](RELEASE_2_0_VERIFICATION.json)。
+早期 1.0.0 外壳的双源联调快照见 [原正式联调证据](DATA_SYNC_LIVE_VERIFICATION.json)；
+本机 `build/data_sync_verification.json` 也是早期快照，不代表当前 2.0 发布包。
 
-生产数据已由发布端上线；用户已授权将外壳改造提交、推送并触发首次 Alpha 发包。Android 已有 CI 模拟器验证；物理断电和实体手机长期运行不作通过声明。
+生产数据与 [2.0.0-alpha](https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/tag/v2.0.0-alpha) 均已上线。
+Android 安装验证在 CI 专用模拟器执行；ARM 包已核对签名及元数据，物理断电和实体手机长期运行不作通过声明。

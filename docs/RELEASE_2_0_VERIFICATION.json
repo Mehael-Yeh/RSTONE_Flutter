@@ -1,0 +1,263 @@
+{
+  "verifiedAtUtc": "2026-10-21T07:32:44.965219+00:00",
+  "appVersion": "2.0.0",
+  "releaseTag": "v2.0.0-alpha",
+  "sourceCommit": "8f57a8fdbeeceb40a8dbdd9eeda901e64f7261c1",
+  "minimumAndroidApi": 29,
+  "minimumAndroidVersion": "10",
+  "releaseUrl": "https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/tag/v2.0.0-alpha",
+  "publishedAt": "2026-10-21T07:31:58Z",
+  "buildRunUrl": "https://github.com/Mehael-Yeh/RSTONE_Flutter/actions/runs/39561149330",
+  "validationRunUrl": "https://github.com/Mehael-Yeh/RSTONE_Flutter/actions/runs/39561149158",
+  "historicalApksVerified": 9,
+  "packages": [
+    {
+      "package": "com.rstone.rstone_flutter",
+      "versionCode": 29876120,
+      "versionName": "2.0.0",
+      "abis": [
+        "arm64-v8a"
+      ],
+      "activity": "com.rstone.rstone_flutter.MainActivity",
+      "certificateSha256": "8a593a18b7f62500f1f47f27643c04456f51c5756defd9d9460365e058495658",
+      "minSdk": 29,
+      "file": "RSTONE-v2.0.0-alpha-Lite-arm64-v8a-release.apk",
+      "size": 23293229,
+      "sha256": "9a28f22e3ac59027ce0214fa9468e3ac18d980c2db7f0f68fdf03ef7471cd49d",
+      "url": "https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/download/v2.0.0-alpha/RSTONE-v2.0.0-alpha-Lite-arm64-v8a-release.apk"
+    },
+    {
+      "package": "com.rstone.rstone_flutter",
+      "versionCode": 29876120,
+      "versionName": "2.0.0",
+      "abis": [
+        "armeabi-v7a"
+      ],
+      "activity": "com.rstone.rstone_flutter.MainActivity",
+      "certificateSha256": "8a593a18b7f62500f1f47f27643c04456f51c5756defd9d9460365e058495658",
+      "minSdk": 29,
+      "file": "RSTONE-v2.0.0-alpha-Lite-armeabi-v7a-release.apk",
+      "size": 21280161,
+      "sha256": "81c13c60993095193be534d93d02a76454aeea3d6e74e286f5ba86a9c21f6b53",
+      "url": "https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/download/v2.0.0-alpha/RSTONE-v2.0.0-alpha-Lite-armeabi-v7a-release.apk"
+    },
+    {
+      "package": "com.rstone.rstone_flutter",
+      "versionCode": 29876120,
+      "versionName": "2.0.0",
+      "abis": [
+        "x86_64"
+      ],
+      "activity": "com.rstone.rstone_flutter.MainActivity",
+      "certificateSha256": "8a593a18b7f62500f1f47f27643c04456f51c5756defd9d9460365e058495658",
+      "minSdk": 29,
+      "file": "RSTONE-v2.0.0-alpha-Lite-x86_64-release.apk",
+      "size": 24576145,
+      "sha256": "f9d18a4b4fcc44e9c9cb4333dba54b38b74c6a2b9407d5e9e767ae9d69caec54",
+      "url": "https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/download/v2.0.0-alpha/RSTONE-v2.0.0-alpha-Lite-x86_64-release.apk"
+    },
+    {
+      "package": "com.rstone.rstone_flutter",
+      "versionCode": 29876120,
+      "versionName": "2.0.0",
+      "abis": [
+        "arm64-v8a"
+      ],
+      "activity": "com.rstone.rstone_flutter.MainActivity",
+      "certificateSha256": "8a593a18b7f62500f1f47f27643c04456f51c5756defd9d9460365e058495658",
+      "minSdk": 29,
+      "file": "RSTONE-v2.0.0-alpha-arm64-v8a-release.apk",
+      "size": 40896798,
+      "sha256": "c89c3d4ec6e414e15f01f855e46674c97dba24f35d97f5561c448e35663058c8",
+      "url": "https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/download/v2.0.0-alpha/RSTONE-v2.0.0-alpha-arm64-v8a-release.apk"
+    },
+    {
+      "package": "com.rstone.rstone_flutter",
+      "versionCode": 29876120,
+      "versionName": "2.0.0",
+      "abis": [
+        "armeabi-v7a"
+      ],
+      "activity": "com.rstone.rstone_flutter.MainActivity",
+      "certificateSha256": "8a593a18b7f62500f1f47f27643c04456f51c5756defd9d9460365e058495658",
+      "minSdk": 29,
+      "file": "RSTONE-v2.0.0-alpha-armeabi-v7a-release.apk",
+      "size": 38883730,
+      "sha256": "6c01539b57d3ba1cf8083192c49126a02ffb3c382f0fcbbbc169bbd4045c0d82",
+      "url": "https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/download/v2.0.0-alpha/RSTONE-v2.0.0-alpha-armeabi-v7a-release.apk"
+    },
+    {
+      "package": "com.rstone.rstone_flutter",
+      "versionCode": 29876120,
+      "versionName": "2.0.0",
+      "abis": [
+        "x86_64"
+      ],
+      "activity": "com.rstone.rstone_flutter.MainActivity",
+      "certificateSha256": "8a593a18b7f62500f1f47f27643c04456f51c5756defd9d9460365e058495658",
+      "minSdk": 29,
+      "file": "RSTONE-v2.0.0-alpha-x86_64-release.apk",
+      "size": 42179714,
+      "sha256": "113ffeef7ccd6961e9419579d37828ad35cf6f5f926f27939f5e0a304988e56f",
+      "url": "https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/download/v2.0.0-alpha/RSTONE-v2.0.0-alpha-x86_64-release.apk"
+    }
+  ],
+  "upgradeTests": [
+    {
+      "tag": "v2.0.0-alpha",
+      "androidApi": 29,
+      "cases": [
+        {
+          "from": "v0.0.263-alpha",
+          "fromLite": false,
+          "toLite": false,
+          "oldVersionCode": 29753969,
+          "newVersionCode": 29876120,
+          "replaceInstall": true,
+          "uidPreserved": true,
+          "notesPreserved": true,
+          "personalMarkdownPreserved": true,
+          "customRulesPreserved": true,
+          "preferencesPreserved": true
+        },
+        {
+          "from": "v0.0.263-alpha",
+          "fromLite": true,
+          "toLite": true,
+          "oldVersionCode": 29753969,
+          "newVersionCode": 29876120,
+          "replaceInstall": true,
+          "uidPreserved": true,
+          "notesPreserved": true,
+          "personalMarkdownPreserved": true,
+          "customRulesPreserved": true,
+          "preferencesPreserved": true
+        },
+        {
+          "from": "v1.0.9",
+          "fromLite": false,
+          "toLite": false,
+          "oldVersionCode": 29725181,
+          "newVersionCode": 29876120,
+          "replaceInstall": true,
+          "uidPreserved": true,
+          "notesPreserved": true,
+          "personalMarkdownPreserved": true,
+          "customRulesPreserved": true,
+          "preferencesPreserved": true
+        },
+        {
+          "from": "v0.0.263-alpha",
+          "fromLite": false,
+          "toLite": true,
+          "oldVersionCode": 29753969,
+          "newVersionCode": 29876120,
+          "replaceInstall": true,
+          "uidPreserved": true,
+          "notesPreserved": true,
+          "personalMarkdownPreserved": true,
+          "customRulesPreserved": true,
+          "preferencesPreserved": true
+        }
+      ]
+    },
+    {
+      "tag": "v2.0.0-alpha",
+      "androidApi": 35,
+      "cases": [
+        {
+          "from": "v0.0.263-alpha",
+          "fromLite": false,
+          "toLite": false,
+          "oldVersionCode": 29753969,
+          "newVersionCode": 29876120,
+          "replaceInstall": true,
+          "uidPreserved": true,
+          "notesPreserved": true,
+          "personalMarkdownPreserved": true,
+          "customRulesPreserved": true,
+          "preferencesPreserved": true
+        },
+        {
+          "from": "v0.0.263-alpha",
+          "fromLite": true,
+          "toLite": true,
+          "oldVersionCode": 29753969,
+          "newVersionCode": 29876120,
+          "replaceInstall": true,
+          "uidPreserved": true,
+          "notesPreserved": true,
+          "personalMarkdownPreserved": true,
+          "customRulesPreserved": true,
+          "preferencesPreserved": true
+        },
+        {
+          "from": "v1.0.9",
+          "fromLite": false,
+          "toLite": false,
+          "oldVersionCode": 29725181,
+          "newVersionCode": 29876120,
+          "replaceInstall": true,
+          "uidPreserved": true,
+          "notesPreserved": true,
+          "personalMarkdownPreserved": true,
+          "customRulesPreserved": true,
+          "preferencesPreserved": true
+        },
+        {
+          "from": "v0.0.263-alpha",
+          "fromLite": false,
+          "toLite": true,
+          "oldVersionCode": 29753969,
+          "newVersionCode": 29876120,
+          "replaceInstall": true,
+          "uidPreserved": true,
+          "notesPreserved": true,
+          "personalMarkdownPreserved": true,
+          "customRulesPreserved": true,
+          "preferencesPreserved": true
+        }
+      ]
+    }
+  ],
+  "web": {
+    "url": "https://mehael-yeh.github.io/RSTONE_Flutter/",
+    "appVersion": "2.0.0",
+    "buildNumber": "29876067",
+    "deploymentRun": 39556839665,
+    "verification": {
+      "installed": {
+        "sequence": 1,
+        "dataVersion": "2026.10.21.001",
+        "files": 187,
+        "lastLog": "新增 187，修改 0，删除 0，修复 0；实际下载 84388 字节",
+        "lastSuccess": "2026-10-21T06:58:13.176Z"
+      },
+      "firstObjectRequests": 187,
+      "repeatObjectRequests": 0,
+      "cors": [
+        {
+          "source": "GitHub Pages",
+          "files": 187,
+          "objectBytes": 84388,
+          "signatureVerified": true
+        },
+        {
+          "source": "GitHub raw 备用",
+          "files": 187,
+          "objectBytes": 84388,
+          "signatureVerified": true
+        }
+      ],
+      "shellCacheFiles": 33,
+      "offlineColdReload": true,
+      "personalVisible": "RS-LIVE-WEB",
+      "versionHttpRequests": 0,
+      "pageErrors": []
+    }
+  },
+  "limits": [
+    "Upgrade devices are dedicated x86_64 emulators; ARM APKs are audited but not run on physical phones.",
+    "Crash fault injection does not certify physical power-loss durability."
+  ]
+}
