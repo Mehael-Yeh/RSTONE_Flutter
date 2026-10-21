@@ -26,7 +26,7 @@ void main() async {
   );
 
   const compiledVersion =
-      String.fromEnvironment('APP_VERSION', defaultValue: '2.0.0');
+      String.fromEnvironment('APP_VERSION', defaultValue: '2.0.1');
   var appVersion = compiledVersion.split('+').first;
   // Web PackageInfo fetches version.json with a cache-busting URL. Offline
   // startup must use the version bundled into this shell instead of HTTP.
@@ -219,8 +219,30 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.dataService.sync?.takeCompletionNotice();
+    widget.dataService.addListener(_showSyncNotice);
     WidgetsBinding.instance.addPostFrameCallback(
         (_) => widget.dataService.sync?.checkAutomatically());
+  }
+
+  void _showSyncNotice() {
+    final notice = widget.dataService.sync?.takeCompletionNotice();
+    if (notice == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(notice)));
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant MainScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.dataService, widget.dataService)) {
+      oldWidget.dataService.removeListener(_showSyncNotice);
+      widget.dataService.sync?.takeCompletionNotice();
+      widget.dataService.addListener(_showSyncNotice);
+    }
   }
 
   @override
@@ -233,6 +255,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    widget.dataService.removeListener(_showSyncNotice);
     super.dispose();
   }
 

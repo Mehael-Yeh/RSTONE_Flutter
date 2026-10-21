@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rst_flutter/data_sync/services/diff_engine.dart';
+import 'package:rst_flutter/data_sync/data_sync_service.dart';
 import 'package:rst_flutter/data_sync/services/index_manager.dart';
 import 'package:rst_flutter/data_sync/storage/storage_adapter.dart';
 import 'package:rst_flutter/models/product_item.dart';
@@ -43,6 +44,133 @@ void main() {
     expect(offline.products.single.fileName, 'RS1');
     expect(offline.sync!.current!.sequence, 1);
     offline.dispose();
+  });
+
+  test('first install overlaps downloads with a bounded pool', () async {
+    await f.publish(1, {
+      for (var i = 0; i < 25; i++) '产品列表/RS$i.md': product('水性', 'file $i')
+    });
+    final started = Completer<void>(), release = Completer<void>();
+    var active = 0, peak = 0;
+    f.transport.beforeResponse = (url) async {
+      if (!url.path.contains('/objects/')) return;
+      active++;
+      if (active > peak) peak = active;
+      if (active == DataSyncService.downloadConcurrency &&
+          !started.isCompleted) {
+        started.complete();
+      }
+      await release.future;
+      active--;
+    };
+    final syncing = app.sync!.synchronize();
+    try {
+      await started.future.timeout(const Duration(seconds: 5));
+      expect(f.transport.objectRequests,
+          hasLength(DataSyncService.downloadConcurrency));
+      expect(app.sync!.current, isNull);
+    } finally {
+      release.complete();
+    }
+    expect(await syncing, isTrue);
+    expect(peak, DataSyncService.downloadConcurrency);
+    expect(f.transport.objectRequests, hasLength(25));
+    expect(app.products, hasLength(25));
+  });
+
+  test('an unavailable source is not retried for every remaining object',
+      () async {
+    await f.publish(1, {
+      for (var i = 0; i < 25; i++) '产品列表/RS$i.md': product('水性', 'file $i')
+    });
+    f.transport.beforeResponse = (url) async {
+      if (url.host == 'main.test' && url.path.contains('/objects/')) {
+        throw StateError('unavailable primary');
+      }
+    };
+    expect(await app.sync!.synchronize(), isTrue);
+    final primary =
+        f.transport.objectRequests.where((url) => url.host == 'main.test');
+    expect(primary.length,
+        inInclusiveRange(1, DataSyncService.downloadConcurrency));
+    expect(f.transport.objectRequests.where((url) => url.host == 'mirror.test'),
+        hasLength(25));
+  });
+
+  test(
+      'a failed parallel download drains in-flight writes before allowing retry',
+      () async {
+    await install({'产品列表/RS1.md': product('水性')});
+    await f.publish(
+        2, {'产品列表/RS1.md': product('UV'), '产品列表/RS2.md': product('PU')});
+    final manifest = jsonDecode(
+        utf8.decode(f.transport.resources['manifests/000002.json']!));
+    final held = manifest['files'][0]['sha256'],
+        blocked = manifest['files'][1]['sha256'];
+    final started = Completer<void>(),
+        failed = Completer<void>(),
+        release = Completer<void>();
+    var blockedAttempts = 0, finished = false;
+    f.transport.beforeResponse = (url) async {
+      if (url.path.endsWith(held)) {
+        if (!started.isCompleted) started.complete();
+        await release.future;
+      }
+      if (url.path.endsWith(blocked)) {
+        if (++blockedAttempts == 2) failed.complete();
+        throw StateError('object unavailable on both mirrors');
+      }
+    };
+    final syncing = app.sync!.synchronize();
+    syncing.then((_) => finished = true);
+    await Future.wait([started.future, failed.future])
+        .timeout(const Duration(seconds: 5));
+    await Future<void>.delayed(Duration.zero);
+    expect(finished, isFalse);
+    expect(app.sync!.isSyncing, isTrue);
+    release.complete();
+    expect(await syncing, isFalse);
+    expect(app.sync!.current!.sequence, 1);
+    expect(await store.read('official/objects/$held'), isNotNull);
+    f.transport.beforeResponse = null;
+    f.transport.requests.clear();
+    expect(await app.sync!.synchronize(), isTrue);
+    expect(f.transport.objectRequests, hasLength(1));
+    expect(f.transport.objectRequests.single.path, endsWith(blocked));
+  });
+
+  test(
+      'post-download validation repairs changed bytes even with an unchanged fingerprint',
+      () async {
+    await install({'产品列表/RS1.md': product('水性')});
+    final file = app.sync!.current!.files.single;
+    final key = app.sync!.content.key(file.sha256);
+    // Simulate a storage fault outside this session's verified fingerprint.
+    final bytes = await store.read(key);
+    final oldToken = await store.read('fingerprint/$key');
+    await store.write(key, raw('X' * file.size));
+    await store.write('fingerprint/$key', oldToken!);
+    expect(await app.sync!.synchronize(), isTrue);
+    expect(await store.read(key), bytes);
+    expect(f.transport.objectRequests, hasLength(1));
+    expect(app.sync!.plan!.count(DataChange.repair), 1);
+  });
+
+  test(
+      'completion notice is consumed once and is not replayed after restart or a no-op',
+      () async {
+    await install({'产品列表/RS1.md': product('水性')});
+    expect(app.sync!.takeCompletionNotice(), contains('资料已更新至'));
+    expect(app.sync!.takeCompletionNotice(), isNull);
+    expect(await app.sync!.synchronize(), isTrue);
+    expect(app.sync!.takeCompletionNotice(), isNull);
+    final reopened = await f.app(store);
+    await f.publish(2, {'产品列表/RS1.md': product('水性')});
+    expect(await app.sync!.synchronize(), isTrue);
+    expect(app.sync!.downloadedBytes, 0);
+    expect(app.sync!.takeCompletionNotice(), contains('2026.10.21.002'));
+    expect(reopened.sync!.takeCompletionNotice(), isNull);
+    reopened.dispose();
   });
 
   test('500 files: add 5 modify 8 delete 3 downloads exactly 13 objects',

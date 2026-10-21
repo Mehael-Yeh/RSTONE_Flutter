@@ -1,0 +1,93 @@
+{
+  "verifiedAtUtc": "2026-10-21T09:20:57.989439+00:00",
+  "scope": "Download speed and settings UI, pre-release working-tree verification",
+  "releaseTarget": "v2.0.1-alpha",
+  "baseCommit": "5caca7faa5337f5a05779647885c000b50a22278",
+  "sourceFilesSha256": {
+    "lib/data_sync/data_sync_service.dart": "69ccdd05fa76250607c64f9300cea556d177fa8bd76ec0d1dd06e9f6c0cac593",
+    "lib/data_sync/services/source_manager.dart": "15e95e2f0e00cb830e745c9aed4e62b10c575c9c27f4e976d08091bdc9d868de",
+    "lib/data_sync/storage/legacy_migration_native.dart": "1165c3677e420f2cbbb5a2d26e8db7c199adf4b7873042947ad621270864e901",
+    "lib/main.dart": "e60abbef644e00b2be064848c8546ffa60c4fdaa91f35edfd6a0304ed6cc582d",
+    "lib/pages/settings_page.dart": "4217be553e8be4a79d2fb99b74d870eecf642af210536fe514ac244108da3ee2",
+    "lib/services/obsidian_data_service.dart": "05a3b051086b9a5c48c31775dc1ddc8e78a3b328359c8bcfd489bb805c3af142",
+    "test/data_sync_test.dart": "daa7e616e4270b408791b386bbd50819fb59bf0de04cf2cbc509dc3d6c24ec9b",
+    "test/production_interop_test.dart": "5c690aae93cfc32396c5d9a6b9614abd7b66b4a13dd4f2e5ec238ff2cfc2f8dd",
+    "test/storage_and_migration_test.dart": "f138446a06f600dbe9d5a9ef932b691ba36c3cdc0401f9f8aaa89e154e31edc8",
+    "test/support/sync_fixture.dart": "342a3c8d4aefcc43406c6cfd5f76a3c6f563613463d352b9efac729a8a45cfac",
+    "test/settings_sync_test.dart": "fb75382deff64bcaaf66e32a914f42e3c27d5adad2c1dbd9a21812c2e5735d47"
+  },
+  "downloadComparison": {
+    "baselineCommit": "5caca7faa5337f5a05779647885c000b50a22278",
+    "concurrency": 8,
+    "measuredOn": "Windows desktop, live HTTPS",
+    "sources": [
+      {
+        "source": "GitHub Pages",
+        "beforeMs": 75243,
+        "afterMs": 5247,
+        "speedup": 14.34,
+        "firstObjectRequests": 187,
+        "repeatObjectRequests": 0
+      },
+      {
+        "source": "GitHub raw 备用",
+        "beforeMs": 89541,
+        "afterMs": 5367,
+        "speedup": 16.68,
+        "firstObjectRequests": 187,
+        "repeatObjectRequests": 0
+      }
+    ]
+  },
+  "fullTestsPassed": 73,
+  "liteTestsPassed": 73,
+  "analyzerIssues": 0,
+  "settingsViewportWidths": [
+    320,
+    360,
+    600
+  ],
+  "settingsChecks": [
+    "One version row with a right-hand update button",
+    "New remote version appears only when an update exists",
+    "Download-source row opens a direct source picker",
+    "Removed both recovery entries and manual repair controls",
+    "Completion summary appears once; no replay on opening settings",
+    "Equal 16-pixel card margins and right-hand action inset"
+  ],
+  "web": {
+    "installed": {
+      "sequence": 1,
+      "dataVersion": "2026.10.21.001",
+      "files": 187,
+      "lastLog": "新增 187，修改 0，删除 0，修复 0；实际下载 84388 字节",
+      "lastSuccess": "2026-10-21T09:14:43.502Z"
+    },
+    "firstObjectRequests": 187,
+    "repeatObjectRequests": 0,
+    "cors": [
+      {
+        "source": "GitHub Pages",
+        "files": 187,
+        "objectBytes": 84388,
+        "signatureVerified": true
+      },
+      {
+        "source": "GitHub raw 备用",
+        "files": 187,
+        "objectBytes": 84388,
+        "signatureVerified": true
+      }
+    ],
+    "shellCacheFiles": 34,
+    "offlineColdReload": true,
+    "personalVisible": "RS-LIVE-WEB",
+    "versionHttpRequests": 0,
+    "pageErrors": []
+  },
+  "webArtifactSha256": "4aa033b7cb5a749fc1d56f054d73cd5ef91a21d1ba9e64857f045b6a7f4bb74f",
+  "limits": [
+    "Timing is one before/after Windows HTTPS run, not an Android device guarantee.",
+    "This is pre-release verification; published APK evidence is recorded separately."
+  ]
+}

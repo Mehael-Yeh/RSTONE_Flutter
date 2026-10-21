@@ -9,7 +9,7 @@
 **锐石内部产品资料检索应用**  
 搜索管理产品、应用场景、配方信息，并支持现场笔记记录与导出。
 
-📱 **Android 2.0.0-alpha 下载**：[Full / Lite 安装包](https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/tag/v2.0.0-alpha)，支持 Android 10 及以上，可覆盖安装旧版。
+📱 **Android 2.0.1-alpha 下载**：[Full / Lite 安装包](https://github.com/Mehael-Yeh/RSTONE_Flutter/releases/tag/v2.0.1-alpha)，支持 Android 10 及以上，可覆盖安装旧版。
 
 🌐 **静态网页（GitHub Pages）**：  
 https://Mehael-Yeh.github.io/RSTONE_Flutter/
@@ -32,8 +32,9 @@ RSTONE 是一个基于 Flutter 的跨平台检索工具，用于集中管理和�
 
 本次重构的分阶段改动、测试、生产配置和证据边界见 [数据同步交付记录](docs/DATA_SYNC_REFACTOR.md)。
 `assets/data_sync_config.json` 已固定正式 Pages/备用 raw 源及 production-2026 公钥。
-新外壳版本为 2.0.0，支持 Android 10 及以上系统；保留旧应用标识与签名，发包前验证旧版覆盖安装与个人资料保留。
+新外壳版本为 2.0.1，支持 Android 10 及以上系统；保留旧应用标识与签名，发包前验证旧版覆盖安装与个人资料保留。
 真实首版资料 187 份，重复同步不下载已有对象。示例公钥仅用于测试。
+首次下载并发提速；设置页合并版本与更新入口，点击下载源直接切换，更新后自动校验并仅提示一次结果。
 
 ---
 
@@ -107,7 +108,7 @@ flutter run -d chrome
 Web 离线外壳构建（应用版本请与 pubspec.yaml 保持一致）：
 
 ```bash
-flutter build web --release --no-web-resources-cdn --dart-define=APP_VERSION=2.0.0
+flutter build web --release --no-web-resources-cdn --dart-define=APP_VERSION=2.0.1
 python scripts/prepare_web_offline.py
 ```
 

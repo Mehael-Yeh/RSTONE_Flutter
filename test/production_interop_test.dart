@@ -70,12 +70,14 @@ void main() {
           bootstrapRules: '');
       var app = makeApp();
       try {
+        final installWatch = Stopwatch()..start();
         await app.initialize();
         expect(app.initializationError, isNull);
         expect(await app.sync!.synchronize(), isTrue,
             reason:
                 '${app.sync!.failureDetails}; ${app.sync!.sources.failures}');
         final manifest = app.sync!.current!;
+        installWatch.stop();
         final signed = jsonDecode(utf8.decode(manifest.manifestBytes)) as Map;
         final hashes = manifest.files.map((f) => f.sha256).toSet();
         final sizes = {
@@ -115,6 +117,7 @@ void main() {
           'tds': app.tdsByProduct.length,
           'firstObjectRequests': transport.objectRequests,
           'firstObjectBytes': transport.objectBytes,
+          'installDurationMs': installWatch.elapsedMilliseconds,
         };
 
         await app.addProductMarkdown(

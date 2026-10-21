@@ -5,8 +5,8 @@ import '../protocol/rstone_protocol.dart';
 import 'storage_adapter.dart';
 
 /// Copy only; legacy originals and SharedPreferences are never removed.
-/// Unmarked legacy files might be old asset copies OR user edits. Quarantine
-/// them for explicit recovery instead of guessing and reviving deleted data.
+/// Unmarked legacy files remain in their original directory. Only explicitly
+/// marked personal files are imported; old official assets never reappear.
 Future<void> migrateLegacyData(StorageAdapter storage,
     {Directory? legacyRoot}) async {
   if (await storage.read('migration/v1') != null) return;
@@ -21,7 +21,7 @@ Future<void> migrateLegacyData(StorageAdapter storage,
     }
     manual = value;
   }
-  final imported = <String>[], quarantined = <String>[];
+  final imported = <String>[];
   for (final pair in {
     '产品列表': 'products',
     '产品应用': 'applications',
@@ -31,6 +31,7 @@ Future<void> migrateLegacyData(StorageAdapter storage,
         .whereType<String>()
         .map((s) => pair.key == '产品列表' ? s.toUpperCase() : s)
         .toSet();
+    if (marked.isEmpty) continue;
     final dir = Directory('${legacyRoot.path}/${pair.key}');
     if (!await dir.exists()) continue;
     await for (final entity in dir.list(recursive: true, followLinks: false)) {
@@ -38,16 +39,16 @@ Future<void> migrateLegacyData(StorageAdapter storage,
       final relative =
           entity.path.substring(dir.path.length + 1).replaceAll('\\', '/');
       final path = '${pair.key}/$relative';
-      validateLogicalPath(path);
       final name = relative.substring(0, relative.length - 3);
       final explicitUser =
           marked.contains(pair.key == '产品列表' ? name.toUpperCase() : name);
-      final destination =
-          explicitUser ? 'user/$path' : 'migration/quarantine/$path';
+      if (!explicitUser) continue;
+      validateLogicalPath(path);
+      final destination = 'user/$path';
       if (await storage.read(destination) == null) {
         await storage.write(destination, await entity.readAsBytes());
       }
-      (explicitUser ? imported : quarantined).add(path);
+      imported.add(path);
     }
   }
   final rules = File('${legacyRoot.path}/tag_alias_rules.custom.txt');
@@ -58,6 +59,5 @@ Future<void> migrateLegacyData(StorageAdapter storage,
         await rules.readAsBytes());
   }
   // Marker is last. Re-running after a crash never duplicates or overwrites.
-  await storage.writeText('migration/v1',
-      jsonEncode({'imported': imported, 'quarantined': quarantined}));
+  await storage.writeText('migration/v1', jsonEncode({'imported': imported}));
 }

@@ -67,6 +67,7 @@ class SourceManager {
   String? preferredSource;
   String? currentSource;
   final List<String> failures = [];
+  final Set<String> _unavailable = {};
   SourceManager(
       {required this.sources,
       required this.trustedKeys,
@@ -80,6 +81,23 @@ class SourceManager {
           if (source.baseUrl.toString() != preferredSource) source,
       ];
 
+  void beginSync() => _unavailable.clear();
+
+  List<DataSource> get _objectSources {
+    final result = ordered.toList();
+    result.sort((a, b) {
+      final aUrl = a.baseUrl.toString(), bUrl = b.baseUrl.toString();
+      final health = (_unavailable.contains(aUrl) ? 1 : 0)
+          .compareTo(_unavailable.contains(bUrl) ? 1 : 0);
+      if (health != 0) return health;
+      final preference = (aUrl == preferredSource ? 0 : 1)
+          .compareTo(bUrl == preferredSource ? 0 : 1);
+      if (preference != 0) return preference;
+      return sources.indexOf(a).compareTo(sources.indexOf(b));
+    });
+    return result;
+  }
+
   Future<ManifestCandidate> latest(
       {required String appVersion,
       int highestSequence = 0,
@@ -88,8 +106,7 @@ class SourceManager {
     if (sources.isEmpty || trustedKeys.isEmpty) {
       throw StateError('官方数据源或签名公钥尚未配置');
     }
-    final candidates = <ManifestCandidate>[];
-    for (final source in ordered) {
+    final results = await Future.wait(ordered.map((source) async {
       try {
         final pointer = await transport.get(
             source.baseUrl.resolve('latest.json').replace(queryParameters: {
@@ -105,28 +122,32 @@ class SourceManager {
         }
         final name = index['sequence'].toString().padLeft(6, '0');
         // Construct both paths ourselves; never follow URLs from unsigned JSON.
-        final raw = await transport.get(
-            source.baseUrl.resolve('manifests/$name.json'),
-            maxBytes: 32 * 1024 * 1024);
-        final sig = await transport
-            .get(source.baseUrl.resolve('manifests/$name.sig'), maxBytes: 512);
+        final payloads = await Future.wait([
+          transport.get(source.baseUrl.resolve('manifests/$name.json'),
+              maxBytes: 32 * 1024 * 1024),
+          transport.get(source.baseUrl.resolve('manifests/$name.sig'),
+              maxBytes: 512),
+        ]);
         final manifest = await DataManifest.verify(
             latest: pointer,
-            manifest: raw,
-            signature: sig,
+            manifest: payloads[0],
+            signature: payloads[1],
             keys: trustedKeys,
             appVersion: appVersion,
             highestSequence: highestSequence,
             acceptedHash: acceptedHash);
-        candidates.add(ManifestCandidate(manifest, source));
+        return ManifestCandidate(manifest, source);
       } catch (e) {
         if (e is FormatException &&
             e.message == 'Same-sequence manifest conflict') {
           throw StateError('发现已验签的同序号清单冲突，已停止更新');
         }
+        _unavailable.add(source.baseUrl.toString());
         failures.add('${source.name}: $e');
+        return null;
       }
-    }
+    }));
+    final candidates = results.whereType<ManifestCandidate>().toList();
     if (candidates.isEmpty) {
       throw StateError('未能获取可信数据，继续使用本地资料。${failures.join('；')}');
     }
@@ -149,7 +170,7 @@ class SourceManager {
   }
 
   Future<Uint8List> object(DataFile file) async {
-    for (final source in ordered) {
+    for (final source in _objectSources) {
       try {
         final bytes = await transport.get(
             source.baseUrl.resolve('objects/${file.sha256}'),
@@ -160,6 +181,7 @@ class SourceManager {
         currentSource = source.name;
         return bytes;
       } catch (e) {
+        _unavailable.add(source.baseUrl.toString());
         failures.add('${source.name}: $e');
       }
     }

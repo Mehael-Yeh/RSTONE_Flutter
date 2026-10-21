@@ -67,7 +67,7 @@ void main() {
   });
 
   test(
-      'migration is idempotent, preserves originals, isolates unmarked assets and keeps custom rules',
+      'migration is idempotent, preserves unmarked originals and imports only personal files and rules',
       () async {
     final products = Directory('${root.path}/产品列表');
     await products.create();
@@ -75,6 +75,8 @@ void main() {
     await apps.create();
     await File('${products.path}/RS1.md').writeAsString(product('个人'));
     await File('${products.path}/RS2.md').writeAsString(product('旧官方'));
+    final unmarked = File('${products.path}/e\u0301.md');
+    await unmarked.writeAsString(product('未标记的旧文件'));
     await File('${apps.path}/个人方案.md').writeAsString('[[RS1]]');
     await File('${root.path}/manual_items.json').writeAsString(jsonEncode({
       'products': ['RS1'],
@@ -90,16 +92,13 @@ void main() {
     expect(await store.readText('user/产品列表/RS1.md'), product('已修改'));
     expect(await store.readText('user/custom_rules/tag_alias_rules.custom.txt'),
         '自定义 -> 别名');
-    expect(await store.readText('migration/quarantine/产品列表/RS2.md'),
-        product('旧官方'));
+    expect(await store.readText('migration/quarantine/产品列表/RS2.md'), isNull);
     expect(await File('${products.path}/RS2.md').exists(), isTrue);
+    expect(await unmarked.exists(), isTrue);
     final app = await fixture.app(store);
     expect(app.products.map((p) => p.fileName).toList(), ['RS1']);
     expect(app.applications.single.origin, DataOrigin.user);
-    expect(app.legacyQuarantine, ['产品列表/RS2.md']);
-    await app.recoverLegacyFile('产品列表/RS2.md');
-    expect(app.products.singleWhere((p) => p.fileName == 'RS2').origin,
-        DataOrigin.user);
+    expect(app.products.any((p) => p.fileName == 'RS2'), isFalse);
     app.dispose();
   });
 }

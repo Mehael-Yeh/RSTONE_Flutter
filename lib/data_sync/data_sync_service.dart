@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'models/data_manifest.dart';
+import 'protocol/rstone_protocol.dart' show DataFile;
 import 'services/content_store.dart';
 import 'services/diff_engine.dart';
 import 'services/index_manager.dart';
@@ -34,12 +35,21 @@ class DataSyncService extends ChangeNotifier {
   String? error, lastLog;
   String? failureDetails;
   bool autoUpdate = true;
+  bool lastSyncChanged = false;
   Future<bool>? _running;
   Uint8List? _activeBytes;
   Map<String, dynamic>? _state;
   DateTime? _lastAutoCheck;
+  String? _completionNotice;
   bool _loaded = false;
+  static const downloadConcurrency = 8;
   bool get isSyncing => _running != null;
+  String? takeCompletionNotice() {
+    final notice = _completionNotice;
+    _completionNotice = null;
+    return notice;
+  }
+
   String get databaseVersion =>
       servingManifest?.dataVersion ??
       (current == null ? '尚未下载' : '${current!.dataVersion}（需要修复）');
@@ -171,9 +181,11 @@ class DataSyncService extends ChangeNotifier {
     failureDetails = null;
     downloadedBytes = 0;
     completedObjects = 0;
+    lastSyncChanged = false;
     plan = null;
     _stage(SyncStage.checking);
     try {
+      sources.beginSync();
       if (!_loaded) throw StateError('本地版本记录未通过校验，请先恢复有效的本地存储');
       // Another app window may have committed while this one was idle.
       if (!sameBytes(
@@ -196,17 +208,40 @@ class DataSyncService extends ChangeNotifier {
       final valid = await content.validHashes(target.files, full: repair);
       plan = DataDiffEngine().compare(current, target, valid);
       _stage(SyncStage.downloading);
-      for (final file in plan!.downloads) {
-        final bytes = await sources.object(file);
-        await content.save(file, bytes);
-        downloadedBytes += bytes.length;
-        completedObjects++;
-        notifyListeners();
-      }
+      await _downloadObjects(plan!.downloads);
       _stage(SyncStage.validating);
+      // Always verify the downloaded generation and automatically repair any
+      // missing/corrupt object before it can become the active database.
+      final verified = await content.validHashes(target.files, full: true);
+      final repairs = <String, DataFile>{
+        for (final file in target.files)
+          if (!verified.contains(file.sha256)) file.sha256: file
+      };
+      if (repairs.isNotEmpty) {
+        final repairPaths = {
+          for (final file in target.files)
+            if (repairs.containsKey(file.sha256)) file.path
+        };
+        plan = DataSyncPlan({
+          for (final entry in plan!.changes.entries)
+            entry.key: entry.value == DataChange.unchanged &&
+                    repairPaths.contains(entry.key)
+                ? DataChange.repair
+                : entry.value
+        }, plan!.downloads);
+        await _downloadObjects(repairs.values.toList());
+        final checked = await content.validHashes(target.files, full: true);
+        if (target.files.any((file) => !checked.contains(file.sha256))) {
+          throw StateError('资料自动校验未通过，请重试更新');
+        }
+      }
       // Build the entire next business snapshot before the pointer changes.
       // An index/parser failure leaves both the old pointer and old UI intact.
       final prepared = await _prepare(target);
+      final changed = current?.hash != target.hash ||
+          servingManifest?.hash != target.hash ||
+          downloadedBytes > 0 ||
+          plan!.changes.values.any((c) => c != DataChange.unchanged);
       final timestamp = DateTime.now().toUtc();
       final log =
           '新增 ${plan!.count(DataChange.add)}，修改 ${plan!.count(DataChange.modify)}，'
@@ -235,6 +270,10 @@ class DataSyncService extends ChangeNotifier {
       snapshot = prepared;
       lastSuccess = timestamp;
       lastLog = log;
+      lastSyncChanged = changed;
+      if (changed) {
+        _completionNotice = '资料已更新至 ${target.dataVersion}\n$log';
+      }
       _stage(SyncStage.success);
       return true;
     } catch (e) {
@@ -246,7 +285,7 @@ class DataSyncService extends ChangeNotifier {
           ? '当前客户端不支持该资料版本或签名密钥，请升级应用。已保留本地资料。'
           : details.contains('尚未配置')
               ? '官方数据源或签名公钥尚未配置。'
-              : '更新未完成，已保留本地资料。请检查网络后重试，或运行数据校验与修复。';
+              : '更新未完成，已保留本地资料。请检查网络后重试更新。';
       try {
         await storage.writeText(
             'logs/last_failure',
@@ -262,6 +301,34 @@ class DataSyncService extends ChangeNotifier {
     }
   }
 
+  Future<void> _downloadObjects(List<DataFile> files) async {
+    var next = 0;
+    Object? failure;
+    StackTrace? failureStack;
+    Future<void> worker() async {
+      while (failure == null && next < files.length) {
+        final file = files[next++];
+        try {
+          final bytes = await sources.object(file);
+          await content.save(file, bytes);
+          downloadedBytes += bytes.length;
+          completedObjects++;
+          notifyListeners();
+        } catch (e, stack) {
+          failure ??= e;
+          failureStack ??= stack;
+        }
+      }
+    }
+
+    // Drain in-flight work before failing: retries can safely reuse completed
+    // objects, and no worker can write after a subsequent sync starts.
+    await Future.wait(List.generate(
+        files.length < downloadConcurrency ? files.length : downloadConcurrency,
+        (_) => worker()));
+    if (failure != null) Error.throwWithStackTrace(failure!, failureStack!);
+  }
+
   Future<DataSnapshot> _prepare(DataManifest manifest) async {
     final files = <String, String>{};
     for (final file in manifest.files) {
@@ -274,11 +341,6 @@ class DataSyncService extends ChangeNotifier {
     }
     return indexManager.prepare(files);
   }
-
-  /// Local rollback would violate the replay watermark. Restores are issued by
-  /// the publisher with a newer sequence; this message is also used in Settings.
-  String get rollbackGuidance =>
-      '恢复历史资料需要发布端发布新的恢复版本；本地不会降低已接受的版本序号。更新失败会自动保留原数据库。';
 
   // Old CAS objects are intentionally retained. No automatic GC runs until a
   // cross-process reader/maintenance lease is available on every platform.

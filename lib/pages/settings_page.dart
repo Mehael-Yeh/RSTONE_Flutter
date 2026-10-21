@@ -3,7 +3,6 @@ library;
 
 import 'dart:convert';
 import '../services/share_file.dart';
-import '../data_sync/services/diff_engine.dart';
 import '../data_sync/data_sync_service.dart';
 
 import 'package:flutter/material.dart';
@@ -91,13 +90,51 @@ class _SettingsPageState extends State<SettingsPage> {
     super.dispose();
   }
 
-  Future<void> _synchronize({bool repair = false}) async {
+  Future<void> _synchronize() async {
     final sync = widget.dataService.sync;
     if (sync == null) return;
-    final ok = await sync.synchronize(repair: repair);
+    final ok = await sync.synchronize();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ok ? '资料已同步' : sync.error ?? '同步失败，已保留原数据库')));
+    if (!ok || !sync.lastSyncChanged) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ok ? '资料已是最新版本' : sync.error ?? '同步失败，已保留本地资料')));
+    }
+  }
+
+  Future<void> _selectDownloadSource() async {
+    final sync = widget.dataService.sync;
+    if (sync == null || sync.isSyncing) return;
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            ListTile(
+              title: const Text('自动选择'),
+              trailing: sync.sources.preferredSource == null
+                  ? const Icon(Icons.check)
+                  : null,
+              onTap: () => Navigator.pop(sheetContext, ''),
+            ),
+            for (final source in sync.sources.sources)
+              ListTile(
+                title: Text(source.name),
+                trailing:
+                    sync.sources.preferredSource == source.baseUrl.toString()
+                        ? const Icon(Icons.check)
+                        : null,
+                onTap: () =>
+                    Navigator.pop(sheetContext, source.baseUrl.toString()),
+              ),
+          ]),
+        ),
+      ),
+    );
+    if (selected != null) {
+      await sync.selectSource(selected.isEmpty ? null : selected);
+    }
   }
 
   Widget _buildSyncCard() {
@@ -108,13 +145,23 @@ class _SettingsPageState extends State<SettingsPage> {
           child: Text(widget.dataService.initializationError ?? '正在初始化本地资料'));
     }
     final busy = sync.isSyncing;
-    final plan = sync.plan;
+    final remote = sync.remote;
+    final hasUpdate = remote != null &&
+        remote.sequence > (sync.servingManifest?.sequence ?? 0);
+    var sourceLabel = sync.sources.currentSource == null
+        ? '自动选择'
+        : '自动选择 · ${sync.sources.currentSource}';
+    for (final source in sync.sources.sources) {
+      if (source.baseUrl.toString() == sync.sources.preferredSource) {
+        sourceLabel = source.name;
+      }
+    }
     final labels = {
       SyncStage.idle: '等待检查',
       SyncStage.checking: '检查版本',
       SyncStage.downloading: '下载资料',
-      SyncStage.validating: '校验资料',
-      SyncStage.committing: '切换版本',
+      SyncStage.validating: '校验并修复资料',
+      SyncStage.committing: '保存资料',
       SyncStage.success: '同步完成',
       SyncStage.failed: '同步未完成',
     };
@@ -124,94 +171,45 @@ class _SettingsPageState extends State<SettingsPage> {
           if (widget.dataService.initializationError != null)
             Text(widget.dataService.initializationError!),
           ListTile(
+              leading: const Icon(Icons.storage_outlined),
               title: const Text('当前资料版本'),
-              subtitle: Text(sync.databaseVersion)),
+              subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(sync.databaseVersion),
+                    if (hasUpdate) Text('可更新至 ${remote.dataVersion}'),
+                  ]),
+              trailing: FilledButton.tonal(
+                  onPressed: busy ? null : _synchronize,
+                  child: const Text('更新'))),
           ListTile(
-              title: const Text('远程资料版本'),
-              subtitle: Text(sync.remote?.dataVersion ?? '尚未检查')),
-          ListTile(
-              title: const Text('上次成功同步'),
-              subtitle: Text(
-                  sync.lastSuccess?.toLocal().toString().split('.').first ??
-                      '尚未同步')),
-          ListTile(
+              leading: const Icon(Icons.cloud_download_outlined),
               title: const Text('下载源'),
-              subtitle: Text(sync.sources.currentSource ?? '自动选择')),
-          DropdownButtonFormField<String>(
-            // ignore: deprecated_member_use
-            value: sync.sources.preferredSource ?? '',
-            decoration: const InputDecoration(labelText: '选择数据源'),
-            items: [
-              const DropdownMenuItem(value: '', child: Text('自动选择')),
-              ...sync.sources.sources.map((s) => DropdownMenuItem(
-                  value: s.baseUrl.toString(), child: Text(s.name)))
-            ],
-            onChanged: busy
-                ? null
-                : (value) => sync.selectSource(value == '' ? null : value),
-          ),
+              subtitle: Text(sourceLabel),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: busy ? null : _selectDownloadSource),
           SwitchListTile(
+              secondary: const Icon(Icons.sync_outlined),
               title: const Text('自动更新资料'),
               value: sync.autoUpdate,
               onChanged: sync.setAutoUpdate),
-          if (busy) LinearProgressIndicator(value: sync.progress),
-          Text(labels[sync.stage]!),
-          if (plan != null)
+          if (busy)
             Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                    '新增 ${plan.count(DataChange.add)} · 修改 ${plan.count(DataChange.modify)} · 删除 ${plan.count(DataChange.delete)} · 修复 ${plan.count(DataChange.repair)}\n实际下载 ${(sync.downloadedBytes / 1024).toStringAsFixed(1)} KB')),
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LinearProgressIndicator(value: sync.progress),
+                    const SizedBox(height: 8),
+                    Text(labels[sync.stage]!),
+                  ]),
+            ),
           if (sync.error != null)
             Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(sync.error!)),
           if (sync.sources.sources.isEmpty || sync.sources.trustedKeys.isEmpty)
             const Text('官方数据源尚未配置，请在配置完成后的客户端版本中下载资料。'),
-          Wrap(spacing: 8, children: [
-            FilledButton.icon(
-                onPressed: busy ? null : () => _synchronize(),
-                icon: const Icon(Icons.sync),
-                label: const Text('检查并同步')),
-            OutlinedButton(
-                onPressed: busy ? null : () => _synchronize(repair: true),
-                child: const Text('数据校验与修复')),
-            TextButton(
-                onPressed: () => showDialog<void>(
-                    context: context,
-                    builder: (c) => AlertDialog(
-                            title: const Text('恢复历史资料'),
-                            content: Text(sync.rollbackGuidance),
-                            actions: [
-                              TextButton(
-                                  onPressed: () => Navigator.pop(c),
-                                  child: const Text('知道了'))
-                            ])),
-                child: const Text('恢复历史资料')),
-          ]),
-          if (sync.lastLog != null)
-            ExpansionTile(
-                title: const Text('最近一次同步'), children: [Text(sync.lastLog!)]),
-          if (widget.dataService.legacyQuarantine.isNotEmpty)
-            ExpansionTile(
-                title: const Text('旧版资料恢复'),
-                subtitle: const Text('来源未标注的旧文件已隔离保存，可逐项恢复为个人资料。'),
-                children: widget.dataService.legacyQuarantine
-                    .map((path) => ListTile(
-                        title: Text(path),
-                        trailing: TextButton(
-                            onPressed: () async {
-                              try {
-                                await widget.dataService
-                                    .recoverLegacyFile(path);
-                              } catch (e) {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('$e')));
-                                }
-                              }
-                            },
-                            child: const Text('恢复'))))
-                    .toList()),
         ]));
   }
 
@@ -532,15 +530,6 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.storage_outlined),
-                  title: const Text('数据库版本'),
-                  trailing: Text(
-                    widget.dataService.sync?.databaseVersion ?? '尚未下载',
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant),
-                  ),
-                ),
-                ListTile(
                   leading: const Icon(Icons.inventory_2),
                   title: const Text('产品数量'),
                   trailing: Text(
@@ -835,6 +824,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildSectionCard({required String title, required Widget child}) {
     return Card(
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
         child: Column(
@@ -850,7 +840,14 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
               ),
             ),
-            child,
+            ListTileTheme(
+              data: const ListTileThemeData(
+                contentPadding: EdgeInsets.symmetric(horizontal: 4),
+                minLeadingWidth: 24,
+                horizontalTitleGap: 12,
+              ),
+              child: child,
+            ),
           ],
         ),
       ),

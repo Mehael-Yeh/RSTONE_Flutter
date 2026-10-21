@@ -22,9 +22,11 @@ class FakeTransport implements DataTransport {
   final Map<String, Uint8List> overrides = {};
   bool offline = false;
   Completer<void>? gate;
+  Future<void> Function(Uri)? beforeResponse;
   @override
   Future<Uint8List> get(Uri url, {required int maxBytes}) async {
     requests.add(url);
+    await beforeResponse?.call(url);
     if (gate != null) await gate!.future;
     final key = '${url.host}${url.path}';
     if (offline || failures.contains(key)) {

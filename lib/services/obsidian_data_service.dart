@@ -24,7 +24,7 @@ class ObsidianDataService extends ChangeNotifier {
   final bool migrateLegacy;
   ObsidianDataService(
       {DataSyncService? syncService,
-      this.appVersion = '2.0.0',
+      this.appVersion = '2.0.1',
       this.migrateLegacy = true,
       this.bootstrapRules})
       : sync = syncService,
@@ -45,7 +45,6 @@ class ObsidianDataService extends ChangeNotifier {
   final List<String> _logs = [];
   int revision = 0;
   String? initializationError;
-  List<String> legacyQuarantine = [];
   List<ProductItem> get products => List.unmodifiable(_products);
   List<ProductItem> get applications => List.unmodifiable(_applications);
   List<ProductItem> get formulas => List.unmodifiable(_formulas);
@@ -97,11 +96,6 @@ class ObsidianDataService extends ChangeNotifier {
                 trustedKeys: Map<String, String>.from(config['keys'] as Map)));
       }
       if (migrateLegacy) await migrateLegacyData(_store);
-      final migration = await _store.readText('migration/v1');
-      if (migration != null) {
-        legacyQuarantine =
-            List<String>.from(jsonDecode(migration)['quarantined'] as List);
-      }
       _customTagAliasRulesRaw = await _store
               .readText('user/custom_rules/tag_alias_rules.custom.txt') ??
           '';
@@ -706,19 +700,6 @@ ${_joinTagsToYamlList(tags)}
             ProductItem.fromMdContent(key, content, origin: DataOrigin.user);
       }
     }
-  }
-
-  Future<void> recoverLegacyFile(String path) async {
-    validateLogicalPath(path);
-    final content = await _store.readText('migration/quarantine/$path');
-    if (content == null) throw StateError('旧版文件不存在');
-    if (await _store.read('user/$path') != null) {
-      throw StateError('已有同名用户资料，请先导出或重命名');
-    }
-    await _store.writeText('user/$path', content);
-    await _loadUserItems();
-    _composeSnapshot();
-    notifyListeners();
   }
 
   Future<Uint8List?> exportMarkdownArchive() async {
