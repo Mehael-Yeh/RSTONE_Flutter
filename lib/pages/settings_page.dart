@@ -1,14 +1,16 @@
 /// 设置中心页面：主题、数据同步、备份恢复与入口导航。
 library;
 
-import 'dart:io';
+import 'dart:convert';
+import '../services/share_file.dart';
+import '../data_sync/services/diff_engine.dart';
+import '../data_sync/data_sync_service.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../utils/compat_color.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
@@ -48,7 +50,7 @@ class _SettingsPageState extends State<SettingsPage> {
       Uri.parse('https://github.com/Mehael-Yeh/RSTONE_Flutter/releases');
   String _appVersion = '...';
   String _appVersionName = '0.0.0';
-  String _databaseVersion = '未注入';
+
   late ThemeMode _selectedThemeMode;
   late Color _selectedThemeSeedColor;
   static const List<Color> _presetThemeColors = <Color>[
@@ -76,6 +78,141 @@ class _SettingsPageState extends State<SettingsPage> {
     _selectedThemeMode = widget.themeMode;
     _selectedThemeSeedColor = widget.themeSeedColor;
     _loadVersion();
+    widget.dataService.addListener(_onDataChanged);
+  }
+
+  void _onDataChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.dataService.removeListener(_onDataChanged);
+    super.dispose();
+  }
+
+  Future<void> _synchronize({bool repair = false}) async {
+    final sync = widget.dataService.sync;
+    if (sync == null) return;
+    final ok = await sync.synchronize(repair: repair);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ok ? '资料已同步' : sync.error ?? '同步失败，已保留原数据库')));
+  }
+
+  Widget _buildSyncCard() {
+    final sync = widget.dataService.sync;
+    if (sync == null) {
+      return _buildSectionCard(
+          title: '数据库同步',
+          child: Text(widget.dataService.initializationError ?? '正在初始化本地资料'));
+    }
+    final busy = sync.isSyncing;
+    final plan = sync.plan;
+    final labels = {
+      SyncStage.idle: '等待检查',
+      SyncStage.checking: '检查版本',
+      SyncStage.downloading: '下载资料',
+      SyncStage.validating: '校验资料',
+      SyncStage.committing: '切换版本',
+      SyncStage.success: '同步完成',
+      SyncStage.failed: '同步未完成',
+    };
+    return _buildSectionCard(
+        title: '数据库同步',
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (widget.dataService.initializationError != null)
+            Text(widget.dataService.initializationError!),
+          ListTile(
+              title: const Text('当前资料版本'),
+              subtitle: Text(sync.databaseVersion)),
+          ListTile(
+              title: const Text('远程资料版本'),
+              subtitle: Text(sync.remote?.dataVersion ?? '尚未检查')),
+          ListTile(
+              title: const Text('上次成功同步'),
+              subtitle: Text(
+                  sync.lastSuccess?.toLocal().toString().split('.').first ??
+                      '尚未同步')),
+          ListTile(
+              title: const Text('下载源'),
+              subtitle: Text(sync.sources.currentSource ?? '自动选择')),
+          DropdownButtonFormField<String>(
+            // ignore: deprecated_member_use
+            value: sync.sources.preferredSource ?? '',
+            decoration: const InputDecoration(labelText: '选择数据源'),
+            items: [
+              const DropdownMenuItem(value: '', child: Text('自动选择')),
+              ...sync.sources.sources.map((s) => DropdownMenuItem(
+                  value: s.baseUrl.toString(), child: Text(s.name)))
+            ],
+            onChanged: busy
+                ? null
+                : (value) => sync.selectSource(value == '' ? null : value),
+          ),
+          SwitchListTile(
+              title: const Text('自动更新资料'),
+              value: sync.autoUpdate,
+              onChanged: sync.setAutoUpdate),
+          if (busy) LinearProgressIndicator(value: sync.progress),
+          Text(labels[sync.stage]!),
+          if (plan != null)
+            Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                    '新增 ${plan.count(DataChange.add)} · 修改 ${plan.count(DataChange.modify)} · 删除 ${plan.count(DataChange.delete)} · 修复 ${plan.count(DataChange.repair)}\n实际下载 ${(sync.downloadedBytes / 1024).toStringAsFixed(1)} KB')),
+          if (sync.error != null)
+            Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(sync.error!)),
+          if (sync.sources.sources.isEmpty || sync.sources.trustedKeys.isEmpty)
+            const Text('官方数据源尚未配置，请在配置完成后的客户端版本中下载资料。'),
+          Wrap(spacing: 8, children: [
+            FilledButton.icon(
+                onPressed: busy ? null : () => _synchronize(),
+                icon: const Icon(Icons.sync),
+                label: const Text('检查并同步')),
+            OutlinedButton(
+                onPressed: busy ? null : () => _synchronize(repair: true),
+                child: const Text('数据校验与修复')),
+            TextButton(
+                onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (c) => AlertDialog(
+                            title: const Text('恢复历史资料'),
+                            content: Text(sync.rollbackGuidance),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.pop(c),
+                                  child: const Text('知道了'))
+                            ])),
+                child: const Text('恢复历史资料')),
+          ]),
+          if (sync.lastLog != null)
+            ExpansionTile(
+                title: const Text('最近一次同步'), children: [Text(sync.lastLog!)]),
+          if (widget.dataService.legacyQuarantine.isNotEmpty)
+            ExpansionTile(
+                title: const Text('旧版资料恢复'),
+                subtitle: const Text('来源未标注的旧文件已隔离保存，可逐项恢复为个人资料。'),
+                children: widget.dataService.legacyQuarantine
+                    .map((path) => ListTile(
+                        title: Text(path),
+                        trailing: TextButton(
+                            onPressed: () async {
+                              try {
+                                await widget.dataService
+                                    .recoverLegacyFile(path);
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('$e')));
+                                }
+                              }
+                            },
+                            child: const Text('恢复'))))
+                    .toList()),
+        ]));
   }
 
   String _formatBuildTimeLabel(String raw) {
@@ -114,29 +251,31 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _loadVersion() async {
-    final pkg = await PackageInfo.fromPlatform();
-    const databaseVersionFromDefine =
-        String.fromEnvironment('DB_VERSION', defaultValue: '');
+    PackageInfo? pkg;
+    if (!kIsWeb) {
+      try {
+        pkg = await PackageInfo.fromPlatform()
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {/* Display the shell's trusted app version offline. */}
+    }
+    final version = pkg?.version ?? widget.dataService.appVersion;
     const buildTimeFromDefine =
         String.fromEnvironment('APP_BUILD_TIME', defaultValue: '');
     final buildTime = buildTimeFromDefine.trim().isNotEmpty
         ? _formatBuildTimeLabel(buildTimeFromDefine)
-        : pkg.buildNumber.trim();
+        : pkg?.buildNumber.trim() ?? '';
     final normalizedBuildTime = buildTime
         .replaceAll('UTC+08', '')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
-    final versionLabel = _isLiteBuild ? '${pkg.version}-Lite' : pkg.version;
+    final versionLabel = _isLiteBuild ? '$version-Lite' : version;
     final displayVersion = normalizedBuildTime.isNotEmpty
         ? 'v$versionLabel ($normalizedBuildTime)'
         : 'v$versionLabel';
     if (mounted) {
       setState(() {
         _appVersion = displayVersion;
-        _appVersionName = pkg.version;
-        _databaseVersion = databaseVersionFromDefine.trim().isEmpty
-            ? '未注入'
-            : databaseVersionFromDefine.trim();
+        _appVersionName = version;
       });
     }
   }
@@ -386,6 +525,8 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 12),
+          _buildSyncCard(),
+          const SizedBox(height: 12),
           _buildSectionCard(
             title: '数据统计',
             child: Column(
@@ -394,7 +535,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   leading: const Icon(Icons.storage_outlined),
                   title: const Text('数据库版本'),
                   trailing: Text(
-                    _databaseVersion,
+                    widget.dataService.sync?.databaseVersion ?? '尚未下载',
                     style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
@@ -751,14 +892,8 @@ class _SettingsPageState extends State<SettingsPage> {
       return;
     }
 
-    final directory = await getTemporaryDirectory();
-    final file = File('${directory.path}/产品笔记.md');
-    await file.writeAsString(markdownContent);
-
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'text/markdown', name: '产品笔记.md')],
-      subject: '产品笔记',
-    );
+    await shareFileBytes(Uint8List.fromList(utf8.encode(markdownContent)),
+        name: '产品笔记.md', mimeType: 'text/markdown', subject: '产品笔记');
   }
 
   Future<void> _copyProductNotesMarkdownToClipboard() async {
@@ -787,11 +922,10 @@ class _SettingsPageState extends State<SettingsPage> {
       return;
     }
 
-    await Share.shareXFiles(
-      [XFile(archive.path)],
-      subject: 'RSTONE Markdown 数据包',
-      text: '产品列表/产品应用/产品配方 Markdown 导出包',
-    );
+    await shareFileBytes(archive,
+        name: 'RSTONE_Markdown.zip',
+        mimeType: 'application/zip',
+        subject: 'RSTONE Markdown 数据包');
   }
 
   Future<void> _confirmClearAllManualMarkdownData() async {

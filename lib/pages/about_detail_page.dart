@@ -2,7 +2,7 @@
 library;
 
 import 'dart:convert';
-import 'dart:io';
+import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -33,15 +33,20 @@ class AboutDetailPage extends StatelessWidget {
     }
   }
 
-  Future<void> _confirmAndOpenUrl(BuildContext context, String title, Uri uri) async {
+  Future<void> _confirmAndOpenUrl(
+      BuildContext context, String title, Uri uri) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('打开$title'),
         content: Text('即将跳转到外部浏览器：\n$uri\n\n是否继续？'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('继续')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('继续')),
         ],
       ),
     );
@@ -59,7 +64,8 @@ class AboutDetailPage extends StatelessWidget {
   int _compareVersions(String a, String b) {
     final aParts = _parseVersionParts(a);
     final bParts = _parseVersionParts(b);
-    final maxLength = aParts.length > bParts.length ? aParts.length : bParts.length;
+    final maxLength =
+        aParts.length > bParts.length ? aParts.length : bParts.length;
     for (int i = 0; i < maxLength; i++) {
       final av = i < aParts.length ? aParts[i] : 0;
       final bv = i < bParts.length ? bParts[i] : 0;
@@ -69,23 +75,16 @@ class AboutDetailPage extends StatelessWidget {
   }
 
   Future<Map<String, dynamic>?> _fetchLatestStableRelease() async {
-    final client = HttpClient();
     try {
-      final req = await client.getUrl(
-        Uri.parse('https://api.github.com/repos/Mehael-Yeh/RSTONE_Flutter/releases/latest'),
-      );
-      req.headers.set(HttpHeaders.acceptHeader, 'application/vnd.github+json');
-      req.headers.set(HttpHeaders.userAgentHeader, 'RSTONE-Flutter-App');
-      final resp = await req.close();
-      if (resp.statusCode != 200) return null;
-      final body = await utf8.decoder.bind(resp).join();
-      final data = jsonDecode(body);
-      if (data is Map<String, dynamic>) return data;
-      return null;
+      final response = await http
+          .get(Uri.parse(
+              'https://api.github.com/repos/Mehael-Yeh/RSTONE_Flutter/releases/latest'))
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body);
+      return data is Map<String, dynamic> ? data : null;
     } catch (_) {
       return null;
-    } finally {
-      client.close(force: true);
     }
   }
 
@@ -132,7 +131,9 @@ class AboutDetailPage extends StatelessWidget {
           title: const Text('检查更新'),
           content: Text('当前已是最新正式版。\n当前版本：v$appVersionName'),
           actions: [
-            FilledButton(onPressed: () => Navigator.pop(context), child: const Text('知道了')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('知道了')),
           ],
         ),
       );
@@ -154,7 +155,8 @@ class AboutDetailPage extends StatelessWidget {
           FilledButton(
             onPressed: () async {
               Navigator.pop(context);
-              final target = latestUrl.isNotEmpty ? Uri.parse(latestUrl) : releaseUrl;
+              final target =
+                  latestUrl.isNotEmpty ? Uri.parse(latestUrl) : releaseUrl;
               if (context.mounted) {
                 await _openExternalUrl(context, target);
               }
@@ -186,7 +188,8 @@ class AboutDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionCard(BuildContext context, {required String title, required Widget child}) {
+  Widget _buildSectionCard(BuildContext context,
+      {required String title, required Widget child}) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),

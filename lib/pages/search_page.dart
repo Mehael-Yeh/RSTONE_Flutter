@@ -69,9 +69,25 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
     }
   }
 
+  int _dataRevision = 0;
+  void _onDataChanged() {
+    if (!mounted) return;
+    if (_dataRevision == widget.dataService.revision) {
+      setState(() {});
+      return;
+    }
+    _dataRevision = widget.dataService.revision;
+    ProductDetailSheet.hideIfOpen(context);
+    setState(() {
+      _results = widget.dataService.search(_searchController.text);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    _dataRevision = widget.dataService.revision;
+    widget.dataService.addListener(_onDataChanged);
     WidgetsBinding.instance.addObserver(this);
     _searchController.addListener(_onSearchChanged);
     _searchFocusNode.addListener(_onSearchFocusChanged);
@@ -79,6 +95,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    widget.dataService.removeListener(_onDataChanged);
     WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     _searchFocusNode.removeListener(_onSearchFocusChanged);
@@ -169,6 +186,19 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
       ),
       body: Column(
         children: [
+          if (widget.dataService.sync?.current == null)
+            ListTile(
+              leading: const Icon(Icons.cloud_download_outlined),
+              title: const Text('首次使用请下载官方资料'),
+              subtitle: Text(widget.dataService.sync?.isSyncing == true
+                  ? '正在下载资料…'
+                  : widget.dataService.sync?.error ?? '下载后即可离线检索，个人资料会独立保存。'),
+              trailing: TextButton(
+                  onPressed: widget.dataService.sync?.isSyncing == true
+                      ? null
+                      : () => widget.dataService.sync?.synchronize(),
+                  child: const Text('下载')),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
             child: TextField(

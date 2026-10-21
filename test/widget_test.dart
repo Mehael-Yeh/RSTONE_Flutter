@@ -143,8 +143,7 @@ tags:
       );
     });
 
-    test('matches tags as whole words so 聚碳 does not hit 聚碳酸酯 (PC)',
-        () async {
+    test('matches tags as whole words so 聚碳 does not hit 聚碳酸酯 (PC)', () async {
       TestWidgetsFlutterBinding.ensureInitialized();
       final service = ObsidianDataService();
 

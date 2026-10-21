@@ -1,16 +1,14 @@
 /// TDS PDF 生成服务，负责解析 Markdown 并输出可分享文档。
 library;
 
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:share_plus/share_plus.dart';
+import 'share_file.dart';
 
 import '../models/product_item.dart';
 
@@ -52,7 +50,7 @@ class TdsPdfService {
     '但是关于产品特性、应用、质量、安全性、产品规格、适销性，以及针对特定用途的适用性，本技术数据表中所涉及的内容仅供参考，无论是明示或隐含的信息，我们不提供任何保证。在此提供的任何信息不应被视作实施专利技术的许可，也不应被视作未经专利所有人许可的前提下实施专利技术的诱导。',
   ];
 
-  static Future<File> generateAndShareTds(
+  static Future<XFile> generateAndShareTds(
     ProductItem product, {
     required String tdsMarkdown,
   }) async {
@@ -60,19 +58,14 @@ class TdsPdfService {
       product,
       tdsMarkdown: tdsMarkdown,
     );
-    final dir = await getTemporaryDirectory();
-    final safeName = product.fileName.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_').trim();
+    final safeName =
+        product.fileName.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_').trim();
     final fileName = '${safeName.isEmpty ? '产品' : safeName} TDS(CN).pdf';
-    final file = File('${dir.path}/$fileName');
-    await file.writeAsBytes(bytes, flush: true);
-
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/pdf', name: fileName)],
-      subject: '${product.fileName} TDS(CN).pdf',
-      text: '产品 TDS PDF 文件',
-    );
-
-    return file;
+    return shareFileBytes(bytes,
+        name: fileName,
+        mimeType: 'application/pdf',
+        subject: '${product.fileName} TDS(CN).pdf',
+        text: '产品 TDS PDF 文件');
   }
 
   static Future<Uint8List> generatePdfBytes(
@@ -99,11 +92,17 @@ class TdsPdfService {
       arialRegular: await PdfGoogleFonts.robotoRegular(),
       tdsHeaderArialBold: pw.Font.helveticaBold(),
       simheiRegular: await _loadFirstAvailableFont(
-        candidates: const ['assets/fonts/SimHei.ttf', 'assets/fonts/simhei.ttf'],
+        candidates: const [
+          'assets/fonts/SimHei.ttf',
+          'assets/fonts/simhei.ttf'
+        ],
         fallback: PdfGoogleFonts.notoSansSCRegular,
       ),
       simheiBold: await _loadFirstAvailableFont(
-        candidates: const ['assets/fonts/SimHei.ttf', 'assets/fonts/simhei.ttf'],
+        candidates: const [
+          'assets/fonts/SimHei.ttf',
+          'assets/fonts/simhei.ttf'
+        ],
         fallback: PdfGoogleFonts.notoSansSCBold,
       ),
     );
@@ -379,7 +378,8 @@ class TdsPdfService {
     );
   }
 
-  static bool _shouldCenterSingleLineParagraph(List<_TdsBlock> blocks, int index) {
+  static bool _shouldCenterSingleLineParagraph(
+      List<_TdsBlock> blocks, int index) {
     if (index <= 0 || index >= blocks.length) return false;
     final block = blocks[index];
     if (block.type != _TdsBlockType.paragraph || block.sourceLineCount != 1) {
@@ -421,9 +421,8 @@ class TdsPdfService {
         '';
 
     final segments = <_StyledTextSegment>[];
-    final boldMatches = enableMarkdownBold
-        ? pattern.allMatches(source)
-        : const <RegExpMatch>[];
+    final boldMatches =
+        enableMarkdownBold ? pattern.allMatches(source) : const <RegExpMatch>[];
     for (final match in boldMatches) {
       if (match.start > start) {
         segments.add(
@@ -565,19 +564,40 @@ class TdsPdfService {
             pw.RichText(
               text: pw.TextSpan(
                 children: [
-                  pw.TextSpan(text: '地址', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
-                  pw.TextSpan(text: ' ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
-                  pw.TextSpan(text: 'ADD: ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
-                  pw.TextSpan(text: '嘉兴市秀洲区油车港镇永越大厦11楼1102', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
+                  pw.TextSpan(
+                      text: '地址',
+                      style:
+                          pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
+                  pw.TextSpan(
+                      text: ' ',
+                      style:
+                          pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                  pw.TextSpan(
+                      text: 'ADD: ',
+                      style:
+                          pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                  pw.TextSpan(
+                      text: '嘉兴市秀洲区油车港镇永越大厦11楼1102',
+                      style:
+                          pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
                 ],
               ),
             ),
             pw.RichText(
               text: pw.TextSpan(
                 children: [
-                  pw.TextSpan(text: '电话/传真', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
-                  pw.TextSpan(text: ' ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
-                  pw.TextSpan(text: 'TEL/FAX: 15067388778 0573-82203606', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                  pw.TextSpan(
+                      text: '电话/传真',
+                      style:
+                          pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
+                  pw.TextSpan(
+                      text: ' ',
+                      style:
+                          pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                  pw.TextSpan(
+                      text: 'TEL/FAX: 15067388778 0573-82203606',
+                      style:
+                          pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                 ],
               ),
             ),
@@ -591,9 +611,18 @@ class TdsPdfService {
                 pw.RichText(
                   text: pw.TextSpan(
                     children: [
-                      pw.TextSpan(text: '网址', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
-                      pw.TextSpan(text: ' ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
-                      pw.TextSpan(text: 'WEBSITE: ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                      pw.TextSpan(
+                          text: '网址',
+                          style: pw.TextStyle(
+                              font: fonts.simheiRegular, fontSize: 9)),
+                      pw.TextSpan(
+                          text: ' ',
+                          style: pw.TextStyle(
+                              font: fonts.arialRegular, fontSize: 9)),
+                      pw.TextSpan(
+                          text: 'WEBSITE: ',
+                          style: pw.TextStyle(
+                              font: fonts.arialRegular, fontSize: 9)),
                     ],
                   ),
                 ),
@@ -614,9 +643,18 @@ class TdsPdfService {
             pw.RichText(
               text: pw.TextSpan(
                 children: [
-                  pw.TextSpan(text: '邮箱', style: pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
-                  pw.TextSpan(text: ' ', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
-                  pw.TextSpan(text: 'EMAIL: zhoulei22kb@rstone-resin.com', style: pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                  pw.TextSpan(
+                      text: '邮箱',
+                      style:
+                          pw.TextStyle(font: fonts.simheiRegular, fontSize: 9)),
+                  pw.TextSpan(
+                      text: ' ',
+                      style:
+                          pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
+                  pw.TextSpan(
+                      text: 'EMAIL: zhoulei22kb@rstone-resin.com',
+                      style:
+                          pw.TextStyle(font: fonts.arialRegular, fontSize: 9)),
                 ],
               ),
             ),
@@ -653,7 +691,8 @@ class TdsPdfService {
     void flushTableIfNeeded() {
       if (collectingTableRows != null && collectingTableRows!.isNotEmpty) {
         current ??= _TdsSection(title: '');
-        current!.blocks.add(_TdsBlock.table(List<List<String>>.from(collectingTableRows!)));
+        current!.blocks.add(
+            _TdsBlock.table(List<List<String>>.from(collectingTableRows!)));
       }
       collectingTableRows = null;
     }
@@ -682,7 +721,8 @@ class TdsPdfService {
         flushTableIfNeeded();
         flushParagraphIfNeeded();
         current ??= _TdsSection(title: '');
-        current!.blocks.add(_TdsBlock.note(line.replaceFirst(RegExp(r'^>\s*'), '').trim()));
+        current!.blocks.add(
+            _TdsBlock.note(line.replaceFirst(RegExp(r'^>\s*'), '').trim()));
         continue;
       }
 
@@ -739,7 +779,8 @@ class TdsPdfService {
       if (skippingMarkdownDisclaimer) continue;
 
       flushTableIfNeeded();
-      final isOrderedLine = RegExp(r'^((\d+[\.\)、])|([（(]\d+[）)]))\s+').hasMatch(line);
+      final isOrderedLine =
+          RegExp(r'^((\d+[\.\)、])|([（(]\d+[）)]))\s+').hasMatch(line);
       if (isOrderedLine) {
         flushParagraphIfNeeded();
         current ??= _TdsSection(title: '');

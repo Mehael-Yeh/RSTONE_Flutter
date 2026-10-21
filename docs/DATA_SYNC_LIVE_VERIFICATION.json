@@ -1,0 +1,106 @@
+{
+  "verifiedAtUtc": "2026-10-21T05:56:26.340524+00:00",
+  "appVersion": "1.0.0",
+  "publisherCodeCommit": "c33fa9955f95c2e2aa5242d126f691238a74658c",
+  "publisherTrustedKeysBlob": "74ed404bb89c54c75d2a90d6b2b72fc6cbcd4140",
+  "publisherProtocolBlob": "0f06778a3b17dfada1626525b7f2cbe5f49ceea6",
+  "publicKeySha256": "3d164860cc877be08b4d7ca1d27a5bafae779fd58fe953db67c6841605c46aac",
+  "nativeHttps": [
+    {
+      "source": {
+        "name": "GitHub Pages",
+        "url": "https://mehael-yeh.github.io/RSTONE_Data/"
+      },
+      "appVersion": "1.0.0",
+      "sequence": 1,
+      "dataVersion": "2026.10.21.001",
+      "manifestSha256": "e6e32540db6ecbda3cb869343b22bb4a400d28a73331ed858e59506228ef882f",
+      "keyId": "production-2026",
+      "sourceCommits": {
+        "Mehael-Yeh/Rstone": "3bd65259e01b40167f13d45b96173c6d9255ec2b",
+        "Mehael-Yeh/RstoneTDS": "afac9f9c1349a1f47d5763598fd0110f6430d496"
+      },
+      "files": 187,
+      "products": 99,
+      "applications": 21,
+      "formulas": 16,
+      "tds": 51,
+      "firstObjectRequests": 187,
+      "firstObjectBytes": 84388,
+      "repeatObjectRequests": 0,
+      "repeatObjectBytes": 0,
+      "offlineReopen": true,
+      "personalPreserved": true
+    },
+    {
+      "source": {
+        "name": "GitHub raw 备用",
+        "url": "https://raw.githubusercontent.com/Mehael-Yeh/RSTONE_Data/distribution/public/"
+      },
+      "appVersion": "1.0.0",
+      "sequence": 1,
+      "dataVersion": "2026.10.21.001",
+      "manifestSha256": "e6e32540db6ecbda3cb869343b22bb4a400d28a73331ed858e59506228ef882f",
+      "keyId": "production-2026",
+      "sourceCommits": {
+        "Mehael-Yeh/Rstone": "3bd65259e01b40167f13d45b96173c6d9255ec2b",
+        "Mehael-Yeh/RstoneTDS": "afac9f9c1349a1f47d5763598fd0110f6430d496"
+      },
+      "files": 187,
+      "products": 99,
+      "applications": 21,
+      "formulas": 16,
+      "tds": 51,
+      "firstObjectRequests": 187,
+      "firstObjectBytes": 84388,
+      "repeatObjectRequests": 0,
+      "repeatObjectBytes": 0,
+      "offlineReopen": true,
+      "personalPreserved": true
+    }
+  ],
+  "webBrowser": {
+    "installed": {
+      "sequence": 1,
+      "dataVersion": "2026.10.21.001",
+      "files": 187,
+      "lastLog": "新增 187，修改 0，删除 0，修复 0；实际下载 84388 字节",
+      "lastSuccess": "2026-10-21T05:55:54.723Z"
+    },
+    "firstObjectRequests": 187,
+    "repeatObjectRequests": 0,
+    "cors": [
+      {
+        "source": "GitHub Pages",
+        "files": 187,
+        "objectBytes": 84388,
+        "signatureVerified": true
+      },
+      {
+        "source": "GitHub raw 备用",
+        "files": 187,
+        "objectBytes": 84388,
+        "signatureVerified": true
+      }
+    ],
+    "shellCacheFiles": 34,
+    "offlineColdReload": true,
+    "personalVisible": "RS-LIVE-WEB",
+    "versionHttpRequests": 0,
+    "pageErrors": []
+  },
+  "apkChecks": {
+    "full": {
+      "productionConfig": true,
+      "officialMarkdown": 0,
+      "fonts": 3
+    },
+    "lite": {
+      "productionConfig": true,
+      "officialMarkdown": 0,
+      "fonts": 0
+    }
+  },
+  "androidDeviceIntegration": "NOT_VERIFIED: no connected device; earlier isolated emulator had ADB unauthorized",
+  "publishedShell": false
+}

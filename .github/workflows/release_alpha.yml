@@ -2,197 +2,27 @@ name: Release Alpha APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'android/**'
+      - 'pubspec.*'
+      - 'assets/fonts/**'
+      - 'assets/data_sync_config.json'
+      - 'assets/tag_alias_rules.default.txt'
+      - 'scripts/next_app_version.py'
+      - 'scripts/validate_data_sync_config.py'
+      - 'scripts/verify_release_apks.py'
+      - '.github/workflows/release_alpha.yml'
+      - '.github/workflows/release_apk.yml'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   release:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.24.0"
-          channel: "stable"
-
-      - name: Build metadata
-        id: build_meta
-        run: |
-          python3 scripts/generate_build_date.py >> "$GITHUB_OUTPUT"
-
-      - name: Get latest alpha version
-        id: version
-        run: |
-          LATEST=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-alpha$' | head -1)
-          if [ -z "$LATEST" ]; then
-            CURRENT=$(grep '^version:' pubspec.yaml | awk '{print $2}')
-            BASE=${CURRENT%%+*}
-            new_ver="$BASE"
-          else
-            BASE=${LATEST#v}
-            BASE=${BASE%-alpha}
-            major=$(echo "$BASE" | cut -d. -f1)
-            minor=$(echo "$BASE" | cut -d. -f2)
-            patch=$(echo "$BASE" | cut -d. -f3)
-            patch=$((patch + 1))
-            new_ver="${major}.${minor}.${patch}"
-          fi
-
-          build_number=${{ steps.build_meta.outputs.build_code }}
-
-          echo "version=${new_ver}+${build_number}" >> $GITHUB_OUTPUT
-          echo "tag=v${new_ver}-alpha" >> $GITHUB_OUTPUT
-          echo "display=v${new_ver} (${{ steps.build_meta.outputs.build_time }})" >> $GITHUB_OUTPUT
-
-      - name: Update version in pubspec.yaml
-        run: |
-          sed -i 's/^version:.*/version: ${{ steps.version.outputs.version }}/' pubspec.yaml
-          grep '^version:' pubspec.yaml
-
-      - name: Commit & Tag
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-          git add pubspec.yaml
-          git commit -m "chore: version ${{ steps.version.outputs.tag }}"
-          git tag ${{ steps.version.outputs.tag }}
-          git push origin main --tags
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Restore signing config
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/rst_flutter.jks
-          cat > android/key.properties << 'KEYEOF'
-          storePassword=${{ secrets.KEYSTORE_STORE_PASSWORD }}
-          keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEYSTORE_KEY_ALIAS }}
-          storeFile=rst_flutter.jks
-          KEYEOF
-          cat android/key.properties
-
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
-      - name: Checkout private repo Rstone
-        uses: actions/checkout@v4
-        with:
-          repository: Mehael-Yeh/Rstone
-          token: ${{ secrets.PRIVATE_REPO_READ_TOKEN }}
-          path: external/rstone_data
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Checkout private repo RstoneTDS
-        uses: actions/checkout@v4
-        with:
-          repository: Mehael-Yeh/RstoneTDS
-          token: ${{ secrets.PRIVATE_REPO_READ_TOKEN }}
-          path: external/rstone_tds_data
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Fetch latest data from Rstone and RstoneTDS
-        run: |
-          test -n "${{ secrets.PRIVATE_REPO_READ_TOKEN }}"
-
-          rm -rf assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
-          mkdir -p assets/产品列表 assets/产品应用 assets/产品配方 assets/产品TDS
-          cp external/rstone_data/产品列表/*.md assets/产品列表/
-          cp external/rstone_data/产品应用/*.md assets/产品应用/
-          cp external/rstone_data/产品配方/*.md assets/产品配方/
-          cp external/rstone_tds_data/*.TDS.md assets/产品TDS/
-
-          python3 -c "
-          import os, json
-
-          for folder, jsonfile, suffix in [
-              ('产品列表', 'assets/产品列表.json', '.md'),
-              ('产品应用', 'assets/产品应用.json', '.md'),
-              ('产品配方', 'assets/产品配方.json', '.md'),
-              ('产品TDS', 'assets/产品TDS.json', '.TDS.md'),
-          ]:
-              files = sorted([f for f in os.listdir(f'assets/{folder}') if f.endswith(suffix)])
-              with open(jsonfile, 'w', encoding='utf-8') as f:
-                  json.dump(files, f, ensure_ascii=False, indent=2)
-              print(f'{folder}: {len(files)} files')
-          "
-
-          echo "Done. Assets updated from Rstone and RstoneTDS."
-
-      - name: Extract database version
-        id: db_version
-        run: |
-          DB_VERSION_FILE="external/rstone_data/版本信息.md"
-          if [ -f "$DB_VERSION_FILE" ]; then
-            DB_VERSION=$(python3 scripts/extract_db_version.py "$DB_VERSION_FILE" || true)
-          fi
-          if [ -z "$DB_VERSION" ]; then
-            DB_VERSION="未知"
-          fi
-          echo "db_version=$DB_VERSION" >> "$GITHUB_OUTPUT"
-          echo "Database version: $DB_VERSION"
-
-      - name: Build Release APK (Android)
-        run: |
-          flutter build apk --release --split-per-abi --flavor full --dart-define=APP_BUILD_TIME=${{ steps.build_meta.outputs.build_time }} --dart-define=DB_VERSION=${{ steps.db_version.outputs.db_version }} --dart-define=RSTONE_LITE=false
-          cd build/app/outputs/flutter-apk
-          for apk in app-*-release.apk; do
-            case "$apk" in
-              *armeabi-v7a*)  ABI=armeabi-v7a ;;
-              *arm64-v8a*)    ABI=arm64-v8a ;;
-              *x86_64*)       ABI=x86_64 ;;
-              *) continue ;;
-            esac
-            mv "$apk" "RSTONE-${{ steps.version.outputs.tag }}-${ABI}-release.apk"
-          done
-
-          cd -
-          flutter build apk --release --split-per-abi --flavor lite --dart-define=APP_BUILD_TIME=${{ steps.build_meta.outputs.build_time }} --dart-define=DB_VERSION=${{ steps.db_version.outputs.db_version }} --dart-define=RSTONE_LITE=true
-          cd build/app/outputs/flutter-apk
-          for apk in app-*-release.apk; do
-            case "$apk" in
-              *armeabi-v7a*)  ABI=armeabi-v7a ;;
-              *arm64-v8a*)    ABI=arm64-v8a ;;
-              *x86_64*)       ABI=x86_64 ;;
-              *) continue ;;
-            esac
-            mv "$apk" "RSTONE-${{ steps.version.outputs.tag }}-Lite-${ABI}-release.apk"
-          done
-          ls -la
-
-      - name: Upload APK to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Alpha ${{ steps.version.outputs.display }}
-          body: |
-            ## Alpha Pre-release
-            自动构建版本: `${{ steps.version.outputs.display }}`
-            - 标签: `${{ steps.version.outputs.tag }}`
-            - 提交: `${{ github.sha }}`
-            - 构建日期: `${{ steps.build_meta.outputs.build_time }}`
-            - 数据库版本: `${{ steps.db_version.outputs.db_version }}`
-          files: |
-            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-arm64-v8a-release.apk
-            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-armeabi-v7a-release.apk
-            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-x86_64-release.apk
-            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-Lite-arm64-v8a-release.apk
-            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-Lite-armeabi-v7a-release.apk
-            build/app/outputs/flutter-apk/RSTONE-${{ steps.version.outputs.tag }}-Lite-x86_64-release.apk
-          prerelease: true
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    uses: ./.github/workflows/release_apk.yml
+    with:
+      channel: alpha
+    secrets: inherit

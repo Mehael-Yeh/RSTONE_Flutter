@@ -15,6 +15,7 @@ class ObsidianTable extends StatefulWidget {
   final List<ProductItem> items;
   final List<ProductItem> formulas;
   final Map<String, String> tdsByProduct;
+  final String? Function(String)? tdsForProduct;
   final List<String> defaultColumns;
   final List<String> availableColumns;
   final bool isMobile;
@@ -33,6 +34,7 @@ class ObsidianTable extends StatefulWidget {
     required this.items,
     required this.formulas,
     required this.tdsByProduct,
+    this.tdsForProduct,
     required this.defaultColumns,
     required this.availableColumns,
     required this.isMobile,
@@ -216,6 +218,9 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
   String? _tdsOf(ProductItem item) {
     if (item.folder != '产品列表') return null;
+    if (widget.tdsForProduct != null) {
+      return widget.tdsForProduct!(item.fileName);
+    }
     final direct = widget.tdsByProduct[item.fileName];
     if (direct != null) return direct;
 

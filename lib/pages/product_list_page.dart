@@ -58,15 +58,26 @@ class _ProductListPageState extends State<ProductListPage> {
   static const double _pullButtonHeight = 58;
   static const double _pullTriggerHeight = 56;
 
+  int _dataRevision = 0;
+  void _onDataChanged() {
+    if (!mounted || _dataRevision == widget.dataService.revision) return;
+    _dataRevision = widget.dataService.revision;
+    ProductDetailSheet.hideIfOpen(context);
+    setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
+    _dataRevision = widget.dataService.revision;
+    widget.dataService.addListener(_onDataChanged);
     // 不在这里调用MediaQuery，延迟到build中
     FocusManager.instance.addListener(_handleFocusLost);
   }
 
   @override
   void dispose() {
+    widget.dataService.removeListener(_onDataChanged);
     FocusManager.instance.removeListener(_handleFocusLost);
     super.dispose();
   }
@@ -538,6 +549,7 @@ class _ProductListPageState extends State<ProductListPage> {
                         items: items,
                         formulas: widget.dataService.formulas,
                         tdsByProduct: widget.dataService.tdsByProduct,
+                        tdsForProduct: widget.dataService.tdsForProduct,
                         defaultColumns: _columns,
                         availableColumns: isMobile
                             ? _mobileDefaultColumns

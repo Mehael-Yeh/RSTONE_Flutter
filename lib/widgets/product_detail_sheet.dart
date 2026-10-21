@@ -1,16 +1,14 @@
 /// 产品详情底部弹层，整合 Markdown、配方表与 TDS 预览。
 library;
 
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../utils/compat_color.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
-import 'package:share_plus/share_plus.dart';
+import '../services/share_file.dart';
 import '../models/product_item.dart';
 import '../services/tds_pdf_service.dart';
 import 'product_detail/formula_content_parser.dart';
@@ -67,6 +65,7 @@ class ProductDetailSheet extends StatefulWidget {
 
   static void hideIfOpen(BuildContext context) {
     if (!_isShowing) return;
+    _isShowing = false;
     Navigator.of(context, rootNavigator: true).maybePop();
   }
 
@@ -663,19 +662,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       if (byteData == null) return;
 
       final pngBytes = byteData.buffer.asUint8List();
-      final tempDir = await getTemporaryDirectory();
       final safeTitle = title
           .replaceAll('配方：', '')
           .replaceAll(RegExp(r'[\\/:*?"<>|\\s]+'), '_');
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = '${safeTitle}_$timestamp.png';
-      final file = File('${tempDir.path}/$fileName');
-      await file.writeAsBytes(pngBytes, flush: true);
-
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'image/png', name: fileName)],
-        subject: '$title - 锐石 RSTONE',
-      );
+      await shareFileBytes(pngBytes,
+          name: fileName, mimeType: 'image/png', subject: '$title - 锐石 RSTONE');
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1339,7 +1332,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          widget.product.folder,
+                          '${widget.product.folder} · ${widget.product.origin == DataOrigin.user ? '个人' : '官方'}',
                           style: TextStyle(
                             color: folderAccent,
                             fontSize: 12,
@@ -1403,6 +1396,12 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                   ),
                 ),
                 Divider(color: cs.outlineVariant, height: 1),
+                if (widget.product.unresolvedProductReferences.isNotEmpty)
+                  Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                          '以下引用的资料当前不可用：${widget.product.unresolvedProductReferences.join('、')}。方案内容已保留。',
+                          style: TextStyle(color: cs.error))),
                 // 标签
                 if (widget.product.tags.isNotEmpty)
                   Padding(

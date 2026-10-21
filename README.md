@@ -25,6 +25,12 @@ RSTONE 是一个基于 Flutter 的跨平台检索工具，用于集中管理和�
 - 统一展示产品信息、应用场景等产品资料
 - 支持标签同义词提升搜索增强（如 `PA6 -> 尼龙`）
 - 支持业务笔记记录与导出
+- 固定应用外壳：官方资料按签名清单同步，只下载缺失对象，支持删除、离线检索与失败恢复
+- 个人 Markdown、笔记和偏好独立保存，官方同步不会覆盖个人资料
+
+本次重构的分阶段改动、测试、生产配置和证据边界见 [数据同步交付记录](docs/DATA_SYNC_REFACTOR.md)。
+`assets/data_sync_config.json` 已固定正式 Pages/备用 raw 源及 production-2026 公钥。
+首次支持此协议的外壳版本为 1.0.0；真实首版资料 187 份，重复同步不下载已有对象。示例公钥仅用于测试。
 
 ---
 
@@ -95,11 +101,21 @@ flutter run
 flutter run -d chrome
 ```
 
+Web 离线外壳构建（应用版本请与 pubspec.yaml 保持一致）：
+
+```bash
+flutter build web --release --no-web-resources-cdn --dart-define=APP_VERSION=1.0.0
+python scripts/prepare_web_offline.py
+```
+
+完成首次在线缓存后可断网刷新。外壳缓存仅包含程序资源，官方资料仍由签名清单和 IndexedDB 管理。
+
 ### 构建 APK
 
 ```bash
-flutter build apk --debug
-flutter build apk --release --split-per-abi
+flutter build apk --debug --flavor full --dart-define=RSTONE_LITE=false
+flutter build apk --release --split-per-abi --flavor full --dart-define=RSTONE_LITE=false
+flutter build apk --release --split-per-abi --flavor lite --dart-define=RSTONE_LITE=true
 ```
 
 ---

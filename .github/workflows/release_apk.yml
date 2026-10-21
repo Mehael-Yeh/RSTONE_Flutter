@@ -1,0 +1,176 @@
+name: Build and publish signed APKs
+
+on:
+  workflow_call:
+    inputs:
+      channel:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rstone-apk-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate production configuration and release scripts
+        run: |
+          python3 scripts/validate_data_sync_config.py
+          python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build metadata
+        id: build_meta
+        run: python3 scripts/generate_build_date.py >> "$GITHUB_OUTPUT"
+
+      - name: Select release version
+        id: version
+        env:
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+          BUILD_CODE: ${{ steps.build_meta.outputs.build_code }}
+        run: |
+          new_ver=$(python3 scripts/next_app_version.py "$RELEASE_CHANNEL")
+          suffix=''
+          if [ "$RELEASE_CHANNEL" = alpha ]; then suffix='-alpha'; fi
+          echo "version=${new_ver}+${BUILD_CODE}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${new_ver}${suffix}" >> "$GITHUB_OUTPUT"
+          # Build metadata stays local; the tag points to the reviewed source commit.
+          sed -i "s/^version:.*/version: ${new_ver}+${BUILD_CODE}/" pubspec.yaml
+
+      - name: Validate application
+        run: |
+          flutter pub get
+          flutter analyze --no-pub
+          flutter test --no-pub --reporter expanded
+          flutter test --no-pub --dart-define=RSTONE_LITE=true --reporter expanded
+          flutter test --no-pub --dart-define=RUN_PRODUCTION_INTEROP=true test/production_interop_test.dart --reporter expanded
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Restore signing configuration
+        env:
+          SIGNING_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
+        run: |
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          names = ['SIGNING_KEYSTORE', 'SIGNING_STORE_PASSWORD', 'SIGNING_KEY_PASSWORD', 'SIGNING_KEY_ALIAS']
+          if any(not os.environ.get(name) for name in names):
+              raise SystemExit('All four Android signing secrets must be configured')
+          Path('android/app/rst_flutter.jks').write_bytes(base64.b64decode(''.join(os.environ['SIGNING_KEYSTORE'].split()), validate=True))
+          def escape(value):
+              return value.replace('\\', '\\\\').replace('\r', '\\r').replace('\n', '\\n').replace('=', '\\=').replace(':', '\\:').replace(' ', '\\ ')
+          fields = {'storePassword': os.environ['SIGNING_STORE_PASSWORD'], 'keyPassword': os.environ['SIGNING_KEY_PASSWORD'], 'keyAlias': os.environ['SIGNING_KEY_ALIAS'], 'storeFile': 'rst_flutter.jks'}
+          Path('android/key.properties').write_text(''.join(f'{key}={escape(value)}\n' for key, value in fields.items()), encoding='utf-8')
+          PY
+
+      - name: Build Full and Lite release APKs
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          BUILD_TIME: ${{ steps.build_meta.outputs.build_time }}
+        run: |
+          for edition in full lite; do
+            lite=false
+            suffix=''
+            if [ "$edition" = lite ]; then lite=true; suffix='-Lite'; fi
+            flutter build apk --release --no-pub --split-per-abi --flavor "$edition" \
+              --dart-define=APP_VERSION="$RELEASE_VERSION" \
+              --dart-define=APP_BUILD_TIME="$BUILD_TIME" --dart-define=RSTONE_LITE="$lite"
+            for abi in arm64-v8a armeabi-v7a x86_64; do
+              mv "build/app/outputs/flutter-apk/app-${abi}-${edition}-release.apk" \
+                "build/app/outputs/flutter-apk/RSTONE-${RELEASE_TAG}${suffix}-${abi}-release.apk"
+            done
+          done
+
+      - name: Audit signatures, versions, data configuration and edition assets
+        id: audit
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          build_tools=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1 | xargs dirname)
+          python3 scripts/verify_release_apks.py --tag "$RELEASE_TAG" \
+            --version "$RELEASE_VERSION" --build-tools "$build_tools"
+
+      - name: Preserve validated packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: RSTONE-${{ steps.version.outputs.tag }}
+          path: |
+            build/app/outputs/flutter-apk/RSTONE-*.apk
+            build/app/outputs/flutter-apk/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Prepare complete draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: RSTONE ${{ steps.version.outputs.tag }}
+          draft: true
+          prerelease: ${{ inputs.channel == 'alpha' }}
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          body: |
+            固定应用外壳与签名资料增量同步。
+            - 产品资料在线同步，更新资料无需重新安装 APK；首次启动请联网下载。
+            - 已下载的官方资料与个人资料支持离线使用。
+            - Full/Lite 各提供 arm64-v8a、armeabi-v7a、x86_64；SHA256SUMS.txt 可核对下载文件。
+            - 构建版本：`${{ steps.version.outputs.version }}`
+            - 源提交：`${{ github.sha }}`
+            - 构建时间（UTC+08）：`${{ steps.build_meta.outputs.build_time }}`
+          files: |
+            build/app/outputs/flutter-apk/RSTONE-*.apk
+            build/app/outputs/flutter-apk/SHA256SUMS.txt
+
+      - name: Publish complete release
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+        run: |
+          gh release view "$RELEASE_TAG" --json assets > build/release-assets.json
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          tag = os.environ['RELEASE_TAG']
+          expected = {f'RSTONE-{tag}{suffix}-{abi}-release.apk' for suffix in ['', '-Lite'] for abi in ['arm64-v8a', 'armeabi-v7a', 'x86_64']} | {'SHA256SUMS.txt'}
+          actual = {asset['name'] for asset in json.loads(Path('build/release-assets.json').read_text())['assets']}
+          if actual != expected:
+              raise SystemExit('Release assets are incomplete or unexpected')
+          PY
+          if [ "$RELEASE_CHANNEL" = production ]; then
+            gh release edit "$RELEASE_TAG" --draft=false --latest
+          else
+            gh release edit "$RELEASE_TAG" --draft=false
+          fi
+          gh release view "$RELEASE_TAG" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f android/key.properties android/app/rst_flutter.jks

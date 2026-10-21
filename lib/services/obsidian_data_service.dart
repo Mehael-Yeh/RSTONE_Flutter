@@ -1,454 +1,236 @@
-/// Obsidian 数据聚合服务，负责索引、搜索与缓存管理。
+/// Official signed generations and an independent user overlay feed the existing UI.
 library;
 
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:archive/archive.dart';
-import 'package:path_provider/path_provider.dart';
+import '../data_sync/data_sync_service.dart';
+import '../data_sync/protocol/rstone_protocol.dart';
+import '../data_sync/protocol/src/casefold.dart';
+import '../data_sync/services/index_manager.dart';
+import '../data_sync/services/source_manager.dart';
+import '../data_sync/storage/storage_adapter.dart';
+import '../data_sync/storage/storage_factory.dart';
+import '../data_sync/storage/legacy_migration.dart';
 import '../models/product_item.dart';
 import '../utils/natural_sort.dart';
 
-/// Obsidian 数据服务
-///
-/// 负责从 Flutter Asset 加载产品列表、产品应用、产品配方三类数据。
-/// 数据来源为内置的 assets 目录下的 JSON 索引文件和 Markdown 文件。
-/// 同时提供搜索功能和日志记录。
-class ObsidianDataService {
-  /// 产品列表 Asset 索引文件路径
-  static const String _productsAssetIndex = 'assets/产品列表.json';
+class ObsidianDataService extends ChangeNotifier {
+  DataSyncService? sync;
+  StorageAdapter? _storage;
+  final String appVersion;
+  final String? bootstrapRules;
+  final bool migrateLegacy;
+  ObsidianDataService(
+      {DataSyncService? syncService,
+      this.appVersion = '1.0.0',
+      this.migrateLegacy = true,
+      this.bootstrapRules})
+      : sync = syncService,
+        _storage = syncService?.storage;
 
-  /// 产品应用 Asset 索引文件路径
-  static const String _applicationsAssetIndex = 'assets/产品应用.json';
-
-  /// 产品列表 Asset 目录路径
-  static const String _productsAssetPath = 'assets/产品列表';
-
-  /// 产品应用 Asset 目录路径
-  static const String _applicationsAssetPath = 'assets/产品应用';
-
-  /// TDS Asset 索引文件路径
-  static const String _tdsAssetIndex = 'assets/产品TDS.json';
-
-  /// TDS Asset 目录路径（文件名格式：产品名称.TDS.md）
-  static const String _tdsAssetPath = 'assets/产品TDS';
-
-  /// 标签同义词规则（代码内置，不依赖可替换 Asset 文件）
-  static const String _builtInTagAliasRulesDefault = '''
-# 标签同义词规则：格式 `左侧标签 -> 右侧扩展词`
-# 支持 `->` 或 `→`，左侧可用 `、` / `,` / `，` 分隔多个标签
-
-PVD -> 真空镀
-PVD -> 镀膜
-PVD -> 物理气相沉积
-PU -> 羟丙
-PU -> 羟基丙烯酸
-双固化 -> PU
-双固化 -> UV
-PUD -> 自干
-PUD -> 聚氨酯分散体
-PC -> 聚碳酸酯
-ABS -> 丙烯腈-丁二烯-苯乙烯共聚物
-PA、PA6、PA66、TR90 -> 尼龙
-PMMA -> 亚克力
-TPEE -> 热塑性弹性体
-PET -> 聚对苯二甲酸乙二醇酯
-PS -> 聚苯乙烯
-PE -> 聚乙烯
-PP -> 聚丙烯
-PPS -> 聚苯硫醚
-PEEK -> 聚醚醚酮
-EPDM -> 三元乙丙橡胶
-''';
-
-  /// 标签同义词规则文档（用户新增，仅存储在应用私有目录）
-  static const String _tagAliasCustomRulesFileName =
-      'tag_alias_rules.custom.txt';
-  static const String _manualItemsMetaFileName = 'manual_items.json';
-
-  /// 产品列表数据
-  final List<ProductItem> _products = [];
-
-  /// 产品应用数据
-  final List<ProductItem> _applications = [];
-
-  /// 产品配方数据
-  final List<ProductItem> _formulas = [];
-
-  /// 内置标签同义词规则（来自 assets，不允许外部修改）
-  String _builtInTagAliasRulesRaw = '';
-
-  /// 用户自定义新增规则（来自应用私有目录）
-  String _customTagAliasRulesRaw = '';
-
-  /// 合并后的规则文本（用于展示）
-  String _combinedTagAliasRulesRaw = '';
-
-  /// TDS 文档缓存（key: 产品名称，value: 对应 .TDS.md 文本）
-  final Map<String, String> _tdsByProduct = {};
-
-  /// 归一化索引（key: 归一化产品名，value: 对应 .TDS.md 文本）
-  final Map<String, String> _tdsByNormalizedProduct = {};
-
-  /// 标签同义词映射（key -> 可匹配词）
+  List<ProductItem> _products = [], _applications = [], _formulas = [];
+  final Map<String, ProductItem> _userItems = {};
+  DataSnapshot _official = const DataSnapshot();
+  final Map<String, String> _tdsByProduct = {}, _tdsByNormalizedProduct = {};
+  final Map<String, List<String>> _missingReferences = {};
+  String _defaultRules = '',
+      _builtInTagAliasRulesRaw = '',
+      _customTagAliasRulesRaw = '',
+      _combinedTagAliasRulesRaw = '';
   Map<String, Set<String>> _tagAliasRules = {};
-
-  /// 是否已完成初始化
   bool _initialized = false;
-  final Set<String> _manualProductNames = <String>{};
-  final Set<String> _manualApplicationNames = <String>{};
-  final Set<String> _manualFormulaNames = <String>{};
-
-  /// 日志记录（最近 100 条）
+  Future<void>? _initializing;
   final List<String> _logs = [];
-
-  List<ProductItem> get products => _products;
-  List<ProductItem> get applications => _applications;
-  List<ProductItem> get formulas => _formulas;
+  int revision = 0;
+  String? initializationError;
+  List<String> legacyQuarantine = [];
+  List<ProductItem> get products => List.unmodifiable(_products);
+  List<ProductItem> get applications => List.unmodifiable(_applications);
+  List<ProductItem> get formulas => List.unmodifiable(_formulas);
   String get builtInTagAliasRulesRaw => _builtInTagAliasRulesRaw;
   String get customTagAliasRulesRaw => _customTagAliasRulesRaw;
   String get tagAliasRulesRaw => _combinedTagAliasRulesRaw;
-  Map<String, Set<String>> get tagAliasRules => _tagAliasRules;
+  Map<String, Set<String>> get tagAliasRules =>
+      Map.unmodifiable(_tagAliasRules);
   Map<String, String> get tdsByProduct => Map.unmodifiable(_tdsByProduct);
   bool get isInitialized => _initialized;
   List<String> get logs => List.unmodifiable(_logs);
+  List<String> unresolvedReferencesFor(ProductItem item) =>
+      _missingReferences[item.filePath] ?? const [];
+  StorageAdapter get _store => _storage ?? (throw StateError('本地存储不可用'));
 
   @visibleForTesting
-  void setItemsForTesting({
-    List<ProductItem> products = const <ProductItem>[],
-    List<ProductItem> applications = const <ProductItem>[],
-    List<ProductItem> formulas = const <ProductItem>[],
-  }) {
-    _products
-      ..clear()
-      ..addAll(products);
-    _applications
-      ..clear()
-      ..addAll(applications);
-    _formulas
-      ..clear()
-      ..addAll(formulas);
+  void setItemsForTesting(
+      {List<ProductItem> products = const [],
+      List<ProductItem> applications = const [],
+      List<ProductItem> formulas = const []}) {
+    _products = [...products];
+    _applications = [...applications];
+    _formulas = [...formulas];
+  }
+
+  Future<void> initialize() {
+    if (_initialized) return Future.value();
+    return _initializing ??= _initialize();
+  }
+
+  Future<void> _initialize() async {
+    try {
+      _defaultRules = bootstrapRules ??
+          await rootBundle.loadString('assets/tag_alias_rules.default.txt');
+      _rebuildRules();
+      if (sync == null) {
+        final config = jsonDecode(
+                await rootBundle.loadString('assets/data_sync_config.json'))
+            as Map<String, dynamic>;
+        _storage = await openStorage();
+        sync = DataSyncService(
+            storage: _store,
+            appVersion: appVersion,
+            sources: SourceManager(
+                sources: (config['sources'] as List)
+                    .map((v) =>
+                        DataSource(v['name'] as String, v['url'] as String))
+                    .toList(),
+                trustedKeys: Map<String, String>.from(config['keys'] as Map)));
+      }
+      if (migrateLegacy) await migrateLegacyData(_store);
+      final migration = await _store.readText('migration/v1');
+      if (migration != null) {
+        legacyQuarantine =
+            List<String>.from(jsonDecode(migration)['quarantined'] as List);
+      }
+      _customTagAliasRulesRaw = await _store
+              .readText('user/custom_rules/tag_alias_rules.custom.txt') ??
+          '';
+      await _loadUserItems();
+      await sync!.initialize();
+      _official = sync!.snapshot;
+      _composeSnapshot();
+      sync!.addListener(_onSyncChanged);
+      _addLog('本地资料已加载；官方版本：${sync!.databaseVersion}');
+    } catch (e) {
+      initializationError = '本地官方资料暂不可用，个人资料已保留。请检查存储或恢复有效备份。';
+      _addLog('$initializationError $e');
+      // Official-state failure must not hide an already preserved user layer.
+      _composeSnapshot();
+    }
+    _initialized = true;
+  }
+
+  void _onSyncChanged() {
+    if (!identical(_official, sync!.snapshot)) {
+      _official = sync!.snapshot;
+      _composeSnapshot();
+      _addLog(sync!.lastLog ?? '资料版本已切换');
+    }
+    if (sync!.failureDetails != null &&
+        !_logs.any((line) => line.endsWith(sync!.failureDetails!))) {
+      _addLog(sync!.failureDetails!);
+    }
+    notifyListeners();
+  }
+
+  void _composeSnapshot() {
+    List<ProductItem> merge(List<ProductItem> official, String folder) {
+      final byPath = {
+        for (final item in official) protocolCaseFold(item.filePath): item
+      };
+      for (final entry in _userItems.entries) {
+        if (entry.key.startsWith('$folder/')) {
+          byPath[protocolCaseFold(entry.key)] = entry.value;
+        }
+      }
+      return byPath.values.toList()
+        ..sort((a, b) => compareNaturalText(a.filePath, b.filePath));
+    }
+
+    _products = merge(_official.products, '产品列表');
+    _applications = merge(_official.applications, '产品应用');
+    _formulas = merge(_official.formulas, '产品配方');
+    _tdsByProduct.clear();
+    _tdsByNormalizedProduct.clear();
+    _tdsByProduct.addAll(_official.tds);
+    final candidates = <String, List<String>>{};
+    for (final entry in _official.tds.entries) {
+      final key = _normalizeProductKey(entry.key.split('/').last);
+      candidates.putIfAbsent(key, () => []).add(entry.value);
+    }
+    for (final entry in candidates.entries) {
+      if (entry.value.length == 1) {
+        _tdsByNormalizedProduct[entry.key] = entry.value.single;
+      }
+    }
+    _missingReferences.clear();
+    final known = {
+      ..._products.map((p) => p.fileName.toLowerCase()),
+      ..._formulas.map((p) => p.fileName.toLowerCase())
+    };
+    for (final app in _applications) {
+      final missing = app.linkedWikiReferences
+          .where((r) =>
+              RegExp(r'^R[DS]', caseSensitive: false).hasMatch(r) &&
+              !known.contains(r.toLowerCase()))
+          .toList();
+      if (missing.isNotEmpty) _missingReferences[app.filePath] = missing;
+    }
+    _applications = _applications
+        .map((app) => ProductItem.fromMdContent(app.filePath, app.rawContent,
+            origin: app.origin,
+            unresolvedProductReferences:
+                _missingReferences[app.filePath] ?? const []))
+        .toList();
+    _rebuildRules();
+    revision++;
+  }
+
+  void _rebuildRules() {
+    _builtInTagAliasRulesRaw = _official.rules ?? _defaultRules;
+    _tagAliasRules = _parseTagAliasRules(_builtInTagAliasRulesRaw);
+    _mergeTagAliasRules(_parseTagAliasRules(_customTagAliasRulesRaw));
+    _combinedTagAliasRulesRaw = _composeCombinedTagAliasRulesText();
+  }
+
+  Future<void> saveTagAliasRules(String rawContent) async {
+    await _store.writeText(
+        'user/custom_rules/tag_alias_rules.custom.txt', rawContent);
+    _customTagAliasRulesRaw = rawContent;
+    _rebuildRules();
+    revision++;
+    notifyListeners();
   }
 
   String? tdsForProduct(String productName) {
-    final direct = _tdsByProduct[productName];
-    if (direct != null) return direct;
-
-    for (final candidate in _tdsLookupCandidates(productName)) {
-      final hit = _tdsByNormalizedProduct[candidate];
-      if (hit != null) return hit;
+    if (_tdsByProduct.containsKey(productName)) {
+      return _tdsByProduct[productName];
+    }
+    for (final key in _tdsLookupCandidates(productName)) {
+      if (_tdsByNormalizedProduct.containsKey(key)) {
+        return _tdsByNormalizedProduct[key];
+      }
     }
     return null;
   }
 
-  Iterable<String> _tdsLookupCandidates(String productName) sync* {
-    final normalized = _normalizeProductKey(productName);
+  Iterable<String> _tdsLookupCandidates(String name) sync* {
+    final normalized = _normalizeProductKey(name);
     if (normalized.isNotEmpty) yield normalized;
-
-    final baseName = productName.split('-').first.trim();
-    final normalizedBase = _normalizeProductKey(baseName);
-    if (normalizedBase.isNotEmpty && normalizedBase != normalized) {
-      yield normalizedBase;
-    }
-
-    if (normalized.startsWith('RS')) {
-      yield 'RD${normalized.substring(2)}';
-    } else if (normalized.startsWith('RD')) {
-      yield 'RS${normalized.substring(2)}';
-    }
+    final base = _normalizeProductKey(name.split('-').first.trim());
+    if (base.isNotEmpty && base != normalized) yield base;
+    if (normalized.startsWith('RS')) yield 'RD${normalized.substring(2)}';
+    if (normalized.startsWith('RD')) yield 'RS${normalized.substring(2)}';
   }
 
-  String _normalizeProductKey(String raw) {
-    return raw
-        .toUpperCase()
-        .replaceAll('.TDS.MD', '')
-        .replaceAll('.MD', '')
-        .replaceAll(RegExp(r'[^A-Z0-9]'), '');
-  }
-
+  String _normalizeProductKey(String raw) => raw
+      .toUpperCase()
+      .replaceAll('.TDS.MD', '')
+      .replaceAll('.MD', '')
+      .replaceAll(RegExp(r'[^A-Z0-9]'), '');
   void _addLog(String message) {
-    final timestamp = DateTime.now().toString().substring(11, 19);
-    _logs.insert(0, '[$timestamp] $message');
-    // 只保留最近100条日志
-    if (_logs.length > 100) {
-      _logs.removeLast();
-    }
-  }
-
-  void _sortIndexedItems() {
-    _products.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
-    _applications.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
-    _formulas.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
-  }
-
-  Future<Directory?> _getPrivateDataDirectory() async {
-    if (kIsWeb) return null;
-    try {
-      final appDir = await getApplicationDocumentsDirectory();
-      return Directory('${appDir.path}/rst_data');
-    } on MissingPluginException catch (e) {
-      _addLog('DataService: Private dir plugin unavailable: $e');
-      return null;
-    } catch (e) {
-      _addLog('DataService: Failed to resolve private dir: $e');
-      return null;
-    }
-  }
-
-  /// 初始化数据加载
-  ///
-  /// 加载顺序：
-  /// 1. 直接从 Asset 加载（最可靠的内置数据）
-  /// 2. 如果 Asset 为空，从私有目录加载（备用方案）
-  /// 3. 如果数据存在，复制 Asset 到私有目录（供后续使用）
-  Future<void> initialize() async {
-    if (_initialized) {
-      _addLog('DataService: Already initialized, skipping');
-      return;
-    }
-
-    _addLog('DataService: Starting initialization');
-
-    try {
-      // 第一步：直接从Asset加载（最可靠）
-      _addLog('DataService: Loading from assets...');
-      await _loadFromAssetsOnly();
-      await _loadTagAliasRules();
-      await _loadManualItemMeta();
-      await _loadManualMarkdownItems();
-      _addLog(
-          'DataService: Asset load complete. Products: ${_products.length}, Applications: ${_applications.length}');
-
-      // 第二步：如果Asset加载失败，从私有目录加载
-      if (_products.isEmpty && _applications.isEmpty) {
-        _addLog('DataService: Asset load failed, trying private directory...');
-        final dataDir = await _getPrivateDataDirectory();
-        if (dataDir != null) {
-          await _loadFromPrivateDir(dataDir);
-        }
-        _addLog(
-            'DataService: Private dir load complete. Products: ${_products.length}, Applications: ${_applications.length}');
-      }
-
-      // 第三步：如果还是空的，从Asset复制到私有目录
-      if (_products.isEmpty && _applications.isEmpty) {
-        _addLog('DataService: All loads failed, product list is empty!');
-      } else {
-        _sortIndexedItems();
-        // 复制到私有目录以便后续使用
-        _addLog('DataService: Copying data to private directory...');
-        final dataDir = await _getPrivateDataDirectory();
-        if (dataDir != null) {
-          await _copyAssetsToPrivateDir(dataDir);
-        }
-      }
-
-      _initialized = true;
-      _addLog(
-          'DataService: Initialization complete. Total: ${_products.length + _applications.length} items');
-    } catch (e, stack) {
-      _addLog('DataService: ERROR during initialization: $e');
-      _addLog('DataService: Stack trace: $stack');
-      _initialized = true; // 标记为已初始化，避免无限重试
-    }
-  }
-
-  /// 从私有目录加载
-  Future<void> _loadFromPrivateDir(Directory dataDir) async {
-    try {
-      // 加载产品列表
-      final productsDir = Directory('${dataDir.path}/产品列表');
-      if (await productsDir.exists()) {
-        final files = await productsDir.list().toList();
-        _addLog(
-            'DataService: Found ${files.length} product files in private dir');
-        for (var entity in files) {
-          if (entity is File && entity.path.endsWith('.md')) {
-            try {
-              final content = await entity.readAsString();
-              _products.add(ProductItem.fromMdContent(entity.path, content));
-            } catch (e) {
-              _addLog(
-                  'DataService: Error reading product file: ${entity.path}');
-            }
-          }
-        }
-      }
-
-      // 加载产品应用
-      final appsDir = Directory('${dataDir.path}/产品应用');
-      if (await appsDir.exists()) {
-        final files = await appsDir.list().toList();
-        _addLog(
-            'DataService: Found ${files.length} application files in private dir');
-        for (var entity in files) {
-          if (entity is File && entity.path.endsWith('.md')) {
-            try {
-              final content = await entity.readAsString();
-              _applications
-                  .add(ProductItem.fromMdContent(entity.path, content));
-            } catch (e) {
-              _addLog(
-                  'DataService: Error reading application file: ${entity.path}');
-            }
-          }
-        }
-      }
-    } catch (e) {
-      _addLog('DataService: Error loading from private dir: $e');
-    }
-  }
-
-  /// 只从Asset加载（不保存到私有目录）
-  Future<void> _loadFromAssetsOnly() async {
-    _addLog('DataService: Loading products from assets...');
-
-    // 加载产品列表索引
-    try {
-      final indexContent = await rootBundle.loadString(_productsAssetIndex);
-      final List<dynamic> productFiles = jsonDecode(indexContent);
-      _addLog(
-          'DataService: Found ${productFiles.length} product files in index');
-
-      for (final fileName in productFiles) {
-        try {
-          final content =
-              await rootBundle.loadString('$_productsAssetPath/$fileName');
-          _products.add(ProductItem.fromMdContent(
-              '$_productsAssetPath/$fileName', content));
-        } catch (e) {
-          _addLog('DataService: Error loading product $fileName: $e');
-        }
-      }
-    } catch (e) {
-      _addLog('DataService: Error loading product index: $e');
-    }
-
-    // 加载产品应用索引
-    _addLog('DataService: Loading applications from assets...');
-    try {
-      final indexContent = await rootBundle.loadString(_applicationsAssetIndex);
-      final List<dynamic> appFiles = jsonDecode(indexContent);
-      _addLog(
-          'DataService: Found ${appFiles.length} application files in index');
-
-      for (final fileName in appFiles) {
-        try {
-          final content =
-              await rootBundle.loadString('$_applicationsAssetPath/$fileName');
-          _applications.add(ProductItem.fromMdContent(
-              '$_applicationsAssetPath/$fileName', content));
-        } catch (e) {
-          _addLog('DataService: Error loading application $fileName: $e');
-        }
-      }
-    } catch (e) {
-      _addLog('DataService: Error loading application index: $e');
-    }
-
-    // 加载产品配方（通过 assets/产品配方.json 索引逐个加载）
-    _addLog('DataService: Loading formulas from assets...');
-    try {
-      const formulaAssetPath = 'assets/产品配方';
-      // 配方文件无 frontmatter，直接用文件名作为配方名称，body 即为 markdown 表格
-      final formulaContent = await rootBundle.loadString('assets/产品配方.json');
-      final List<dynamic> formulaFiles = jsonDecode(formulaContent);
-      _addLog('DataService: Found ${formulaFiles.length} formula files');
-
-      for (final fileName in formulaFiles) {
-        try {
-          final content =
-              await rootBundle.loadString('$formulaAssetPath/$fileName');
-          _formulas.add(ProductItem.fromMdContent(
-              '$formulaAssetPath/$fileName', content));
-        } catch (e) {
-          _addLog('DataService: Error loading formula $fileName: $e');
-        }
-      }
-    } catch (e) {
-      _addLog('DataService: Error loading formulas: $e');
-    }
-
-    // 加载 TDS 文档（通过 assets/产品TDS.json 索引逐个加载）
-    _addLog('DataService: Loading TDS from assets...');
-    try {
-      final tdsIndexContent = await rootBundle.loadString(_tdsAssetIndex);
-      final List<dynamic> tdsFiles = jsonDecode(tdsIndexContent);
-      _addLog('DataService: Found ${tdsFiles.length} TDS files');
-
-      for (final fileNameDynamic in tdsFiles) {
-        final fileName = fileNameDynamic.toString();
-        try {
-          final content =
-              await rootBundle.loadString('$_tdsAssetPath/$fileName');
-          final productName = fileName.replaceAll('.TDS.md', '');
-          _tdsByProduct[productName] = content;
-          final normalized = _normalizeProductKey(productName);
-          if (normalized.isNotEmpty) {
-            _tdsByNormalizedProduct[normalized] = content;
-          }
-        } catch (e) {
-          _addLog('DataService: Error loading TDS $fileName: $e');
-        }
-      }
-    } catch (e) {
-      _addLog('DataService: TDS index not found or failed to parse: $e');
-    }
-  }
-
-  /// 加载标签同义词规则（内置规则 + 用户新增规则）。
-  Future<void> _loadTagAliasRules() async {
-    _builtInTagAliasRulesRaw = '';
-    _customTagAliasRulesRaw = '';
-
-    _builtInTagAliasRulesRaw = _builtInTagAliasRulesDefault;
-    _addLog('DataService: Loaded built-in tag alias rules from source code');
-
-    final dataDir = await _getPrivateDataDirectory();
-    if (dataDir != null) {
-      final customRuleFile =
-          File('${dataDir.path}/$_tagAliasCustomRulesFileName');
-
-      if (await customRuleFile.exists()) {
-        try {
-          _customTagAliasRulesRaw = await customRuleFile.readAsString();
-          _addLog(
-              'DataService: Loaded custom tag alias rules from private dir');
-        } catch (e) {
-          _addLog('DataService: Failed to read custom tag alias rules: $e');
-        }
-      }
-    } else {
-      _addLog(
-          'DataService: Private dir unavailable for custom tag alias rules');
-    }
-
-    _tagAliasRules = _parseTagAliasRules(_builtInTagAliasRulesRaw);
-    final customMap = _parseTagAliasRules(_customTagAliasRulesRaw);
-    _mergeTagAliasRules(customMap);
-    _combinedTagAliasRulesRaw = _composeCombinedTagAliasRulesText();
-    _addLog('DataService: Parsed ${_tagAliasRules.length} tag alias keys');
-  }
-
-  /// 保存用户新增标签同义词规则到私有目录，并更新内存映射。
-  Future<void> saveTagAliasRules(String rawContent) async {
-    final dataDir = await _getPrivateDataDirectory();
-    if (dataDir == null) {
-      _addLog(
-          'DataService: Skip saving custom tag alias rules on this platform');
-      return;
-    }
-    await dataDir.create(recursive: true);
-    final customRuleFile =
-        File('${dataDir.path}/$_tagAliasCustomRulesFileName');
-    await customRuleFile.writeAsString(rawContent);
-    _customTagAliasRulesRaw = rawContent;
-    _tagAliasRules = _parseTagAliasRules(_builtInTagAliasRulesRaw);
-    final customMap = _parseTagAliasRules(_customTagAliasRulesRaw);
-    _mergeTagAliasRules(customMap);
-    _combinedTagAliasRulesRaw = _composeCombinedTagAliasRulesText();
-    _addLog('DataService: Saved custom tag alias rules');
+    _logs.insert(0, '[${DateTime.now().toIso8601String()}] $message');
+    if (_logs.length > 100) _logs.removeLast();
   }
 
   void _mergeTagAliasRules(Map<String, Set<String>> additionalRules) {
@@ -516,91 +298,6 @@ EPDM -> 三元乙丙橡胶
     return expanded;
   }
 
-  /// 从Asset复制数据到私有目录
-  Future<void> _copyAssetsToPrivateDir(Directory dataDir) async {
-    try {
-      await dataDir.create(recursive: true);
-
-      // 复制产品列表
-      try {
-        final indexContent = await rootBundle.loadString(_productsAssetIndex);
-        final List<dynamic> productFiles = jsonDecode(indexContent);
-
-        final productsDir = Directory('${dataDir.path}/产品列表');
-        await productsDir.create(recursive: true);
-
-        for (final fileName in productFiles) {
-          try {
-            final content =
-                await rootBundle.loadString('$_productsAssetPath/$fileName');
-            final file = File('${productsDir.path}/$fileName');
-            if (!await file.exists()) {
-              await file.writeAsString(content);
-            }
-          } catch (e) {
-            // 忽略单个文件错误
-          }
-        }
-        _addLog(
-            'DataService: Copied ${productFiles.length} products to private dir');
-      } catch (e) {
-        _addLog('DataService: Error copying products: $e');
-      }
-
-      // 复制产品应用
-      try {
-        final indexContent =
-            await rootBundle.loadString(_applicationsAssetIndex);
-        final List<dynamic> appFiles = jsonDecode(indexContent);
-
-        final appsDir = Directory('${dataDir.path}/产品应用');
-        await appsDir.create(recursive: true);
-
-        for (final fileName in appFiles) {
-          try {
-            final content = await rootBundle
-                .loadString('$_applicationsAssetPath/$fileName');
-            final file = File('${appsDir.path}/$fileName');
-            if (!await file.exists()) {
-              await file.writeAsString(content);
-            }
-          } catch (e) {
-            // 忽略单个文件错误
-          }
-        }
-        _addLog(
-            'DataService: Copied ${appFiles.length} applications to private dir');
-      } catch (e) {
-        _addLog('DataService: Error copying applications: $e');
-      }
-
-      // 复制产品配方
-      try {
-        final formulaIndexContent =
-            await rootBundle.loadString('assets/产品配方.json');
-        final List<dynamic> formulaFiles = jsonDecode(formulaIndexContent);
-        final formulasDir = Directory('${dataDir.path}/产品配方');
-        await formulasDir.create(recursive: true);
-        for (final fileName in formulaFiles) {
-          try {
-            final content =
-                await rootBundle.loadString('assets/产品配方/$fileName');
-            final file = File('${formulasDir.path}/$fileName');
-            if (!await file.exists()) {
-              await file.writeAsString(content);
-            }
-          } catch (_) {}
-        }
-        _addLog(
-            'DataService: Copied ${formulaFiles.length} formulas to private dir');
-      } catch (e) {
-        _addLog('DataService: Error copying formulas: $e');
-      }
-    } catch (e) {
-      _addLog('DataService: Error in _copyAssetsToPrivateDir: $e');
-    }
-  }
-
   String _joinTagsToYamlList(List<String> tags) {
     final normalized =
         tags.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
@@ -665,341 +362,6 @@ ${_joinTagsToYamlList(tags)}
     return tableMarkdown.trim().isEmpty
         ? '| 项目 | 数值 |\n| --- | --- |\n| 示例 | 0 |'
         : tableMarkdown.trim();
-  }
-
-  Future<void> addProductMarkdown({
-    required String code,
-    required String markdown,
-  }) async {
-    final normalizedCode = code.trim().toUpperCase();
-    // 仅校验前两个字符为 RD 或 RS，后续内容不作限制。
-    if (!normalizedCode.startsWith('RD') && !normalizedCode.startsWith('RS')) {
-      throw ArgumentError('文件名需以 RD 或 RS 开头');
-    }
-    final dataDir = await _getPrivateDataDirectory();
-    if (dataDir == null) {
-      throw StateError('当前平台不支持写入本地 Markdown 数据');
-    }
-    final productDir = Directory('${dataDir.path}/产品列表');
-    await productDir.create(recursive: true);
-    final file = File('${productDir.path}/$normalizedCode.md');
-    await file.writeAsString(markdown.trim());
-    _products
-        .removeWhere((item) => item.fileName.toUpperCase() == normalizedCode);
-    _products.add(ProductItem.fromMdContent(file.path, markdown));
-    _products.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
-    _manualProductNames.add(normalizedCode);
-    await _saveManualItemMeta();
-    _addLog('DataService: Saved manual product file $normalizedCode.md');
-  }
-
-  Future<void> addApplicationMarkdown({
-    required String name,
-    required String markdown,
-  }) async {
-    final normalizedName = name.trim();
-    if (normalizedName.isEmpty) {
-      throw ArgumentError('产品应用名称不能为空');
-    }
-    final dataDir = await _getPrivateDataDirectory();
-    if (dataDir == null) {
-      throw StateError('当前平台不支持写入本地 Markdown 数据');
-    }
-    final appDir = Directory('${dataDir.path}/产品应用');
-    await appDir.create(recursive: true);
-    final file = File('${appDir.path}/$normalizedName.md');
-    await file.writeAsString(markdown.trim());
-    _applications.removeWhere((item) => item.fileName == normalizedName);
-    _applications.add(ProductItem.fromMdContent(file.path, markdown));
-    _applications.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
-    _manualApplicationNames.add(normalizedName);
-    await _saveManualItemMeta();
-    _addLog('DataService: Saved manual application file $normalizedName.md');
-  }
-
-  Future<void> addFormulaMarkdown({
-    required String name,
-    required String markdown,
-  }) async {
-    final normalizedName = name.trim();
-    if (normalizedName.isEmpty) {
-      throw ArgumentError('产品配方名称不能为空');
-    }
-    final dataDir = await _getPrivateDataDirectory();
-    if (dataDir == null) {
-      throw StateError('当前平台不支持写入本地 Markdown 数据');
-    }
-    final formulaDir = Directory('${dataDir.path}/产品配方');
-    await formulaDir.create(recursive: true);
-    final file = File('${formulaDir.path}/$normalizedName.md');
-    await file.writeAsString(markdown.trim());
-    _formulas.removeWhere((item) => item.fileName == normalizedName);
-    _formulas.add(ProductItem.fromMdContent(file.path, markdown));
-    _formulas.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
-    _manualFormulaNames.add(normalizedName);
-    await _saveManualItemMeta();
-    _addLog('DataService: Saved manual formula file $normalizedName.md');
-  }
-
-  bool isManualItem(ProductItem item) {
-    switch (item.folder) {
-      case '产品列表':
-        return _manualProductNames.contains(item.fileName.toUpperCase());
-      case '产品应用':
-        return _manualApplicationNames.contains(item.fileName);
-      case '产品配方':
-        return _manualFormulaNames.contains(item.fileName);
-      default:
-        return false;
-    }
-  }
-
-  Future<void> deleteManualItem(ProductItem item) async {
-    if (!isManualItem(item)) {
-      throw StateError('仅支持删除通过新增按钮创建的项目');
-    }
-    final dataDir = await _getPrivateDataDirectory();
-    if (dataDir == null) {
-      throw StateError('当前平台不支持写入本地 Markdown 数据');
-    }
-    final folderName = item.folder;
-    final file = File('${dataDir.path}/$folderName/${item.fileName}.md');
-    if (await file.exists()) {
-      await file.delete();
-    }
-
-    _products.removeWhere((entry) =>
-        entry.folder == item.folder && entry.fileName == item.fileName);
-    _applications.removeWhere((entry) =>
-        entry.folder == item.folder && entry.fileName == item.fileName);
-    _formulas.removeWhere((entry) =>
-        entry.folder == item.folder && entry.fileName == item.fileName);
-    _manualProductNames.remove(item.fileName.toUpperCase());
-    _manualApplicationNames.remove(item.fileName);
-    _manualFormulaNames.remove(item.fileName);
-    await _tryRestoreBundledItem(item.folder, item.fileName);
-    await _saveManualItemMeta();
-    _addLog(
-        'DataService: Deleted manual item ${item.folder}/${item.fileName}.md');
-  }
-
-  Future<int> clearAllManualMarkdownData() async {
-    final dataDir = await _getPrivateDataDirectory();
-    if (dataDir == null) {
-      throw StateError('当前平台不支持写入本地 Markdown 数据');
-    }
-
-    final entries = <(String folder, String name)>[
-      ..._manualProductNames.map((name) => ('产品列表', name)),
-      ..._manualApplicationNames.map((name) => ('产品应用', name)),
-      ..._manualFormulaNames.map((name) => ('产品配方', name)),
-    ];
-
-    var deletedCount = 0;
-    for (final entry in entries) {
-      final file = File('${dataDir.path}/${entry.$1}/${entry.$2}.md');
-      if (await file.exists()) {
-        await file.delete();
-      }
-      _products.removeWhere(
-          (item) => item.folder == entry.$1 && item.fileName == entry.$2);
-      _applications.removeWhere(
-          (item) => item.folder == entry.$1 && item.fileName == entry.$2);
-      _formulas.removeWhere(
-          (item) => item.folder == entry.$1 && item.fileName == entry.$2);
-      await _tryRestoreBundledItem(entry.$1, entry.$2);
-      deletedCount++;
-    }
-
-    _manualProductNames.clear();
-    _manualApplicationNames.clear();
-    _manualFormulaNames.clear();
-    await _saveManualItemMeta();
-    _addLog(
-        'DataService: Cleared all manual markdown data, removed $deletedCount item(s)');
-    return deletedCount;
-  }
-
-  Future<void> _tryRestoreBundledItem(
-      String folderName, String fileName) async {
-    String? assetPath;
-    if (folderName == '产品列表') {
-      assetPath = '$_productsAssetPath/$fileName.md';
-    } else if (folderName == '产品应用') {
-      assetPath = '$_applicationsAssetPath/$fileName.md';
-    } else if (folderName == '产品配方') {
-      assetPath = 'assets/产品配方/$fileName.md';
-    }
-    if (assetPath == null) return;
-
-    try {
-      final content = await rootBundle.loadString(assetPath);
-      final restored = ProductItem.fromMdContent(assetPath, content);
-      if (folderName == '产品列表') {
-        _products.removeWhere((item) => item.fileName == fileName);
-        _products.add(restored);
-        _products.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
-      } else if (folderName == '产品应用') {
-        _applications.removeWhere((item) => item.fileName == fileName);
-        _applications.add(restored);
-        _applications
-            .sort((a, b) => compareNaturalText(a.fileName, b.fileName));
-      } else if (folderName == '产品配方') {
-        _formulas.removeWhere((item) => item.fileName == fileName);
-        _formulas.add(restored);
-        _formulas.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
-      }
-    } catch (_) {
-      // 如果资源中不存在同名文件则不恢复。
-    }
-  }
-
-  Future<File?> exportMarkdownArchive() async {
-    if (kIsWeb) {
-      _addLog('DataService: Export archive skipped on web platform');
-      return null;
-    }
-    final dataDir = await _getPrivateDataDirectory();
-    if (dataDir == null) return null;
-
-    final archive = Archive();
-    Future<void> addMdFiles(
-        String folderName, Iterable<String> fileNames) async {
-      final folder = Directory('${dataDir.path}/$folderName');
-      if (!await folder.exists()) return;
-      for (final name in fileNames) {
-        final entity = File('${folder.path}/$name.md');
-        if (!await entity.exists()) continue;
-        final content = await entity.readAsString();
-        final bytes = utf8.encode(content);
-        final entryName = '$folderName/$name.md';
-        archive.addFile(ArchiveFile(entryName, bytes.length, bytes));
-      }
-    }
-
-    await addMdFiles('产品列表', _manualProductNames);
-    await addMdFiles('产品应用', _manualApplicationNames);
-    await addMdFiles('产品配方', _manualFormulaNames);
-
-    if (archive.isEmpty) {
-      _addLog(
-          'DataService: Export archive skipped because no markdown file found');
-      return null;
-    }
-
-    final tmpDir = await getTemporaryDirectory();
-    final timestamp = DateTime.now()
-        .toIso8601String()
-        .replaceAll(':', '')
-        .replaceAll('-', '')
-        .replaceAll('.', '')
-        .substring(0, 15);
-    final file = File('${tmpDir.path}/RSTONE_Obsidian_MD_$timestamp.zip');
-    final zipBytes = ZipEncoder().encode(archive);
-    if (zipBytes == null) {
-      _addLog(
-          'DataService: Export archive failed due to zip encoder returning null');
-      return null;
-    }
-    await file.writeAsBytes(Uint8List.fromList(zipBytes), flush: true);
-    _addLog('DataService: Exported markdown archive at ${file.path}');
-    return file;
-  }
-
-  Future<void> _loadManualItemMeta() async {
-    if (kIsWeb) return;
-    final dataDir = await _getPrivateDataDirectory();
-    if (dataDir == null) return;
-    final file = File('${dataDir.path}/$_manualItemsMetaFileName');
-    if (!await file.exists()) return;
-    try {
-      final parsed = jsonDecode(await file.readAsString());
-      if (parsed is! Map<String, dynamic>) return;
-      _manualProductNames
-        ..clear()
-        ..addAll(((parsed['products'] as List?) ?? const [])
-            .whereType<String>()
-            .map((e) => e.trim().toUpperCase())
-            .where((e) => e.isNotEmpty));
-      _manualApplicationNames
-        ..clear()
-        ..addAll(((parsed['applications'] as List?) ?? const [])
-            .whereType<String>()
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty));
-      _manualFormulaNames
-        ..clear()
-        ..addAll(((parsed['formulas'] as List?) ?? const [])
-            .whereType<String>()
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty));
-    } catch (e) {
-      _addLog('DataService: Failed to load manual item metadata: $e');
-    }
-  }
-
-  Future<void> _loadManualMarkdownItems() async {
-    if (kIsWeb) return;
-    final dataDir = await _getPrivateDataDirectory();
-    if (dataDir == null) return;
-
-    Future<void> mergeManualItems({
-      required String folderName,
-      required Set<String> fileNames,
-      required List<ProductItem> target,
-      bool normalizeUppercaseName = false,
-    }) async {
-      for (final rawName in fileNames) {
-        final resolvedName =
-            normalizeUppercaseName ? rawName.toUpperCase() : rawName;
-        final file = File('${dataDir.path}/$folderName/$resolvedName.md');
-        if (!await file.exists()) {
-          continue;
-        }
-        try {
-          final content = await file.readAsString();
-          final parsed = ProductItem.fromMdContent(file.path, content);
-          target.removeWhere((item) => item.fileName == parsed.fileName);
-          target.add(parsed);
-        } catch (e) {
-          _addLog(
-              'DataService: Failed to load manual markdown $folderName/$resolvedName.md: $e');
-        }
-      }
-      target.sort((a, b) => compareNaturalText(a.fileName, b.fileName));
-    }
-
-    await mergeManualItems(
-      folderName: '产品列表',
-      fileNames: _manualProductNames,
-      target: _products,
-      normalizeUppercaseName: true,
-    );
-    await mergeManualItems(
-      folderName: '产品应用',
-      fileNames: _manualApplicationNames,
-      target: _applications,
-    );
-    await mergeManualItems(
-      folderName: '产品配方',
-      fileNames: _manualFormulaNames,
-      target: _formulas,
-    );
-  }
-
-  Future<void> _saveManualItemMeta() async {
-    if (kIsWeb) return;
-    final dataDir = await _getPrivateDataDirectory();
-    if (dataDir == null) return;
-    await dataDir.create(recursive: true);
-    final file = File('${dataDir.path}/$_manualItemsMetaFileName');
-    final payload = <String, dynamic>{
-      'products': _manualProductNames.toList()..sort(),
-      'applications': _manualApplicationNames.toList()..sort(),
-      'formulas': _manualFormulaNames.toList()..sort(),
-    };
-    await file
-        .writeAsString(const JsonEncoder.withIndent('  ').convert(payload));
   }
 
   /// 搜索产品和应用
@@ -1277,29 +639,109 @@ ${_joinTagsToYamlList(tags)}
     return results;
   }
 
-  /// 清除应用数据
-  Future<void> clearData() async {
-    _addLog('DataService: Clearing data');
-    try {
-      final dataDir = await _getPrivateDataDirectory();
-      if (dataDir != null && await dataDir.exists()) {
-        await dataDir.delete(recursive: true);
+  Future<void> _saveUserItem(
+      String folder, String name, String markdown) async {
+    final path = '$folder/$name.md';
+    validateLogicalPath(path);
+    final parsed = ProductItem.fromMdContent('user/$path', markdown,
+        origin: DataOrigin.user);
+    await _store.writeText('user/$path', markdown);
+    _userItems[path] = parsed;
+    _composeSnapshot();
+    notifyListeners();
+  }
+
+  Future<void> addProductMarkdown(
+      {required String code, required String markdown}) async {
+    final name = code.trim().toUpperCase();
+    if (!name.startsWith('RD') && !name.startsWith('RS')) {
+      throw ArgumentError('文件名需以 RD 或 RS 开头');
+    }
+    await _saveUserItem('产品列表', name, markdown);
+  }
+
+  Future<void> addApplicationMarkdown(
+      {required String name, required String markdown}) async {
+    if (name.trim().isEmpty) throw ArgumentError('产品应用名称不能为空');
+    await _saveUserItem('产品应用', name.trim(), markdown);
+  }
+
+  Future<void> addFormulaMarkdown(
+      {required String name, required String markdown}) async {
+    if (name.trim().isEmpty) throw ArgumentError('产品配方名称不能为空');
+    await _saveUserItem('产品配方', name.trim(), markdown);
+  }
+
+  bool isManualItem(ProductItem item) => item.origin == DataOrigin.user;
+  Future<void> deleteManualItem(ProductItem item) async {
+    if (!isManualItem(item)) throw StateError('仅支持删除用户新增资料');
+    final path = item.filePath.substring('user/'.length);
+    await _store.remove('user/$path');
+    _userItems.remove(path);
+    // Only the CURRENT official mapping can reappear underneath an overlay.
+    _composeSnapshot();
+    notifyListeners();
+  }
+
+  Future<int> clearAllManualMarkdownData() async {
+    final paths = _userItems.keys.toList();
+    for (final path in paths) {
+      await _store.remove('user/$path');
+      _userItems.remove(path);
+    }
+    _composeSnapshot();
+    notifyListeners();
+    return paths.length;
+  }
+
+  Future<void> _loadUserItems() async {
+    _userItems.clear();
+    for (final key in await _store.keys('user/')) {
+      if (!key.endsWith('.md')) continue;
+      final path = key.substring('user/'.length);
+      validateLogicalPath(path);
+      final content = await _store.readText(key);
+      if (content != null) {
+        _userItems[path] =
+            ProductItem.fromMdContent(key, content, origin: DataOrigin.user);
       }
-      _products.clear();
-      _applications.clear();
-      _formulas.clear();
-      _manualProductNames.clear();
-      _manualApplicationNames.clear();
-      _manualFormulaNames.clear();
-      _initialized = false;
-    } catch (e) {
-      _addLog('DataService: Error clearing data: $e');
     }
   }
 
-  /// 清除日志
+  Future<void> recoverLegacyFile(String path) async {
+    validateLogicalPath(path);
+    final content = await _store.readText('migration/quarantine/$path');
+    if (content == null) throw StateError('旧版文件不存在');
+    if (await _store.read('user/$path') != null) {
+      throw StateError('已有同名用户资料，请先导出或重命名');
+    }
+    await _store.writeText('user/$path', content);
+    await _loadUserItems();
+    _composeSnapshot();
+    notifyListeners();
+  }
+
+  Future<Uint8List?> exportMarkdownArchive() async {
+    final archive = Archive();
+    for (final entry in _userItems.entries) {
+      final bytes = utf8.encode(entry.value.rawContent);
+      archive.addFile(ArchiveFile(entry.key, bytes.length, bytes));
+    }
+    if (archive.isEmpty) return null;
+    final bytes = ZipEncoder().encode(archive);
+    return bytes == null ? null : Uint8List.fromList(bytes);
+  }
+
+  /// Clearing user Markdown does not clear the official replay watermark.
+  Future<void> clearData() async => clearAllManualMarkdownData();
   void clearLogs() {
     _logs.clear();
-    _addLog('DataService: Logs cleared');
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    sync?.removeListener(_onSyncChanged);
+    super.dispose();
   }
 }

@@ -2,6 +2,8 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/services.dart';
 import 'services/obsidian_data_service.dart';
 import 'services/preferences_service.dart';
@@ -23,7 +25,19 @@ void main() async {
     ),
   );
 
-  final dataService = ObsidianDataService();
+  const compiledVersion =
+      String.fromEnvironment('APP_VERSION', defaultValue: '1.0.0');
+  var appVersion = compiledVersion.split('+').first;
+  // Web PackageInfo fetches version.json with a cache-busting URL. Offline
+  // startup must use the version bundled into this shell instead of HTTP.
+  if (!kIsWeb) {
+    try {
+      appVersion =
+          (await PackageInfo.fromPlatform().timeout(const Duration(seconds: 2)))
+              .version;
+    } catch (_) {/* Use the trusted build-time app version. */}
+  }
+  final dataService = ObsidianDataService(appVersion: appVersion);
   final preferencesService = PreferencesService();
 
   // 应用启动阶段完成本地偏好和静态资源数据初始化。
@@ -142,13 +156,20 @@ class _RstoneAppState extends State<RstoneApp> {
   }
 
   dynamic _buildCompatCardTheme(ColorScheme colorScheme) {
-    return CardTheme(
+    final theme = CardTheme(
       elevation: 0,
       color: colorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
     );
+    // New Flutter releases split inherited CardTheme from CardThemeData.
+    // Keep the existing visual values on both supported API shapes.
+    try {
+      return (theme as dynamic).data;
+    } on NoSuchMethodError {
+      return theme;
+    }
   }
 
   @override
@@ -193,7 +214,28 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => widget.dataService.sync?.checkAutomatically());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      widget.dataService.sync?.checkAutomatically();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   /// 当前底部导航索引。
   int _currentIndex = 0;
   int _pageChangeSignal = 0;

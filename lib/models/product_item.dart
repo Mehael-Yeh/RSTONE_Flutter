@@ -1,7 +1,9 @@
 /// 产品/应用数据模型
-/// 
+///
 /// 用于表示产品列表和产品应用两大类数据。
 /// 通过 [fromMdContent] 工厂构造函数从 Markdown 文件内容解析生成。
+enum DataOrigin { unknown, official, user }
+
 class ProductItem {
   static String _normalizeMdLinkValue(String value) {
     final trimmed = value.trim();
@@ -14,32 +16,36 @@ class ProductItem {
     return wikiMatch?.group(1)?.trim() ?? unquoted;
   }
 
-  final String fileName;       // 文件名（不含路径）
-  final String filePath;       // 完整文件路径
-  final String folder;         // 所属文件夹（产品列表/产品应用）
-  final String rawContent;     // 原始MD内容
-  final Map<String, dynamic> frontmatter;  // YAML前置数据
-  final List<String> tags;     // 标签数组
-  final String? engineer;      // 工程师
+  final String fileName; // 文件名（不含路径）
+  final DataOrigin origin;
+  final List<String> unresolvedProductReferences;
+  final String filePath; // 完整文件路径
+  final String folder; // 所属文件夹（产品列表/产品应用）
+  final String rawContent; // 原始MD内容
+  final Map<String, dynamic> frontmatter; // YAML前置数据
+  final List<String> tags; // 标签数组
+  final String? engineer; // 工程师
   final String? experimentalCode; // 实验牌号
-  final String? solidContent;  // 固含
-  final String? hydroxylValue;  // 羟值
+  final String? solidContent; // 固含
+  final String? hydroxylValue; // 羟值
   final String? functionality; // 官能度
   final String? hardness; // 硬度
   final String? gloss60; // 光泽(60°)
   final String? boilResistance; // 水煮
   final String? waterContactAngle; // 水接触角
   final String? technologySource; // 技术源
-  final String? benchmark;     // 对标
-  final String? viscosity;     // 粘度
-  
+  final String? benchmark; // 对标
+  final String? viscosity; // 粘度
+
   // 产品应用相关字段
-  final String? primer;        // 底漆
-  final String? midCoat;      // 中漆
-  final String? topCoat;      // 面漆
+  final String? primer; // 底漆
+  final String? midCoat; // 中漆
+  final String? topCoat; // 面漆
   final String? baseMaterial; // 基材
 
   ProductItem({
+    this.origin = DataOrigin.unknown,
+    this.unresolvedProductReferences = const [],
     required this.fileName,
     required this.filePath,
     required this.folder,
@@ -65,7 +71,9 @@ class ProductItem {
   });
 
   /// 从MD文件内容解析
-  factory ProductItem.fromMdContent(String filePath, String content) {
+  factory ProductItem.fromMdContent(String filePath, String content,
+      {DataOrigin origin = DataOrigin.unknown,
+      List<String> unresolvedProductReferences = const []}) {
     final fileName = filePath.split('/').last.replaceAll('.md', '');
     final folder = filePath.contains('产品列表')
         ? '产品列表'
@@ -74,7 +82,7 @@ class ProductItem {
             : filePath.contains('产品配方')
                 ? '产品配方'
                 : '未知';
-    
+
     Map<String, dynamic> frontmatter = {};
     List<String> tags = [];
     String? engineer;
@@ -98,7 +106,7 @@ class ProductItem {
     final lines = content.split('\n');
     bool inFrontmatter = false;
     List<String> frontmatterLines = [];
-    
+
     for (var line in lines) {
       if (line.trim() == '---') {
         if (!inFrontmatter) {
@@ -131,7 +139,8 @@ class ProductItem {
           }
 
           // 读到下一个字段或空行则结束 tags 列表读取
-          if (candidate.isEmpty || RegExp(r'^[^\s].*:\s*').hasMatch(candidate)) {
+          if (candidate.isEmpty ||
+              RegExp(r'^[^\s].*:\s*').hasMatch(candidate)) {
             break;
           }
         }
@@ -141,23 +150,30 @@ class ProductItem {
       } else if (line.trim().startsWith('工程师:')) {
         engineer = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('实验牌号:')) {
-        experimentalCode = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+        experimentalCode =
+            _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('固含:')) {
-        solidContent = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+        solidContent =
+            _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('羟值:')) {
-        hydroxylValue = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+        hydroxylValue =
+            _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('官能度:')) {
-        functionality = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+        functionality =
+            _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('硬度:')) {
         hardness = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('光泽(60°):')) {
         gloss60 = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('水煮:')) {
-        boilResistance = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+        boilResistance =
+            _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('水接触角:')) {
-        waterContactAngle = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+        waterContactAngle =
+            _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('技术源:')) {
-        technologySource = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+        technologySource =
+            _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('对标:')) {
         benchmark = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('粘度:')) {
@@ -169,20 +185,29 @@ class ProductItem {
       } else if (line.trim().startsWith('面漆:')) {
         topCoat = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('基材:')) {
-        baseMaterial = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+        baseMaterial =
+            _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       }
     }
 
     // 解析tags的另一种格式
     if (tags.isEmpty) {
       final frontmatterContent = frontmatterLines.join('\n');
-      final tagsLine = RegExp(r'tags:\s*\[(.*?)\]').firstMatch(frontmatterContent);
+      final tagsLine =
+          RegExp(r'tags:\s*\[(.*?)\]').firstMatch(frontmatterContent);
       if (tagsLine != null) {
-        tags = tagsLine.group(1)?.split(',').map((t) => t.trim().replaceAll('"', '')).toList() ?? [];
+        tags = tagsLine
+                .group(1)
+                ?.split(',')
+                .map((t) => t.trim().replaceAll('"', ''))
+                .toList() ??
+            [];
       }
     }
 
     return ProductItem(
+      origin: origin,
+      unresolvedProductReferences: unresolvedProductReferences,
       fileName: fileName,
       filePath: filePath,
       folder: folder,
