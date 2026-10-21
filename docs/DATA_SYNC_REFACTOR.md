@@ -119,7 +119,9 @@ Web 发布使用本地 CanvasKit，完成首次在线缓存后可断网刷新。
 `RSTONE_PLAYWRIGHT_MODULE` 指向已安装模块，`RSTONE_WEB_URL` 指定被测本地站点。
 脚本创建独立浏览器上下文，验证真实 Flutter 安装/重复同步、两源全部文件 CORS/签名/哈希、完整外壳缓存和断网检索。
 其个人离线用例直接在该隔离上下文中预置一份测试资料；不是对真实用户数据的操作。
-当前本机 Flutter 3.50.0-0.1.pre / Dart 3.12.0 开发版；CI 使用 Flutter stable。
+本机原验收使用 Flutter 3.50.0-0.1.pre / Dart 3.12.0 开发版；CI 固定 Flutter 3.47.7 stable。
+云端首次构建暴露的新 SDK 最低构建要求已对齐：Gradle 8.14.3（官方 SHA-256 校验）、AGP 8.11.1、Kotlin 2.2.20、Java 17。
+SDK 安装显式指定 platform-tools，避免旧默认 tools 包已下架；Linux 模拟器按上游要求开启 KVM。
 本机 Java 回环管道问题通过仅本次进程设置短 `jdk.net.unixdomain.tmpdir` 解决，没有修改全局 Java 配置。
 
 | 验收场景 | 对应测试/证据 |
