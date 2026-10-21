@@ -13,6 +13,7 @@ on:
       - 'scripts/next_app_version.py'
       - 'scripts/validate_data_sync_config.py'
       - 'scripts/verify_release_apks.py'
+      - 'scripts/verify_apk_upgrade.py'
       - '.github/workflows/release_alpha.yml'
       - '.github/workflows/release_apk.yml'
   workflow_dispatch:

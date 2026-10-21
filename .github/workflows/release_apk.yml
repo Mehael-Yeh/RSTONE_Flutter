@@ -157,6 +157,7 @@ jobs:
           script: python3 scripts/verify_apk_upgrade.py device --tag "$RELEASE_TAG" --expected-api 29 --report build/android-upgrade-verification-api29.json
 
       - name: Preserve validated packages
+        if: always() && steps.audit.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: RSTONE-${{ steps.version.outputs.tag }}

@@ -19,6 +19,15 @@ RULES = 'UPGRADE -> 升级验证\n'.encode('utf-8')
 NOTE = 'RSTONE-UPGRADE-NOTE'
 
 
+def package_uid(listing):
+    # Read the explicit PackageManager UID field instead of relying on the
+    # version-specific formatting of dumpsys diagnostic text.
+    values = re.findall(r'^package:' + re.escape(PACKAGE) + r'\s+uid:(\d+)\s*$', listing, re.M)
+    if len(values) != 1 or int(values[0]) < 10000:
+        raise ValueError('Expected exactly one installed application UID: ' + repr(listing))
+    return values[0]
+
+
 def command(args, check=True):
     result = subprocess.run([str(arg) for arg in args], capture_output=True)
     if check and result.returncode:
@@ -95,10 +104,7 @@ class Device:
         return self.adb('exec-out', 'cat', path, check=check).stdout
 
     def uid(self):
-        match = re.search(r'\buserId=(\d+)', self.shell('dumpsys', 'package', PACKAGE))
-        if match is None:
-            raise ValueError('Installed application UID not found')
-        return match.group(1)
+        return package_uid(self.shell('pm', 'list', 'packages', '--user', '0', '-U', PACKAGE))
 
     def launch(self, activity):
         if activity:
@@ -225,4 +231,13 @@ if __name__ == '__main__':
     device_parser.add_argument('--expected-api', type=int)
     device_parser.add_argument('--report', default='build/android-upgrade-verification.json')
     args = parser.parse_args()
-    prepare(args) if args.mode == 'prepare' else exercise(args)
+    try:
+        prepare(args) if args.mode == 'prepare' else exercise(args)
+    except Exception:
+        if args.mode == 'device':
+            # Keep actual install/launch diagnostics when a device check fails.
+            for diagnostic in [('shell', 'dumpsys', 'package', PACKAGE),
+                               ('logcat', '-b', 'crash', '-d', '-t', '120')]:
+                result = command(['adb', '-s', args.serial, *diagnostic], check=False)
+                print(result.stdout.decode('utf-8', 'replace'), flush=True)
+        raise
