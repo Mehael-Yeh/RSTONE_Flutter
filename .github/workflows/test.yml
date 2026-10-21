@@ -1,8 +1,5 @@
 name: Validate application shell
 on:
-  push:
-    paths: ['lib/**', 'test/**', 'integration_test/**', 'scripts/**', 'pubspec.*', 'assets/data_sync_config.json', 'assets/tag_alias_rules.default.txt', '.github/workflows/*.yml']
-  pull_request:
   workflow_dispatch:
 jobs:
   test:

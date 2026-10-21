@@ -25,11 +25,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate production configuration and release scripts
-        run: |
-          python3 scripts/validate_data_sync_config.py
-          python3 -m unittest discover -s scripts -p 'test_*.py'
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -46,10 +41,6 @@ jobs:
           packages: platform-tools build-tools;35.0.0
           log-accepted-android-sdk-licenses: false
 
-      - name: Verify historical APK identity and upgrade version floor
-        id: baselines
-        run: python3 scripts/verify_apk_upgrade.py prepare --repository "$GITHUB_REPOSITORY"
-
       - name: Build metadata
         id: build_meta
         run: python3 scripts/generate_build_date.py >> "$GITHUB_OUTPUT"
@@ -59,24 +50,15 @@ jobs:
         env:
           RELEASE_CHANNEL: ${{ inputs.channel }}
           BUILD_CODE: ${{ steps.build_meta.outputs.build_code }}
-          MINIMUM_BUILD_CODE: ${{ steps.baselines.outputs.minimum_build_code }}
         run: |
           new_ver=$(python3 scripts/next_app_version.py "$RELEASE_CHANNEL")
-          build_number=$((BUILD_CODE > MINIMUM_BUILD_CODE ? BUILD_CODE : MINIMUM_BUILD_CODE))
+          build_number="$BUILD_CODE"
           suffix=''
           if [ "$RELEASE_CHANNEL" = alpha ]; then suffix='-alpha'; fi
           echo "version=${new_ver}+${build_number}" >> "$GITHUB_OUTPUT"
           echo "tag=v${new_ver}${suffix}" >> "$GITHUB_OUTPUT"
           # Build metadata stays local; the tag points to the reviewed source commit.
           sed -i "s/^version:.*/version: ${new_ver}+${build_number}/" pubspec.yaml
-
-      - name: Validate application
-        run: |
-          flutter pub get
-          flutter analyze --no-pub
-          flutter test --no-pub --reporter expanded
-          flutter test --no-pub --dart-define=RSTONE_LITE=true --reporter expanded
-          flutter test --no-pub --dart-define=RUN_PRODUCTION_INTEROP=true test/production_interop_test.dart --reporter expanded
 
       - name: Restore signing configuration
         env:
@@ -108,8 +90,7 @@ jobs:
             lite=false
             suffix=''
             if [ "$edition" = lite ]; then lite=true; suffix='-Lite'; fi
-            # Regenerate release plugin registration after tests; --no-pub would
-            # retain dev-only integration_test registration on Flutter 3.32.
+            # Resolve dependencies and generate release plugin registration.
             flutter build apk --release --split-per-abi --flavor "$edition" \
               --dart-define=APP_VERSION="$RELEASE_VERSION" \
               --dart-define=APP_BUILD_TIME="$BUILD_TIME" --dart-define=RSTONE_LITE="$lite"
@@ -119,53 +100,18 @@ jobs:
             done
           done
 
-      - name: Audit signatures, versions, data configuration and edition assets
-        id: audit
-        env:
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+      - name: Generate download checksums
         run: |
-          build_tools="$ANDROID_HOME/build-tools/35.0.0"
-          python3 scripts/verify_release_apks.py --tag "$RELEASE_TAG" \
-            --version "$RELEASE_VERSION" --build-tools "$build_tools" \
-            --baselines build/upgrade-baseline/manifest.json
+          cd build/app/outputs/flutter-apk
+          sha256sum RSTONE-*.apk > SHA256SUMS.txt
 
-      - name: Enable Android emulator hardware acceleration
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Verify real in-place upgrades and retained personal data
-        uses: reactivecircus/android-emulator-runner@v2
-        env:
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-        with:
-          api-level: 35
-          arch: x86_64
-          emulator-boot-timeout: 300
-          script: python3 scripts/verify_apk_upgrade.py device --tag "$RELEASE_TAG" --expected-api 35 --report build/android-upgrade-verification-api35.json
-
-      - name: Verify upgrades on the oldest supported Android system
-        uses: reactivecircus/android-emulator-runner@v2
-        env:
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-        with:
-          api-level: 29
-          arch: x86_64
-          emulator-boot-timeout: 300
-          script: python3 scripts/verify_apk_upgrade.py device --tag "$RELEASE_TAG" --expected-api 29 --report build/android-upgrade-verification-api29.json
-
-      - name: Preserve validated packages
-        if: always() && steps.audit.outcome == 'success'
+      - name: Preserve built packages
         uses: actions/upload-artifact@v4
         with:
           name: RSTONE-${{ steps.version.outputs.tag }}
           path: |
             build/app/outputs/flutter-apk/RSTONE-*.apk
             build/app/outputs/flutter-apk/SHA256SUMS.txt
-            build/android-upgrade-verification-*.json
-            build/upgrade-baseline/manifest.json
           if-no-files-found: error
           retention-days: 14
 
@@ -201,16 +147,6 @@ jobs:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
           RELEASE_CHANNEL: ${{ inputs.channel }}
         run: |
-          gh release view "$RELEASE_TAG" --json assets > build/release-assets.json
-          python3 - <<'PY'
-          import json, os
-          from pathlib import Path
-          tag = os.environ['RELEASE_TAG']
-          expected = {f'RSTONE-{tag}{suffix}-{abi}-release.apk' for suffix in ['', '-Lite'] for abi in ['arm64-v8a', 'armeabi-v7a', 'x86_64']} | {'SHA256SUMS.txt'}
-          actual = {asset['name'] for asset in json.loads(Path('build/release-assets.json').read_text())['assets']}
-          if actual != expected:
-              raise SystemExit('Release assets are incomplete or unexpected')
-          PY
           if [ "$RELEASE_CHANNEL" = production ]; then
             gh release edit "$RELEASE_TAG" --draft=false --latest
           else

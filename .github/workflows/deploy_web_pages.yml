@@ -30,9 +30,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate production data source configuration
-        run: python3 scripts/validate_data_sync_config.py
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:

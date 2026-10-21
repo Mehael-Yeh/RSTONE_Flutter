@@ -185,17 +185,19 @@ SDK 安装显式指定 platform-tools，避免旧默认 tools 包已下架；Lin
 }
 ```
 
-`scripts/validate_data_sync_config.py` 阻止空配置、示例密钥或非法下载地址进入公开发布。
+`scripts/validate_data_sync_config.py` 可手动检查空配置、示例密钥或非法下载地址。
 普通产品数据变更由 RSTONE_Data 发布，不触发 APP 版本号变化或重新构建 APK。
 Full/Lite 原有字体及 PDF 功能差异保留。正常历史回滚由发布端签发新的 sequence，客户端不降低最高序号。
 Android NDK 对齐到 `28.2.13676358`，满足当前 Flutter SDK 的原生集成测试插件要求。
 
 主分支代码变更沿用 Alpha 自动发包，Production 仍为手动触发；两者调用同一 `release_apk.yml`。
-该流程先运行静态检查、Full/Lite 回归和正式双源联调，再构建并验收签名、版本、ABI、内置公钥、字体和无 Markdown 资产。
+按用户 2026-10-21 的最新要求，后续流程只构建、签名和上传安装包，成功后直接发布，
+不再自动执行静态检查、测试、双源联调、APK 审计或模拟器安装验证；独立测试流程改为仅手动触发。
 六个 APK 与 SHA256SUMS 完整上传到草稿后才公开 Release；标签指向本次源提交，不再提前打标签或自动提交构建版本到 main。
 新版本以 pubspec 为最低要求，旧标签继续递增；Alpha 与 Production 发包任务串行。
+版本码继续采用构建时的 epoch 分钟数，沿用原应用标识与签名。首次 2.0.0 发布及本次设置改造已完成的验证结果保留为历史记录。
 
-2.0 发包另有覆盖安装门禁：下载已发布的 `v0.0.263-alpha` Full/Lite 与 `v1.0.9` 的三种 ABI，
+首次 2.0.0 发包曾执行覆盖安装门禁：下载已发布的 `v0.0.263-alpha` Full/Lite 与 `v1.0.9` 的三种 ABI，
 并纳入最新稳定/预发布包，核对应用标识、签名和版本码。新版本码高于全部基线，六个 APK 的最低 Android API 必须为 29。
 旧签名证书 SHA-256 为 `8a593a18b7f62500f1f47f27643c04456f51c5756defd9d9460365e058495658`。
 在专用 Android API 29 与 35 模拟器上先安装旧包、预置个人 Markdown/规则/笔记/主题/排序，再执行 `adb install -r`；
