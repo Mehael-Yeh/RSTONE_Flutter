@@ -15,8 +15,11 @@ class ReleaseVersionTest(unittest.TestCase):
     def test_existing_current_version_is_incremented(self):
         self.assertEqual(next_version("1.0.0", ["v1.0.0-alpha"], "alpha"), "1.0.1")
 
-    def test_channels_are_independent(self):
-        self.assertEqual(next_version("1.0.0", ["v2.0.5-alpha"], "production"), "1.0.0")
+    def test_other_channel_is_a_minimum_without_incrementing_it(self):
+        self.assertEqual(next_version("1.0.0", ["v2.0.5-alpha"], "production"), "2.0.5")
+
+    def test_major_two_upgrades_from_existing_stable_and_alpha(self):
+        self.assertEqual(next_version("2.0.0", ["v1.0.9", "v0.0.263-alpha"], "alpha"), "2.0.0")
 
     def test_numeric_version_order(self):
         self.assertEqual(next_version("1.0.0", ["v1.0.9", "v1.0.10"], "production"), "1.0.11")

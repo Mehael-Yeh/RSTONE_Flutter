@@ -26,7 +26,7 @@ void main() async {
   );
 
   const compiledVersion =
-      String.fromEnvironment('APP_VERSION', defaultValue: '1.0.0');
+      String.fromEnvironment('APP_VERSION', defaultValue: '2.0.0');
   var appVersion = compiledVersion.split('+').first;
   // Web PackageInfo fetches version.json with a cache-busting URL. Offline
   // startup must use the version bundled into this shell instead of HTTP.

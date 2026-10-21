@@ -18,7 +18,7 @@ NFC 路径及完整 Unicode 大小写冲突检查。只按 sequence 排序，dat
 `config/trusted_keys.json` 固定到 `assets/data_sync_config.json`：keyId 为 `production-2026`。
 公钥文件 Git blob 为 `74ed404bb89c54c75d2a90d6b2b72fc6cbcd4140`；客户端不在运行时下载或自动信任公钥。
 正式 Pages 与 raw 备用源均已逐对象联调。二者同属 GitHub，不能视为独立服务商容灾。
-外壳实际版本提升为 `1.0.0`，与签名清单 `minAppVersion=1.0.0` 对齐，不绕过兼容校验。
+用户指定新外壳为 `2.0.0`，满足签名清单 `minAppVersion=1.0.0`，不绕过兼容校验。
 Alpha/Production 版本计算同时以 pubspec 为下限，避免旧 0.x 标签使下一版低于新协议要求。
 
 ## 已实现的存储与事务
@@ -96,7 +96,7 @@ flutter test --dart-define=RUN_PRODUCTION_INTEROP=true test/production_interop_t
 python -m unittest discover -s scripts -p 'test_*.py'
 flutter test integration_test/native_sync_test.dart -d <设备> --flavor full
 flutter build windows --release
-flutter build web --release --no-web-resources-cdn --dart-define=APP_VERSION=1.0.0
+flutter build web --release --no-web-resources-cdn --dart-define=APP_VERSION=2.0.0
 python scripts/prepare_web_offline.py
 flutter build apk --debug --flavor full --dart-define=RSTONE_LITE=false
 flutter build apk --debug --flavor lite --dart-define=RSTONE_LITE=true
@@ -119,8 +119,10 @@ Web 发布使用本地 CanvasKit，完成首次在线缓存后可断网刷新。
 `RSTONE_PLAYWRIGHT_MODULE` 指向已安装模块，`RSTONE_WEB_URL` 指定被测本地站点。
 脚本创建独立浏览器上下文，验证真实 Flutter 安装/重复同步、两源全部文件 CORS/签名/哈希、完整外壳缓存和断网检索。
 其个人离线用例直接在该隔离上下文中预置一份测试资料；不是对真实用户数据的操作。
-本机原验收使用 Flutter 3.50.0-0.1.pre / Dart 3.12.0 开发版；CI 固定 Flutter 3.47.7 stable。
-云端首次构建暴露的新 SDK 最低构建要求已对齐：Gradle 8.14.3（官方 SHA-256 校验）、AGP 8.11.1、Kotlin 2.2.20、Java 17。
+本机原验收使用 Flutter 3.50.0-0.1.pre / Dart 3.12.0 开发版；2.0 的 CI 固定 Flutter 3.32.8 stable。
+旧 APK 最低 Android API 为 21。为保留 Android 5.0 的安装范围，固定兼容的 SDK、idb_shim 2.6.7、SQLite 2.9.4 与 ffi 2.3.6，
+并通过 sqlite3_flutter_libs 0.5.41 为桌面打包原生 SQLite；不使用要求新 Dart SDK 的 native-assets 版本。
+Gradle 8.11.1 使用官方分发和 SHA-256 校验，AGP 8.9.1、Kotlin 2.1.0、Java 17 与原项目工具链保持一致。
 SDK 安装显式指定 platform-tools，避免旧默认 tools 包已下架；Linux 模拟器按上游要求开启 KVM。
 本机 Java 回环管道问题通过仅本次进程设置短 `jdk.net.unixdomain.tmpdir` 解决，没有修改全局 Java 配置。
 
@@ -176,6 +178,14 @@ Android NDK 对齐到 `28.2.13676358`，满足当前 Flutter SDK 的原生集成
 六个 APK 与 SHA256SUMS 完整上传到草稿后才公开 Release；标签指向本次源提交，不再提前打标签或自动提交构建版本到 main。
 新版本以 pubspec 为最低要求，旧标签继续递增；Alpha 与 Production 发包任务串行。
 
+2.0 发包另有覆盖安装门禁：下载已发布的 `v0.0.263-alpha` Full/Lite 与 `v1.0.9` 的三种 ABI，
+并纳入最新稳定/预发布包，核对应用标识、签名和版本码。新版本码高于全部基线，最低 Android API 不抬高。
+旧签名证书 SHA-256 为 `8a593a18b7f62500f1f47f27643c04456f51c5756defd9d9460365e058495658`。
+在专用 Android API 21 与 35 模拟器上先安装旧包、预置个人 Markdown/规则/笔记/主题/排序，再执行 `adb install -r`；
+两次安装之间不卸载或清数据，检查 UID 不变、个人文件迁移后字节一致、笔记与偏好保留、旧原件仍在。
+覆盖旧 Alpha Full→新 Full、旧 Alpha Lite→新 Lite、旧正式 Full→新 Full，以及 Full→Lite。
+脚本限制为专用模拟器，所有测试资料均为合成内容，不操作用户手机。通过后才公开六个签名 APK。
+
 ## 本次验证结论
 
 - 改造前原有 18 项回归通过。
@@ -183,8 +193,8 @@ Android NDK 对齐到 `28.2.13676358`，满足当前 Flutter SDK 的原生集成
 - `flutter analyze`：无问题。
 - GitHub 公开模拟分发站点真实 HTTPS 联调通过：5 个文件验签安装，重复同步 0 字节对象下载。
 - 正式 Pages/raw 双源真实客户端联调通过：各 187 文件、84,388 字节原始对象载荷；重复同步 0 个对象，原生持久化断网重开及个人资料保护通过。
-- 发布版本脚本 5 项测试通过，覆盖 0.x→1.0.0 下限、已有版本递增、空标签、频道隔离及数值排序。
-- APK 资源检查脚本 4 项测试通过，覆盖两版资源边界、旧 Markdown、错误信任配置和 Lite 字体泄漏；共用发包流程通过 actionlint 检查。
+- 发布与 APK 检查脚本共 12 项测试通过，覆盖 2.0 大版本、已有版本递增、频道版本下限、数值排序、Full/Lite 资产和直接升级的签名/版本码/最低系统约束。
+- 共用发包流程通过 actionlint 检查；Android 覆盖安装实测以本次 Actions 结果为准。
 - Windows Release、Web Release、Android Full/Lite Debug 已构建成功。
 - 真实 Chromium IndexedDB 测试通过，覆盖事务、重开、损坏修复、删除及个人资料保留。
   本机预发布 Flutter 的 Windows CanvasKit 测试路径返回 404，测试时映射到同一 SDK 原始资源后执行；没有改产品数据或存储实现。

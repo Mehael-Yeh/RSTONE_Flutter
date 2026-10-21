@@ -7,6 +7,10 @@ import subprocess
 
 def next_version(current, tags, channel):
     floor = tuple(map(int, current.split(".")))
+    all_versions = [tuple(map(int, match.groups())) for tag in tags
+                    for match in [re.fullmatch(r'v(\d+)\.(\d+)\.(\d+)(?:-alpha)?', tag)] if match]
+    if all_versions:
+        floor = max(floor, max(all_versions))
     suffix = "-alpha" if channel == "alpha" else ""
     pattern = re.compile(r"^v(\d+)\.(\d+)\.(\d+)" + suffix + r"$")
     versions = [tuple(map(int, match.groups())) for tag in tags

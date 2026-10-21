@@ -37,9 +37,18 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.7'
+          flutter-version: '3.32.8'
           channel: stable
           cache: true
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+
+      - name: Verify historical APK identity and upgrade version floor
+        id: baselines
+        run: python3 scripts/verify_apk_upgrade.py prepare --repository "$GITHUB_REPOSITORY"
 
       - name: Build metadata
         id: build_meta
@@ -50,14 +59,16 @@ jobs:
         env:
           RELEASE_CHANNEL: ${{ inputs.channel }}
           BUILD_CODE: ${{ steps.build_meta.outputs.build_code }}
+          MINIMUM_BUILD_CODE: ${{ steps.baselines.outputs.minimum_build_code }}
         run: |
           new_ver=$(python3 scripts/next_app_version.py "$RELEASE_CHANNEL")
+          build_number=$((BUILD_CODE > MINIMUM_BUILD_CODE ? BUILD_CODE : MINIMUM_BUILD_CODE))
           suffix=''
           if [ "$RELEASE_CHANNEL" = alpha ]; then suffix='-alpha'; fi
-          echo "version=${new_ver}+${BUILD_CODE}" >> "$GITHUB_OUTPUT"
+          echo "version=${new_ver}+${build_number}" >> "$GITHUB_OUTPUT"
           echo "tag=v${new_ver}${suffix}" >> "$GITHUB_OUTPUT"
           # Build metadata stays local; the tag points to the reviewed source commit.
-          sed -i "s/^version:.*/version: ${new_ver}+${BUILD_CODE}/" pubspec.yaml
+          sed -i "s/^version:.*/version: ${new_ver}+${build_number}/" pubspec.yaml
 
       - name: Validate application
         run: |
@@ -66,11 +77,6 @@ jobs:
           flutter test --no-pub --reporter expanded
           flutter test --no-pub --dart-define=RSTONE_LITE=true --reporter expanded
           flutter test --no-pub --dart-define=RUN_PRODUCTION_INTEROP=true test/production_interop_test.dart --reporter expanded
-
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-          log-accepted-android-sdk-licenses: false
 
       - name: Restore signing configuration
         env:
@@ -119,7 +125,34 @@ jobs:
         run: |
           build_tools=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1 | xargs dirname)
           python3 scripts/verify_release_apks.py --tag "$RELEASE_TAG" \
-            --version "$RELEASE_VERSION" --build-tools "$build_tools"
+            --version "$RELEASE_VERSION" --build-tools "$build_tools" \
+            --baselines build/upgrade-baseline/manifest.json
+
+      - name: Enable Android emulator hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify real in-place upgrades and retained personal data
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        with:
+          api-level: 35
+          arch: x86_64
+          emulator-boot-timeout: 300
+          script: python3 scripts/verify_apk_upgrade.py device --tag "$RELEASE_TAG" --expected-api 35 --report build/android-upgrade-verification-api35.json
+
+      - name: Verify upgrades on the oldest supported Android system
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        with:
+          api-level: 21
+          arch: x86_64
+          emulator-boot-timeout: 300
+          script: python3 scripts/verify_apk_upgrade.py device --tag "$RELEASE_TAG" --expected-api 21 --report build/android-upgrade-verification-api21.json
 
       - name: Preserve validated packages
         uses: actions/upload-artifact@v4
@@ -128,6 +161,8 @@ jobs:
           path: |
             build/app/outputs/flutter-apk/RSTONE-*.apk
             build/app/outputs/flutter-apk/SHA256SUMS.txt
+            build/android-upgrade-verification-*.json
+            build/upgrade-baseline/manifest.json
           if-no-files-found: error
           retention-days: 14
 
@@ -144,6 +179,7 @@ jobs:
           body: |
             固定应用外壳与签名资料增量同步。
             - 产品资料在线同步，更新资料无需重新安装 APK；首次启动请联网下载。
+            - 支持旧版覆盖安装；请直接安装对应架构的新 APK，保留个人笔记与资料，无需先卸载。
             - 已下载的官方资料与个人资料支持离线使用。
             - Full/Lite 各提供 arm64-v8a、armeabi-v7a、x86_64；SHA256SUMS.txt 可核对下载文件。
             - 构建版本：`${{ steps.version.outputs.version }}`

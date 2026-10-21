@@ -2,7 +2,7 @@ name: rst_flutter
 description: "锐石 RSTONE - Flutter多平台应用"
 publish_to: 'none'
 
-version: 1.0.0+29749970
+version: 2.0.0+29876067
 
 environment:
   sdk: ^3.5.0
@@ -26,8 +26,10 @@ dependencies:
   unorm_dart: 0.3.3
   http: ^1.2.2
   sqflite: ^2.3.3+1
-  sqflite_common_ffi: ^2.3.3
-  idb_shim: ^2.6.1
+  sqflite_common_ffi: 2.3.6
+  sqlite3: 2.9.4
+  sqlite3_flutter_libs: 0.5.41
+  idb_shim: 2.6.7
 
 dev_dependencies:
   integration_test:

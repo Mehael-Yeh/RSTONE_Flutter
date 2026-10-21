@@ -13,7 +13,7 @@ jobs:
       - run: python3 scripts/validate_data_sync_config.py
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.7'
+          flutter-version: '3.32.8'
           channel: stable
           cache: true
       - run: flutter pub get
@@ -42,7 +42,7 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.7'
+          flutter-version: '3.32.8'
           channel: stable
           cache: true
       - run: flutter pub get

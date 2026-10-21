@@ -13,6 +13,50 @@ FONTS = {'MicrosoftYaHei.ttf', 'MicrosoftYaHeiBold.ttf', 'SimHei.ttf'}
 ABIS = ['arm64-v8a', 'armeabi-v7a', 'x86_64']
 
 
+def build_tools_directory(value=None):
+    if value:
+        return Path(value)
+    sdk = os.environ.get('ANDROID_HOME') or os.environ.get('ANDROID_SDK_ROOT')
+    if not sdk:
+        raise ValueError('Android SDK location is required')
+    candidates = list((Path(sdk) / 'build-tools').glob('*'))
+    candidates = [path for path in candidates if (path / ('aapt.exe' if os.name == 'nt' else 'aapt')).exists()]
+    if not candidates:
+        raise ValueError('Android build-tools are required')
+    return max(candidates, key=lambda path: tuple(map(int, re.findall(r'\d+', path.name))))
+
+
+def apk_identity(apk, build_tools):
+    tools = build_tools_directory(build_tools)
+    aapt = tools / ('aapt.exe' if os.name == 'nt' else 'aapt')
+    signer = tools / ('apksigner.bat' if os.name == 'nt' else 'apksigner')
+    metadata = subprocess.run([str(aapt), 'dump', 'badging', str(apk)],
+                              check=True, capture_output=True, text=True, encoding='utf-8', errors='replace').stdout
+    package = re.search(r"^package: name='([^']+)' versionCode='([^']+)' versionName='([^']+)'", metadata, re.M)
+    native = re.search(r'^native-code: (.+)$', metadata, re.M)
+    activity = re.search(r"^launchable-activity: name='([^']+)'", metadata, re.M)
+    minimum = re.search(r"^sdkVersion:'([0-9]+)'", metadata, re.M)
+    verified = subprocess.run([str(signer), 'verify', '--print-certs', str(apk)],
+                              check=True, capture_output=True, text=True, encoding='utf-8', errors='replace').stdout
+    certs = re.findall(r'^Signer #[0-9]+ certificate SHA-256 digest: ([0-9a-f]+)$', verified, re.M)
+    if package is None or native is None or activity is None or minimum is None or len(certs) != 1:
+        raise ValueError(f'Expected one verified APK signer and a launchable app: {apk}')
+    return {'package': package.group(1), 'versionCode': int(package.group(2)),
+            'versionName': package.group(3), 'abis': re.findall(r"'([^']+)'", native.group(1)),
+            'activity': activity.group(1), 'certificateSha256': certs[0], 'minSdk': int(minimum.group(1))}
+
+
+def assert_upgrade_compatible(new, old):
+    if new['package'] != old['package'] or new['certificateSha256'] != old['certificateSha256']:
+        raise ValueError('Direct upgrade requires the same application ID and signing certificate')
+    if new['versionCode'] <= old['versionCode']:
+        raise ValueError('Direct upgrade requires a strictly higher versionCode')
+    if new['minSdk'] > old['minSdk']:
+        raise ValueError('Direct upgrade must retain the historical Android system minimum')
+    if tuple(map(int, new['versionName'].split('.'))) < tuple(map(int, old['versionName'].split('.'))):
+        raise ValueError('The new displayed version cannot be lower than the installed version')
+
+
 def audit_assets(archive, config, lite):
     names = archive.namelist()
     if any(name.startswith(ASSET_ROOT) and name.endswith('.md') for name in names):
@@ -30,9 +74,8 @@ def run(args):
     output = Path(args.directory)
     config = json.loads(Path('assets/data_sync_config.json').read_text(encoding='utf-8'))
     version, code = args.version.split('+')
-    tools = Path(args.build_tools)
-    aapt = tools / ('aapt.exe' if os.name == 'nt' else 'aapt')
-    signer = tools / ('apksigner.bat' if os.name == 'nt' else 'apksigner')
+    tools = build_tools_directory(args.build_tools)
+    baseline = json.loads(Path(args.baselines).read_text(encoding='utf-8')) if args.baselines else []
     expected = {f'RSTONE-{args.tag}{suffix}-{abi}-release.apk': (suffix != '', abi)
                 for suffix in ['', '-Lite'] for abi in ABIS}
     actual = {p.name for p in output.glob('RSTONE-*.apk')}
@@ -43,19 +86,13 @@ def run(args):
         apk = output / name
         with zipfile.ZipFile(apk) as archive:
             audit_assets(archive, config, lite)
-        metadata = subprocess.run([str(aapt), 'dump', 'badging', str(apk)],
-                                  check=True, capture_output=True, text=True).stdout
-        package = re.search(r"^package: name='([^']+)' versionCode='([^']+)' versionName='([^']+)'", metadata, re.M)
-        native = re.search(r'^native-code: (.+)$', metadata, re.M)
-        if (package is None or package.groups() != ('com.rstone.rstone_flutter', code, version)
-                or native is None or set(re.findall(r"'([^']+)'", native.group(1))) != {abi}):
+        identity = apk_identity(apk, tools)
+        if (identity['package'] != 'com.rstone.rstone_flutter' or identity['versionCode'] != int(code)
+                or identity['versionName'] != version or set(identity['abis']) != {abi}):
             raise ValueError(f'Incorrect package version or ABI: {name}')
-        verified = subprocess.run([str(signer), 'verify', '--print-certs', str(apk)],
-                                  check=True, capture_output=True, text=True).stdout
-        certs = re.findall(r'^Signer #[0-9]+ certificate SHA-256 digest: ([0-9a-f]+)$', verified, re.M)
-        if len(certs) != 1:
-            raise ValueError(f'Expected one verified signer: {name}')
-        certificates.update(certs)
+        for old in baseline:
+            assert_upgrade_compatible(identity, old)
+        certificates.add(identity['certificateSha256'])
         digest = hashlib.sha256()
         with apk.open('rb') as handle:
             for chunk in iter(lambda: handle.read(1024 * 1024), b''):
@@ -73,4 +110,5 @@ if __name__ == '__main__':
     parser.add_argument('--tag', required=True)
     parser.add_argument('--version', required=True)
     parser.add_argument('--build-tools', required=True)
+    parser.add_argument('--baselines')
     run(parser.parse_args())

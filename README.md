@@ -30,7 +30,8 @@ RSTONE 是一个基于 Flutter 的跨平台检索工具，用于集中管理和�
 
 本次重构的分阶段改动、测试、生产配置和证据边界见 [数据同步交付记录](docs/DATA_SYNC_REFACTOR.md)。
 `assets/data_sync_config.json` 已固定正式 Pages/备用 raw 源及 production-2026 公钥。
-首次支持此协议的外壳版本为 1.0.0；真实首版资料 187 份，重复同步不下载已有对象。示例公钥仅用于测试。
+新外壳版本为 2.0.0；保留旧应用标识、签名和 Android 5.0 系统下限，发包前验证旧版覆盖安装与个人资料保留。
+真实首版资料 187 份，重复同步不下载已有对象。示例公钥仅用于测试。
 
 ---
 
@@ -104,7 +105,7 @@ flutter run -d chrome
 Web 离线外壳构建（应用版本请与 pubspec.yaml 保持一致）：
 
 ```bash
-flutter build web --release --no-web-resources-cdn --dart-define=APP_VERSION=1.0.0
+flutter build web --release --no-web-resources-cdn --dart-define=APP_VERSION=2.0.0
 python scripts/prepare_web_offline.py
 ```
 
