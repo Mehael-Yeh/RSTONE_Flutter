@@ -151,10 +151,10 @@ jobs:
         env:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
         with:
-          api-level: 21
+          api-level: 29
           arch: x86_64
           emulator-boot-timeout: 300
-          script: python3 scripts/verify_apk_upgrade.py device --tag "$RELEASE_TAG" --expected-api 21 --report build/android-upgrade-verification-api21.json
+          script: python3 scripts/verify_apk_upgrade.py device --tag "$RELEASE_TAG" --expected-api 29 --report build/android-upgrade-verification-api29.json
 
       - name: Preserve validated packages
         uses: actions/upload-artifact@v4
@@ -180,6 +180,7 @@ jobs:
           generate_release_notes: true
           body: |
             固定应用外壳与签名资料增量同步。
+            - 支持 Android 10 及以上系统。
             - 产品资料在线同步，更新资料无需重新安装 APK；首次启动请联网下载。
             - 支持旧版覆盖安装；请直接安装对应架构的新 APK，保留个人笔记与资料，无需先卸载。
             - 已下载的官方资料与个人资料支持离线使用。

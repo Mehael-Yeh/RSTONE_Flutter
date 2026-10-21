@@ -120,8 +120,9 @@ Web 发布使用本地 CanvasKit，完成首次在线缓存后可断网刷新。
 脚本创建独立浏览器上下文，验证真实 Flutter 安装/重复同步、两源全部文件 CORS/签名/哈希、完整外壳缓存和断网检索。
 其个人离线用例直接在该隔离上下文中预置一份测试资料；不是对真实用户数据的操作。
 本机原验收使用 Flutter 3.50.0-0.1.pre / Dart 3.12.0 开发版；2.0 的 CI 固定 Flutter 3.32.8 stable。
-旧 APK 最低 Android API 为 21。为保留 Android 5.0 的安装范围，固定兼容的 SDK、idb_shim 2.6.7、SQLite 2.9.4 与 ffi 2.3.6，
-并通过 sqlite3_flutter_libs 0.5.41 为桌面打包原生 SQLite；不使用要求新 Dart SDK 的 native-assets 版本。
+旧 APK 最低 Android API 为 21；按用户最新要求，2.0 最低系统提高为 Android 10（API 29）。
+保留已验证的 SDK 与依赖组合：idb_shim 2.6.7、SQLite 2.9.4 与 ffi 2.3.6，
+并通过 sqlite3_flutter_libs 0.5.41 为桌面打包原生 SQLite。
 Gradle 8.11.1 使用官方分发和 SHA-256 校验，AGP 8.9.1、Kotlin 2.1.0、Java 17 与原项目工具链保持一致。
 SDK 安装显式指定 platform-tools，避免旧默认 tools 包已下架；Linux 模拟器按上游要求开启 KVM。
 本机 Java 回环管道问题通过仅本次进程设置短 `jdk.net.unixdomain.tmpdir` 解决，没有修改全局 Java 配置。
@@ -179,9 +180,9 @@ Android NDK 对齐到 `28.2.13676358`，满足当前 Flutter SDK 的原生集成
 新版本以 pubspec 为最低要求，旧标签继续递增；Alpha 与 Production 发包任务串行。
 
 2.0 发包另有覆盖安装门禁：下载已发布的 `v0.0.263-alpha` Full/Lite 与 `v1.0.9` 的三种 ABI，
-并纳入最新稳定/预发布包，核对应用标识、签名和版本码。新版本码高于全部基线，最低 Android API 不抬高。
+并纳入最新稳定/预发布包，核对应用标识、签名和版本码。新版本码高于全部基线，六个 APK 的最低 Android API 必须为 29。
 旧签名证书 SHA-256 为 `8a593a18b7f62500f1f47f27643c04456f51c5756defd9d9460365e058495658`。
-在专用 Android API 21 与 35 模拟器上先安装旧包、预置个人 Markdown/规则/笔记/主题/排序，再执行 `adb install -r`；
+在专用 Android API 29 与 35 模拟器上先安装旧包、预置个人 Markdown/规则/笔记/主题/排序，再执行 `adb install -r`；
 两次安装之间不卸载或清数据，检查 UID 不变、个人文件迁移后字节一致、笔记与偏好保留、旧原件仍在。
 覆盖旧 Alpha Full→新 Full、旧 Alpha Lite→新 Lite、旧正式 Full→新 Full，以及 Full→Lite。
 脚本限制为专用模拟器，所有测试资料均为合成内容，不操作用户手机。通过后才公开六个签名 APK。
@@ -196,13 +197,15 @@ Android NDK 对齐到 `28.2.13676358`，满足当前 Flutter SDK 的原生集成
 - 发布与 APK 检查脚本共 15 项测试通过，覆盖 2.0 大版本、已有版本递增、频道版本下限、数值排序、Full/Lite 资产、跨工具元数据解析和直接升级的签名/版本码/最低系统约束。
 - 共用发包流程通过 actionlint 检查；Android 覆盖安装实测以本次 Actions 结果为准。
 - Windows Release、Web Release、Android Full/Lite Debug 已构建成功。
+- Windows 2.0.0+29876067 Release 已重新构建，随包 SQLite DLL 在隔离内存数据库中完成 BLOB 写入与读取。
 - 真实 Chromium IndexedDB 测试通过，覆盖事务、重开、损坏修复、删除及个人资料保留。
   本机预发布 Flutter 的 Windows CanvasKit 测试路径返回 404，测试时映射到同一 SDK 原始资源后执行；没有改产品数据或存储实现。
-- Android 原生集成入口及 Full/Lite CI 矩阵已加入；本机只读模拟器出现 ADB 未授权，未取得设备端集成通过证据。
+- Android Full/Lite 原生集成已在 GitHub Actions 的专用 API 35 模拟器通过，覆盖事务、离线重开、损坏修复和个人资料保护；见 [CI 运行](https://github.com/Mehael-Yeh/RSTONE_Flutter/actions/runs/39557837023)。
 - Web Release 1.0.0 正式数据冷启动复核通过：首次下载 187 个对象，在线重复同步 0 个；34 个程序资源经哈希校验后缓存，断网刷新仍能检索 RS-LIVE-WEB 个人资料，version.json 在线请求为 0，无页面异常。
+- 线上 Web 2.0.0 已部署并重新验收：首次下载 187 个对象，重复同步 0 个；33 个程序资源完整缓存，断网冷刷新仍可检索合成个人资料，两源全部对象的浏览器跨域请求、签名与哈希通过，无页面异常或 version.json 请求。
 - 生产站点配置与真实产品数据联调已完成；真实 Chromium 从本地 Web 外壳跨域获取两源全部 187 个对象，签名、大小及 SHA-256 均通过。
 
 双源请求计数、清单与源提交、Web 实测及成品配置检查见 [本次正式联调证据](DATA_SYNC_LIVE_VERIFICATION.json)。
 构建产物与完整源文件哈希另存于本机 `build/data_sync_verification.json`。
 
-生产数据已由发布端上线；用户已授权将外壳改造提交、推送并触发首次 Alpha 发包。物理断电及 Android 设备验证仍不作通过声明。
+生产数据已由发布端上线；用户已授权将外壳改造提交、推送并触发首次 Alpha 发包。Android 已有 CI 模拟器验证；物理断电和实体手机长期运行不作通过声明。

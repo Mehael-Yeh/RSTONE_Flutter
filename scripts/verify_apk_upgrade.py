@@ -140,7 +140,7 @@ def exercise(args):
         suffix = '-Lite' if lite else ''
         new_apk = Path(args.directory) / f'RSTONE-{args.tag}{suffix}-x86_64-release.apk'
         new = apk_identity(new_apk, tools)
-        assert_upgrade_compatible(new, old)
+        assert_upgrade_compatible(new, old, android_api=api)
         # Each independent case starts fresh. There is NO uninstall or data clear
         # between installing the historical APK and installing its replacement.
         device.adb('uninstall', PACKAGE, check=False)

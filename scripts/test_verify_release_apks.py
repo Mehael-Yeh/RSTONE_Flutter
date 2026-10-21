@@ -40,17 +40,20 @@ class ReleaseAssetsTest(unittest.TestCase):
 
     def test_upgrade_accepts_legacy_stable_and_alpha(self):
         new = {'package': 'com.rstone.rstone_flutter', 'certificateSha256': 'same',
-               'versionCode': 30000000, 'versionName': '2.0.0', 'minSdk': 21}
+               'versionCode': 30000000, 'versionName': '2.0.0', 'minSdk': 29}
         for version in ['0.0.263', '1.0.9']:
-            old = dict(new, versionName=version, versionCode=29749969)
+            old = dict(new, versionName=version, versionCode=29749969, minSdk=21)
             assert_upgrade_compatible(new, old)
+            assert_upgrade_compatible(new, old, android_api=35)
+            with self.assertRaises(ValueError):
+                assert_upgrade_compatible(new, old, android_api=28)
 
     def test_upgrade_rejects_new_identity_and_old_version_code(self):
         old = {'package': 'com.rstone.rstone_flutter', 'certificateSha256': 'same',
                'versionCode': 29749969, 'versionName': '1.0.9', 'minSdk': 21}
-        new = dict(old, versionCode=30000000, versionName='2.0.0')
+        new = dict(old, versionCode=30000000, versionName='2.0.0', minSdk=29)
         for change in [{'package': 'another.app'}, {'certificateSha256': 'different'},
-                       {'versionCode': 29749969}, {'versionName': '1.0.0'}, {'minSdk': 23}]:
+                       {'versionCode': 29749969}, {'versionName': '1.0.0'}, {'minSdk': 30}]:
             with self.assertRaises(ValueError):
                 assert_upgrade_compatible(dict(new, **change), old)
 

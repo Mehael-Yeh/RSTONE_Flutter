@@ -27,7 +27,7 @@ android {
 
     defaultConfig {
         applicationId = "com.rstone.rstone_flutter"
-        minSdk = 21
+        minSdk = 29
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

@@ -11,6 +11,7 @@ import zipfile
 ASSET_ROOT = 'assets/flutter_assets/'
 FONTS = {'MicrosoftYaHei.ttf', 'MicrosoftYaHeiBold.ttf', 'SimHei.ttf'}
 ABIS = ['arm64-v8a', 'armeabi-v7a', 'x86_64']
+MIN_ANDROID_API = 29
 
 
 def build_tools_directory(value=None):
@@ -59,13 +60,13 @@ def apk_identity(apk, build_tools):
     return parse_identity(metadata, verified, abis)
 
 
-def assert_upgrade_compatible(new, old):
+def assert_upgrade_compatible(new, old, *, android_api=MIN_ANDROID_API):
     if new['package'] != old['package'] or new['certificateSha256'] != old['certificateSha256']:
         raise ValueError('Direct upgrade requires the same application ID and signing certificate')
     if new['versionCode'] <= old['versionCode']:
         raise ValueError('Direct upgrade requires a strictly higher versionCode')
-    if new['minSdk'] > old['minSdk']:
-        raise ValueError('Direct upgrade must retain the historical Android system minimum')
+    if max(new['minSdk'], old['minSdk']) > android_api:
+        raise ValueError(f'Both APKs must support the upgrade test system: Android API {android_api}')
     if tuple(map(int, new['versionName'].split('.'))) < tuple(map(int, old['versionName'].split('.'))):
         raise ValueError('The new displayed version cannot be lower than the installed version')
 
@@ -100,6 +101,8 @@ def run(args):
         with zipfile.ZipFile(apk) as archive:
             audit_assets(archive, config, lite)
         identity = apk_identity(apk, tools)
+        if identity['minSdk'] != MIN_ANDROID_API:
+            raise ValueError('Release APKs must require Android 10 (API 29)')
         if (identity['package'] != 'com.rstone.rstone_flutter' or identity['versionCode'] != int(code)
                 or identity['versionName'] != version or set(identity['abis']) != {abi}):
             raise ValueError(f'Incorrect package version or ABI: {name}')
