@@ -193,7 +193,7 @@ Android NDK 对齐到 `28.2.13676358`，满足当前 Flutter SDK 的原生集成
 - `flutter analyze`：无问题。
 - GitHub 公开模拟分发站点真实 HTTPS 联调通过：5 个文件验签安装，重复同步 0 字节对象下载。
 - 正式 Pages/raw 双源真实客户端联调通过：各 187 文件、84,388 字节原始对象载荷；重复同步 0 个对象，原生持久化断网重开及个人资料保护通过。
-- 发布与 APK 检查脚本共 12 项测试通过，覆盖 2.0 大版本、已有版本递增、频道版本下限、数值排序、Full/Lite 资产和直接升级的签名/版本码/最低系统约束。
+- 发布与 APK 检查脚本共 15 项测试通过，覆盖 2.0 大版本、已有版本递增、频道版本下限、数值排序、Full/Lite 资产、跨工具元数据解析和直接升级的签名/版本码/最低系统约束。
 - 共用发包流程通过 actionlint 检查；Android 覆盖安装实测以本次 Actions 结果为准。
 - Windows Release、Web Release、Android Full/Lite Debug 已构建成功。
 - 真实 Chromium IndexedDB 测试通过，覆盖事务、重开、损坏修复、删除及个人资料保留。

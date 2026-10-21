@@ -4,7 +4,7 @@ import json
 import unittest
 import zipfile
 
-from verify_release_apks import ASSET_ROOT, FONTS, assert_upgrade_compatible, audit_assets
+from verify_release_apks import ASSET_ROOT, FONTS, assert_upgrade_compatible, audit_assets, parse_identity
 
 
 class ReleaseAssetsTest(unittest.TestCase):
@@ -53,6 +53,27 @@ class ReleaseAssetsTest(unittest.TestCase):
                        {'versionCode': 29749969}, {'versionName': '1.0.0'}, {'minSdk': 23}]:
             with self.assertRaises(ValueError):
                 assert_upgrade_compatible(dict(new, **change), old)
+
+
+class ApkMetadataTest(unittest.TestCase):
+    metadata = ("package: name='com.rstone.rstone_flutter' versionName='2.0.0' versionCodeMajor='0' versionCode='30000000'\n"
+                "sdkVersion:'21'\n")
+
+    def test_tool_attribute_order_and_qualified_uppercase_certificate(self):
+        cert = '8A593A18B7F62500F1F47F27643C04456F51C5756DEFD9D9460365E058495658'
+        value = parse_identity(self.metadata, f'Signer #1 (SDK range) certificate SHA-256 digest: {cert}\n', {'x86_64'})
+        self.assertEqual(value['certificateSha256'], cert.lower())
+        self.assertEqual(value['versionCode'], 30000000)
+        self.assertEqual(value['minSdk'], 21)
+
+    def test_distinct_signing_identities_cannot_be_merged(self):
+        signatures = ''.join(f'Signer #{i} certificate SHA-256 digest: {str(i) * 64}\n' for i in [1, 2])
+        with self.assertRaises(ValueError):
+            parse_identity(self.metadata, signatures, {'x86_64'})
+
+    def test_missing_native_payload_cannot_be_verified(self):
+        with self.assertRaises(ValueError):
+            parse_identity(self.metadata, 'Signer #1 certificate SHA-256 digest: ' + 'a' * 64, set())
 
 
 if __name__ == '__main__':

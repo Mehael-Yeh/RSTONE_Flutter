@@ -19,11 +19,30 @@ def build_tools_directory(value=None):
     sdk = os.environ.get('ANDROID_HOME') or os.environ.get('ANDROID_SDK_ROOT')
     if not sdk:
         raise ValueError('Android SDK location is required')
-    candidates = list((Path(sdk) / 'build-tools').glob('*'))
-    candidates = [path for path in candidates if (path / ('aapt.exe' if os.name == 'nt' else 'aapt')).exists()]
-    if not candidates:
-        raise ValueError('Android build-tools are required')
-    return max(candidates, key=lambda path: tuple(map(int, re.findall(r'\d+', path.name))))
+    tools = Path(sdk) / 'build-tools' / '35.0.0'
+    if not (tools / ('aapt.exe' if os.name == 'nt' else 'aapt')).exists():
+        raise ValueError('Install the pinned Android build-tools 35.0.0')
+    return tools
+
+
+def parse_identity(metadata, signed_output, abis):
+    # Android tooling can add/reorder package attributes and signer qualifiers.
+    lines = [line.strip() for line in metadata.splitlines()]
+    package_line = next((line for line in lines if line.startswith('package:')), '')
+    fields = dict(re.findall(r"([A-Za-z0-9_]+)='([^']*)'", package_line))
+    activity = re.search(r"^launchable-activity:.*?\bname='([^']+)'", metadata, re.M)
+    minimum = re.search(r"^(?:sdkVersion|minSdkVersion):\s*'([0-9]+)'", metadata, re.M)
+    certs = {value.lower() for value in re.findall(
+        r'^Signer[^\n]*? certificate SHA-256 digest:\s*([0-9a-fA-F]{64})\s*$', signed_output, re.M)}
+    if (not all(key in fields for key in ['name', 'versionCode', 'versionName'])
+            or not abis or minimum is None or len(certs) != 1):
+        raise ValueError('Cannot verify APK identity: ' + repr({'packageFields': fields, 'abis': abis,
+                         'minSdkFound': minimum is not None, 'certificates': sorted(certs),
+                         'signerOutput': signed_output[:1800]}))
+    return {'package': fields['name'], 'versionCode': int(fields['versionCode']) + (int(fields.get('versionCodeMajor', '0')) << 32),
+            'versionName': fields['versionName'], 'abis': sorted(abis),
+            'activity': activity.group(1) if activity else None,
+            'certificateSha256': next(iter(certs)), 'minSdk': int(minimum.group(1))}
 
 
 def apk_identity(apk, build_tools):
@@ -32,18 +51,12 @@ def apk_identity(apk, build_tools):
     signer = tools / ('apksigner.bat' if os.name == 'nt' else 'apksigner')
     metadata = subprocess.run([str(aapt), 'dump', 'badging', str(apk)],
                               check=True, capture_output=True, text=True, encoding='utf-8', errors='replace').stdout
-    package = re.search(r"^package: name='([^']+)' versionCode='([^']+)' versionName='([^']+)'", metadata, re.M)
-    native = re.search(r'^native-code: (.+)$', metadata, re.M)
-    activity = re.search(r"^launchable-activity: name='([^']+)'", metadata, re.M)
-    minimum = re.search(r"^sdkVersion:'([0-9]+)'", metadata, re.M)
     verified = subprocess.run([str(signer), 'verify', '--print-certs', str(apk)],
                               check=True, capture_output=True, text=True, encoding='utf-8', errors='replace').stdout
-    certs = re.findall(r'^Signer #[0-9]+ certificate SHA-256 digest: ([0-9a-f]+)$', verified, re.M)
-    if package is None or native is None or activity is None or minimum is None or len(certs) != 1:
-        raise ValueError(f'Expected one verified APK signer and a launchable app: {apk}')
-    return {'package': package.group(1), 'versionCode': int(package.group(2)),
-            'versionName': package.group(3), 'abis': re.findall(r"'([^']+)'", native.group(1)),
-            'activity': activity.group(1), 'certificateSha256': certs[0], 'minSdk': int(minimum.group(1))}
+    with zipfile.ZipFile(apk) as archive:
+        abis = {match.group(1) for name in archive.namelist()
+                for match in [re.fullmatch(r'lib/([^/]+)/[^/]+\.so', name)] if match}
+    return parse_identity(metadata, verified, abis)
 
 
 def assert_upgrade_compatible(new, old):

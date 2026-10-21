@@ -101,7 +101,10 @@ class Device:
         return match.group(1)
 
     def launch(self, activity):
-        self.shell('am', 'start', '-W', '-n', PACKAGE + '/' + activity)
+        if activity:
+            self.shell('am', 'start', '-W', '-n', PACKAGE + '/' + activity)
+        else:
+            self.shell('monkey', '-p', PACKAGE, '-c', 'android.intent.category.LAUNCHER', '1')
         time.sleep(3)
         alive = self.shell('pidof', PACKAGE, check=False).strip()
         if not alive:
@@ -184,12 +187,14 @@ def exercise(args):
             raise ValueError('Package replacement failed or changed application identity')
         device.launch(new['activity'])
         migrated = modern + '/user/产品列表/' + PERSONAL_NAME + '.md'
+        migrated_rules = modern + '/user/custom_rules/tag_alias_rules.custom.txt'
         deadline = time.monotonic() + 45
-        while time.monotonic() < deadline and device.read(migrated, check=False) != PERSONAL:
+        while time.monotonic() < deadline and (device.read(migrated, check=False) != PERSONAL
+                                               or device.read(migrated_rules, check=False) != RULES):
             time.sleep(1)
         if device.read(migrated) != PERSONAL:
             raise ValueError('Personal Markdown was not retained/migrated')
-        if device.read(modern + '/user/custom_rules/tag_alias_rules.custom.txt') != RULES:
+        if device.read(migrated_rules) != RULES:
             raise ValueError('Personal tag rules were not retained')
         values = preference_values(device.read(preference_path))
         if any(values.get(key) != value for key, value in expected.items()) or values.get('flutter.product_list_sort_desc') != 'true':
