@@ -14,6 +14,7 @@ import '../data_sync/storage/storage_adapter.dart';
 import '../data_sync/storage/storage_factory.dart';
 import '../data_sync/storage/legacy_migration.dart';
 import '../models/product_item.dart';
+import '../utils/grade_lookup.dart';
 import '../utils/natural_sort.dart';
 
 class ObsidianDataService extends ChangeNotifier {
@@ -33,7 +34,7 @@ class ObsidianDataService extends ChangeNotifier {
   List<ProductItem> _products = [], _applications = [], _formulas = [];
   final Map<String, ProductItem> _userItems = {};
   DataSnapshot _official = const DataSnapshot();
-  final Map<String, String> _tdsByProduct = {}, _tdsByNormalizedProduct = {};
+  final Map<String, String> _tdsByProduct = {}, _tdsByGrade = {};
   final Map<String, List<String>> _missingReferences = {};
   String _defaultRules = '',
       _builtInTagAliasRulesRaw = '',
@@ -145,16 +146,19 @@ class ObsidianDataService extends ChangeNotifier {
     _applications = merge(_official.applications, '产品应用');
     _formulas = merge(_official.formulas, '产品配方');
     _tdsByProduct.clear();
-    _tdsByNormalizedProduct.clear();
+    _tdsByGrade.clear();
     _tdsByProduct.addAll(_official.tds);
-    final candidates = <String, List<String>>{};
+    // A grade only matches its own complete TDS basename. Basenames repeated in
+    // different subfolders are ambiguous and must not resolve to either file.
+    final byGrade = <String, List<String>>{};
     for (final entry in _official.tds.entries) {
-      final key = _normalizeProductKey(entry.key.split('/').last);
-      candidates.putIfAbsent(key, () => []).add(entry.value);
+      byGrade
+          .putIfAbsent(_gradeKey(entry.key.split('/').last), () => [])
+          .add(entry.value);
     }
-    for (final entry in candidates.entries) {
+    for (final entry in byGrade.entries) {
       if (entry.value.length == 1) {
-        _tdsByNormalizedProduct[entry.key] = entry.value.single;
+        _tdsByGrade[entry.key] = entry.value.single;
       }
     }
     _missingReferences.clear();
@@ -197,31 +201,13 @@ class ObsidianDataService extends ChangeNotifier {
   }
 
   String? tdsForProduct(String productName) {
-    if (_tdsByProduct.containsKey(productName)) {
-      return _tdsByProduct[productName];
-    }
-    for (final key in _tdsLookupCandidates(productName)) {
-      if (_tdsByNormalizedProduct.containsKey(key)) {
-        return _tdsByNormalizedProduct[key];
-      }
-    }
-    return null;
+    return _tdsByGrade[_gradeKey(productName)];
   }
 
-  Iterable<String> _tdsLookupCandidates(String name) sync* {
-    final normalized = _normalizeProductKey(name);
-    if (normalized.isNotEmpty) yield normalized;
-    final base = _normalizeProductKey(name.split('-').first.trim());
-    if (base.isNotEmpty && base != normalized) yield base;
-    if (normalized.startsWith('RS')) yield 'RD${normalized.substring(2)}';
-    if (normalized.startsWith('RD')) yield 'RS${normalized.substring(2)}';
-  }
+  /// Case difference and surrounding whitespace are the only tolerated
+  /// variants; every suffix character stays significant.
+  String _gradeKey(String raw) => gradeLookupKey(raw);
 
-  String _normalizeProductKey(String raw) => raw
-      .toUpperCase()
-      .replaceAll('.TDS.MD', '')
-      .replaceAll('.MD', '')
-      .replaceAll(RegExp(r'[^A-Z0-9]'), '');
   void _addLog(String message) {
     _logs.insert(0, '[${DateTime.now().toIso8601String()}] $message');
     if (_logs.length > 100) _logs.removeLast();

@@ -228,15 +228,16 @@ void main() {
     expect(app.applications.single.filePath, '产品应用/PC/方案.md');
   });
 
-  test(
-      'product and TDS deletions invalidate direct normalized alias and search indexes',
+  test('product and TDS deletions invalidate exact grade and search indexes',
       () async {
     await install({
       '产品列表/RS1.md': product('水性'),
       '产品TDS/RS1.TDS.md': '# TDS',
       '产品应用/方案.md': '[[RS1]]'
     });
-    expect(app.tdsForProduct('rd 1'), '# TDS');
+    expect(app.tdsForProduct('RS1'), '# TDS');
+    expect(app.tdsForProduct(' rs1 '), '# TDS');
+    expect(app.tdsForProduct('rd 1'), isNull);
     await f.publish(2, {'产品应用/方案.md': '[[RS1]]'});
     expect(await app.sync!.synchronize(), isTrue);
     expect(app.products, isEmpty);
