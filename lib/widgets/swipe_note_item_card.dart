@@ -17,6 +17,8 @@ class SwipeNoteItemCard extends StatelessWidget {
   final int noteResetSignal;
   final TextStyle? titleStyle;
   final bool showUserAddedDot;
+  final TextDecoration? titleDecoration;
+  final String? statusLabel;
 
   const SwipeNoteItemCard({
     super.key,
@@ -29,6 +31,8 @@ class SwipeNoteItemCard extends StatelessWidget {
     required this.noteResetSignal,
     this.titleStyle,
     this.showUserAddedDot = false,
+    this.titleDecoration,
+    this.statusLabel,
   });
 
   @override
@@ -49,7 +53,8 @@ class SwipeNoteItemCard extends StatelessWidget {
           right: Radius.circular(12),
         ),
         child: Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: EdgeInsets.zero,
           child: InkWell(
             onTap: onTap,
@@ -81,13 +86,34 @@ class SwipeNoteItemCard extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 title,
-                                style: titleStyle ??
-                                    Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          color: cs.onSurface,
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                style: (titleStyle ??
+                                        Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              color: cs.onSurface,
+                                              fontWeight: FontWeight.w700,
+                                            ))
+                                    ?.copyWith(decoration: titleDecoration),
                               ),
                             ),
+                            if (statusLabel != null)
+                              Container(
+                                margin: const EdgeInsets.only(left: 6),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: cs.secondaryContainer,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  statusLabel!,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: cs.onSecondaryContainer,
+                                  ),
+                                ),
+                              ),
                             if (showUserAddedDot)
                               Container(
                                 width: 8,
@@ -109,7 +135,8 @@ class SwipeNoteItemCard extends StatelessWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+                    child:
+                        Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
                   ),
                 ],
               ),

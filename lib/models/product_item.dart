@@ -36,6 +36,7 @@ class ProductItem {
   final String? technologySource; // 技术源
   final String? benchmark; // 对标
   final String? viscosity; // 粘度
+  final String? productStatus; // 产品状态（生命周期标量，可缺省）
 
   // 产品应用相关字段
   final String? primer; // 底漆
@@ -64,6 +65,7 @@ class ProductItem {
     this.technologySource,
     this.benchmark,
     this.viscosity,
+    this.productStatus,
     this.primer,
     this.midCoat,
     this.topCoat,
@@ -97,6 +99,7 @@ class ProductItem {
     String? technologySource;
     String? benchmark;
     String? viscosity;
+    String? productStatus;
     String? primer;
     String? midCoat;
     String? topCoat;
@@ -147,6 +150,10 @@ class ProductItem {
         if (parsedTags.isNotEmpty) {
           tags = parsedTags;
         }
+      } else if (line.trim().startsWith('产品状态:')) {
+        final status =
+            _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
+        if (status.isNotEmpty) productStatus = status;
       } else if (line.trim().startsWith('工程师:')) {
         engineer = _normalizeMdLinkValue(line.split(':').sublist(1).join(':'));
       } else if (line.trim().startsWith('实验牌号:')) {
@@ -226,12 +233,18 @@ class ProductItem {
       technologySource: technologySource,
       benchmark: benchmark,
       viscosity: viscosity,
+      productStatus: productStatus,
       primer: primer,
       midCoat: midCoat,
       topCoat: topCoat,
       baseMaterial: baseMaterial,
     );
   }
+
+  /// 仅明确停产类状态划线；不推广、已转产等仍显示状态但不划线。
+  static const Set<String> discontinuedStatuses = {'停用', '停止', '禁用', '废止'};
+
+  bool get isDiscontinued => discontinuedStatuses.contains(productStatus);
 
   /// 获取显示名称
   String get displayName {

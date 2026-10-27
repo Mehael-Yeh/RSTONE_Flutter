@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import '../utils/compat_color.dart';
 import '../models/product_item.dart';
+import '../utils/grade_lookup.dart';
 import '../utils/natural_sort.dart';
 import '../services/preferences_service.dart';
 import 'note_swipe_tile.dart';
@@ -221,42 +222,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
     if (widget.tdsForProduct != null) {
       return widget.tdsForProduct!(item.fileName);
     }
-    final direct = widget.tdsByProduct[item.fileName];
-    if (direct != null) return direct;
-
-    for (final candidate in _tdsLookupCandidates(item.fileName)) {
-      for (final entry in widget.tdsByProduct.entries) {
-        if (_normalizeProductKey(entry.key) == candidate) {
-          return entry.value;
-        }
-      }
-    }
-    return null;
-  }
-
-  Iterable<String> _tdsLookupCandidates(String productName) sync* {
-    final normalized = _normalizeProductKey(productName);
-    if (normalized.isNotEmpty) yield normalized;
-
-    final baseName = productName.split('-').first.trim();
-    final normalizedBase = _normalizeProductKey(baseName);
-    if (normalizedBase.isNotEmpty && normalizedBase != normalized) {
-      yield normalizedBase;
-    }
-
-    if (normalized.startsWith('RS')) {
-      yield 'RD${normalized.substring(2)}';
-    } else if (normalized.startsWith('RD')) {
-      yield 'RS${normalized.substring(2)}';
-    }
-  }
-
-  String _normalizeProductKey(String raw) {
-    return raw
-        .toUpperCase()
-        .replaceAll('.TDS.MD', '')
-        .replaceAll('.MD', '')
-        .replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    return findExactTds(widget.tdsByProduct, item.fileName);
   }
 
   Future<void> _openNoteEditor(ProductItem item) async {
@@ -400,6 +366,10 @@ class _ObsidianTableState extends State<ObsidianTable> {
             onDeleteTap: _isManual(item) ? () => _deleteManualItem(item) : null,
             noteResetSignal: widget.noteResetSignal,
             showUserAddedDot: _isManual(item),
+            titleDecoration: _columns.first == '牌号' && item.isDiscontinued
+                ? TextDecoration.lineThrough
+                : null,
+            statusLabel: item.productStatus,
             titleStyle: TextStyle(
               color: cs.onSurface,
               fontWeight: FontWeight.w700,
@@ -555,6 +525,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                           children: [
                             ..._columns.map((col) {
                               final val = fields[col] ?? '';
+                              final isGradeColumn = col == '牌号';
                               return SizedBox(
                                 width: _columnWidths[col] ?? 120,
                                 child: Padding(
@@ -574,10 +545,34 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                               color: val.isEmpty
                                                   ? cs.onSurfaceVariant
                                                   : cs.onSurface,
+                                              decoration: isGradeColumn &&
+                                                      item.isDiscontinued
+                                                  ? TextDecoration.lineThrough
+                                                  : null,
                                             ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
+                                        if (isGradeColumn &&
+                                            item.productStatus != null)
+                                          Container(
+                                            margin:
+                                                const EdgeInsets.only(left: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 4, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: cs.secondaryContainer,
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              item.productStatus!,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: cs.onSecondaryContainer,
+                                              ),
+                                            ),
+                                          ),
                                         if (col == _columns.first &&
                                             _isManual(item))
                                           Container(
