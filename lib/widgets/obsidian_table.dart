@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../utils/compat_color.dart';
 import '../models/product_item.dart';
 import '../utils/grade_lookup.dart';
+import '../utils/formula_association.dart';
 import '../utils/natural_sort.dart';
 import '../services/preferences_service.dart';
 import 'note_swipe_tile.dart';
@@ -225,6 +226,26 @@ class _ObsidianTableState extends State<ObsidianTable> {
     return findExactTds(widget.tdsByProduct, item.fileName);
   }
 
+  Widget? _formulaBadge(ProductItem item) {
+    final count = linkedFormulasForProduct(item, widget.formulas).length;
+    if (count == 0) return null;
+    final cs = Theme.of(context).colorScheme;
+    return Tooltip(
+      key: ValueKey('formula-badge:${item.fileName}'),
+      message: '点击产品查看 $count 个关联配方',
+      child: Container(
+        margin: const EdgeInsets.only(left: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        decoration: BoxDecoration(
+          color: cs.secondaryContainer,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text('配方 $count',
+            style: TextStyle(fontSize: 10, color: cs.onSecondaryContainer)),
+      ),
+    );
+  }
+
   Future<void> _openNoteEditor(ProductItem item) async {
     final note = await showDialog<String>(
       context: context,
@@ -370,6 +391,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                 ? TextDecoration.lineThrough
                 : null,
             statusLabel: item.productStatus,
+            titleBadge: _formulaBadge(item),
             titleStyle: TextStyle(
               color: cs.onSurface,
               fontWeight: FontWeight.w700,
@@ -526,6 +548,8 @@ class _ObsidianTableState extends State<ObsidianTable> {
                             ..._columns.map((col) {
                               final val = fields[col] ?? '';
                               final isGradeColumn = col == '牌号';
+                              final formulaBadge =
+                                  isGradeColumn ? _formulaBadge(item) : null;
                               return SizedBox(
                                 width: _columnWidths[col] ?? 120,
                                 child: Padding(
@@ -553,6 +577,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
+                                        if (formulaBadge != null) formulaBadge,
                                         if (isGradeColumn &&
                                             item.productStatus != null)
                                           Container(

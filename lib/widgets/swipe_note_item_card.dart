@@ -19,6 +19,7 @@ class SwipeNoteItemCard extends StatelessWidget {
   final bool showUserAddedDot;
   final TextDecoration? titleDecoration;
   final String? statusLabel;
+  final Widget? titleBadge;
 
   const SwipeNoteItemCard({
     super.key,
@@ -33,6 +34,7 @@ class SwipeNoteItemCard extends StatelessWidget {
     this.showUserAddedDot = false,
     this.titleDecoration,
     this.statusLabel,
+    this.titleBadge,
   });
 
   @override
@@ -97,6 +99,7 @@ class SwipeNoteItemCard extends StatelessWidget {
                                     ?.copyWith(decoration: titleDecoration),
                               ),
                             ),
+                            if (titleBadge != null) titleBadge!,
                             if (statusLabel != null)
                               Container(
                                 margin: const EdgeInsets.only(left: 6),
