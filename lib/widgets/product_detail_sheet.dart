@@ -10,6 +10,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:printing/printing.dart';
 import '../services/share_file.dart';
 import '../models/product_item.dart';
+import '../utils/formula_association.dart';
 import '../services/tds_pdf_service.dart';
 import 'product_detail/formula_content_parser.dart';
 import 'product_detail/markdown_table_parser.dart';
@@ -1105,20 +1106,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     return _deduplicateFormulasByFileName(linked);
   }
 
-  /// 查找并渲染关联的产品配方（文件名以产品牌号开头，如 RS7767-银.md 对应 RS7767）
-  Widget _buildLinkedFormulas() {
+  /// 配方按完整产品牌号或明确的实验牌号关联，不做前缀推断。
+  Widget _buildLinkedFormulas(List<ProductItem> matchedFormulas) {
     final cs = Theme.of(context).colorScheme;
-    final matchedFormulas =
-        _deduplicateFormulasByFileName(widget.formulas.where((f) {
-      // 精确匹配：配方文件名以产品牌号+"-"开头（如 RS7767-银.md 匹配产品 RS7767）
-      // experimentalCode 可能指向另一个系列的产品牌号，仅在非空且有明确匹配时才使用
-      final hasExperimentalCodeMatch =
-          widget.product.experimentalCode != null &&
-              widget.product.experimentalCode!.isNotEmpty &&
-              f.fileName.startsWith(widget.product.experimentalCode!);
-      return f.fileName.startsWith('${widget.product.fileName}-') ||
-          hasExperimentalCodeMatch;
-    }).toList());
 
     if (matchedFormulas.isEmpty) return const SizedBox.shrink();
 
@@ -1173,14 +1163,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         _buildFormulaCard(title, selectedFormula.rawContent),
       ],
     );
-  }
-
-  bool _hasLinkedFormulasForCurrentProduct() {
-    if (widget.product.folder != '产品列表') return false;
-    return widget.formulas.any((f) {
-      final formulaName = f.fileName.replaceAll('.md', '');
-      return formulaName.startsWith('${widget.product.fileName}-');
-    });
   }
 
   String _removeStandaloneWikiLines(String content) {
@@ -1273,7 +1255,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final folderAccent = _folderAccent(cs);
     // 去掉 frontmatter 部分，只留 body
     final bodyContent = _extractMarkdownBody(widget.product.rawContent);
-    final markdownContent = _hasLinkedFormulasForCurrentProduct()
+    final matchedFormulas =
+        linkedFormulasForProduct(widget.product, widget.formulas);
+    final markdownContent = matchedFormulas.isNotEmpty
         ? _removeStandaloneWikiLines(bodyContent)
         : bodyContent;
 
@@ -1432,8 +1416,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                 if (widget.product.folder == '产品应用') _buildFormulaTable(),
                 // 产品详情字段表格（位于配方区块之前）
                 if (widget.product.folder == '产品列表') _buildProductMetaTable(),
-                // 产品配方 section：文件名以当前产品牌号+"-"开头时显示
-                if (widget.product.folder == '产品列表') _buildLinkedFormulas(),
+                // 配方可见性与辅助双链清理共用同一精确关联结果。
+                if (widget.product.folder == '产品列表')
+                  _buildLinkedFormulas(matchedFormulas),
                 // MD 内容（不含 frontmatter）
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
