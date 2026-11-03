@@ -19,7 +19,8 @@ Future<void> _pumpDetail(
 ) async {
   await tester.pumpWidget(MaterialApp(
     home: Scaffold(
-        body: ProductDetailSheet(product: product, formulas: formulas)),
+        body: ProductDetailSheet(
+            product: product, productCatalog: [product], formulas: formulas)),
   ));
   await tester.pumpAndSettle();
   expect(tester.takeException(), isNull);
@@ -43,6 +44,7 @@ Future<void> _pumpTable(
     home: Scaffold(
       body: ObsidianTable(
         items: items,
+        productCatalog: items,
         formulas: formulas,
         tdsByProduct: const {},
         defaultColumns: const ['牌号', '标签'],

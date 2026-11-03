@@ -108,6 +108,19 @@ class TdsPdfService {
     );
 
     final doc = pw.Document();
+    final fontFallback = <pw.Font>[];
+    if (tdsMarkdown.contains('₂')) {
+      // The bundled fonts and NotoSansSC lack U+2082. Load this smaller
+      // existing Google Fonts fallback only for documents that need it.
+      final fallback = await PdfGoogleFonts.notoSansRegular();
+      if (!fallback
+          .getFont(pw.Context(document: doc.document))
+          .isRuneSupported(0x2082)) {
+        // The Google Fonts loader can silently return Helvetica offline.
+        throw StateError('TDS PDF: cannot load a font covering U+2082 (₂).');
+      }
+      fontFallback.add(fallback);
+    }
 
     doc.addPage(
       pw.MultiPage(
@@ -116,6 +129,7 @@ class TdsPdfService {
         theme: pw.ThemeData.withFont(
           base: pdfFonts.bodyRegular,
           bold: pdfFonts.bodyBold,
+          fontFallback: fontFallback,
         ),
         header: (context) => _buildHeader(pdfFonts),
         footer: (context) => _buildFooter(pdfFonts),
@@ -677,6 +691,10 @@ class TdsPdfService {
     return normalized.substring(endIndex + 5).trim();
   }
 
+  @visibleForTesting
+  static String? parseProductSubtitleForTesting(String markdown) =>
+      _parseTdsSections(_extractMarkdownBody(markdown)).productSubtitle;
+
   static _ParsedTds _parseTdsSections(String markdown) {
     final lines = markdown.replaceAll('\r\n', '\n').split('\n');
     String? productCode;
@@ -765,6 +783,9 @@ class TdsPdfService {
         continue;
       }
 
+      // A disclaimer resets current, but must never become a missing subtitle.
+      if (skippingMarkdownDisclaimer) continue;
+
       if (productCode == null) {
         flushTableIfNeeded();
         productCode = line;
@@ -776,8 +797,6 @@ class TdsPdfService {
         productSubtitle = line;
         continue;
       }
-      if (skippingMarkdownDisclaimer) continue;
-
       flushTableIfNeeded();
       final isOrderedLine =
           RegExp(r'^((\d+[\.\)、])|([（(]\d+[）)]))\s+').hasMatch(line);
@@ -849,6 +868,10 @@ class TdsPdfService {
         RegExp(r'[A-Za-z0-9]').hasMatch(rightChar);
   }
 
+  @visibleForTesting
+  static String normalizeParagraphSpacingForTesting(String text) =>
+      _normalizeParagraphSpacing(text);
+
   static String _normalizeParagraphSpacing(String text) {
     var normalized = text
         .replaceAll(RegExp(r'[\t\r\n]+'), ' ')
@@ -857,23 +880,23 @@ class TdsPdfService {
 
     normalized = normalized
         // 中文/全角字符之间不应出现额外空格
-        .replaceAll(
+        .replaceAllMapped(
           RegExp(
             r'([\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF])\s+([\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF])',
           ),
-          r'$1$2',
+          (match) => '${match.group(1)}${match.group(2)}',
         )
         // 中文后接标点前不应保留空格
-        .replaceAll(
+        .replaceAllMapped(
           RegExp(
             r'([\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF])\s+([，。！？；：、）》】』’”,.!?;:\)\]}>])',
           ),
-          r'$1$2',
+          (match) => '${match.group(1)}${match.group(2)}',
         )
         // 左侧括号后不应有空格
-        .replaceAll(
+        .replaceAllMapped(
           RegExp(r'([（《【『“‘(<\[])\s+'),
-          r'$1',
+          (match) => match.group(1)!,
         );
 
     return normalized;

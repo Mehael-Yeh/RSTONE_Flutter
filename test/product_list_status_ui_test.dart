@@ -31,6 +31,7 @@ Future<void> _pumpTable(
     home: Scaffold(
       body: ObsidianTable(
         items: items,
+        productCatalog: items,
         formulas: const [],
         tdsByProduct: const {},
         defaultColumns: const ['牌号', '标签'],

@@ -1,12 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rst_flutter/models/product_item.dart';
-import 'package:rst_flutter/utils/formula_association.dart';
+import 'package:rst_flutter/utils/formula_association.dart' as association;
 
 ProductItem _product(String grade, {String content = ''}) =>
     ProductItem.fromMdContent('产品列表/$grade.md', content);
 
 ProductItem _formula(String name, String content) =>
     ProductItem.fromMdContent('产品配方/$name.md', content);
+
+// Preserve the existing single-product regression scope and all assertions.
+List<ProductItem> linkedFormulasForProduct(
+        ProductItem product, Iterable<ProductItem> formulas) =>
+    association.linkedFormulasForProduct(product, formulas,
+        productCatalog: [product]);
 
 void main() {
   test('ingredient wikilinks associate every blend component', () {

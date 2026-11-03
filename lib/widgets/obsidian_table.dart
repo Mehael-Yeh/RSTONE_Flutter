@@ -15,6 +15,9 @@ import 'swipe_note_item_card.dart';
 /// Obsidian 风格的表格组件，支持列拖拽重排和排序
 class ObsidianTable extends StatefulWidget {
   final List<ProductItem> items;
+
+  /// 完整产品目录，不能使用已筛选的 [items] 代替。
+  final List<ProductItem> productCatalog;
   final List<ProductItem> formulas;
   final Map<String, String> tdsByProduct;
   final String? Function(String)? tdsForProduct;
@@ -34,6 +37,7 @@ class ObsidianTable extends StatefulWidget {
   const ObsidianTable({
     super.key,
     required this.items,
+    required this.productCatalog,
     required this.formulas,
     required this.tdsByProduct,
     this.tdsForProduct,
@@ -227,7 +231,9 @@ class _ObsidianTableState extends State<ObsidianTable> {
   }
 
   Widget? _formulaBadge(ProductItem item) {
-    final count = linkedFormulasForProduct(item, widget.formulas).length;
+    final count = linkedFormulasForProduct(item, widget.formulas,
+            productCatalog: widget.productCatalog)
+        .length;
     if (count == 0) return null;
     final cs = Theme.of(context).colorScheme;
     return Tooltip(
@@ -380,6 +386,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
             onTap: () => ProductDetailSheet.show(
               context,
               item,
+              productCatalog: widget.productCatalog,
               formulas: widget.formulas,
               tdsContent: _tdsOf(item),
             ),
@@ -530,6 +537,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                       onTap: () => ProductDetailSheet.show(
                         context,
                         item,
+                        productCatalog: widget.productCatalog,
                         formulas: widget.formulas,
                         tdsContent: _tdsOf(item),
                       ),
