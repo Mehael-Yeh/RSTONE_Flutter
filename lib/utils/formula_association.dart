@@ -119,15 +119,23 @@ Set<String> _ingredientGradeKeys(String content) {
 /// 参与产品取“关联产品”标量双链与原料列双链的并集，不扫描任意正文。
 /// 无有效显式关联时才兼容旧标题，只移除最后的亮/哑/银/黑/底后缀。
 /// 同一配方多次命中时保留首次出现，不做数字前缀或 RD/RS 推断。
+/// [productCatalog] 必须是完整、未筛选的产品目录；独立产品本号优先于他品实验别名。
 List<ProductItem> linkedFormulasForProduct(
   ProductItem product,
-  Iterable<ProductItem> formulas,
-) {
+  Iterable<ProductItem> formulas, {
+  required Iterable<ProductItem> productCatalog,
+}) {
   if (product.folder != '产品列表') return const [];
+  final canonicalGrades = {
+    for (final item in productCatalog)
+      if (item.folder == '产品列表') gradeLookupKey(item.fileName),
+  };
+  final experimental = product.experimentalCode;
   final identities = {
     gradeLookupKey(product.fileName),
-    if (product.experimentalCode?.isNotEmpty == true)
-      gradeLookupKey(product.experimentalCode!),
+    if (experimental?.isNotEmpty == true &&
+        !canonicalGrades.contains(gradeLookupKey(experimental!)))
+      gradeLookupKey(experimental),
   };
   final matched = <String, ProductItem>{};
   for (final formula in formulas) {

@@ -325,6 +325,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
         ProductDetailSheet.show(
           context,
           item,
+          productCatalog: widget.dataService.products,
           formulas: widget.dataService.formulas,
           tdsContent: widget.dataService.tdsForProduct(item.fileName),
         );

@@ -599,6 +599,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                       },
                       child: ObsidianTable(
                         items: items,
+                        productCatalog: widget.dataService.products,
                         formulas: widget.dataService.formulas,
                         tdsByProduct: widget.dataService.tdsByProduct,
                         tdsForProduct: widget.dataService.tdsForProduct,

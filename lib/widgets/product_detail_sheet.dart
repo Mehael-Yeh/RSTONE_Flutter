@@ -25,6 +25,7 @@ import 'product_detail/markdown_table_parser.dart';
 /// - 拖拽调整弹窗高度（向上展开、向下收起）
 class ProductDetailSheet extends StatefulWidget {
   final ProductItem product;
+  final List<ProductItem> productCatalog;
   final List<ProductItem> formulas;
   final String? tdsContent;
   static bool _isShowing = false;
@@ -32,6 +33,7 @@ class ProductDetailSheet extends StatefulWidget {
   const ProductDetailSheet({
     super.key,
     required this.product,
+    required this.productCatalog,
     this.formulas = const [],
     this.tdsContent,
   });
@@ -40,6 +42,7 @@ class ProductDetailSheet extends StatefulWidget {
   static Future<void> show(
     BuildContext context,
     ProductItem product, {
+    required List<ProductItem> productCatalog,
     List<ProductItem> formulas = const [],
     String? tdsContent,
   }) async {
@@ -56,6 +59,7 @@ class ProductDetailSheet extends StatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (context) => ProductDetailSheet(
         product: product,
+        productCatalog: productCatalog,
         formulas: formulas,
         tdsContent: tdsContent,
       ),
@@ -1255,8 +1259,11 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final folderAccent = _folderAccent(cs);
     // 去掉 frontmatter 部分，只留 body
     final bodyContent = _extractMarkdownBody(widget.product.rawContent);
-    final matchedFormulas =
-        linkedFormulasForProduct(widget.product, widget.formulas);
+    final matchedFormulas = linkedFormulasForProduct(
+      widget.product,
+      widget.formulas,
+      productCatalog: widget.productCatalog,
+    );
     final markdownContent = matchedFormulas.isNotEmpty
         ? _removeStandaloneWikiLines(bodyContent)
         : bodyContent;
