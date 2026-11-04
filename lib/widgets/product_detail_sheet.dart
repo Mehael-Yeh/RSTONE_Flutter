@@ -14,6 +14,7 @@ import '../utils/formula_association.dart';
 import '../services/tds_pdf_service.dart';
 import 'product_detail/formula_content_parser.dart';
 import 'product_detail/markdown_table_parser.dart';
+import 'product_detail/structured_formula_card.dart';
 
 /// 产品详情底部弹窗
 ///
@@ -484,8 +485,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     super.initState();
     final linked = _getApplicationLinkedFormulas();
     if (linked.isNotEmpty) {
-      _selectedApplicationFormulaName =
-          linked.first.fileName.replaceAll('.md', '');
+      _selectedApplicationFormulaName = _formulaName(linked.first);
     }
   }
 
@@ -904,8 +904,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final cs = Theme.of(context).colorScheme;
     final fields = <MapEntry<String, String>>[];
     final linkedByName = {
-      for (final f in _getApplicationLinkedFormulas())
-        f.fileName.replaceAll('.md', ''): f,
+      for (final f in _getApplicationLinkedFormulas()) _formulaName(f): f,
     };
 
     void add(String label, String? value) {
@@ -995,7 +994,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
               child: _buildFormulaCard(
                 '配方：$_selectedApplicationFormulaName',
-                linkedByName[_selectedApplicationFormulaName!]!.rawContent,
+                linkedByName[_selectedApplicationFormulaName!]!,
               ),
             ),
           const SizedBox(height: 8),
@@ -1094,6 +1093,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     );
   }
 
+  String _formulaName(ProductItem formula) => formula.formulaDocument == null
+      ? formula.fileName.replaceAll('.md', '')
+      : formula.fileName;
+
   List<ProductItem> _getApplicationLinkedFormulas() {
     if (widget.product.folder != '产品应用') return const [];
     final keys = <String>{
@@ -1104,9 +1107,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       if (widget.product.topCoat != null && widget.product.topCoat!.isNotEmpty)
         widget.product.topCoat!,
     };
-    final linked = widget.formulas
-        .where((f) => keys.contains(f.fileName.replaceAll('.md', '')))
-        .toList();
+    final linked =
+        widget.formulas.where((f) => keys.contains(_formulaName(f))).toList();
     return _deduplicateFormulasByFileName(linked);
   }
 
@@ -1119,8 +1121,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     // 单配方：直接展示
     if (matchedFormulas.length == 1) {
       final formula = matchedFormulas.first;
-      final title = '配方：${formula.fileName.replaceAll('.md', '')}';
-      return _buildFormulaCard(title, formula.rawContent);
+      final title = '配方：${_formulaName(formula)}';
+      return _buildFormulaCard(title, formula);
     }
 
     // 多配方：下拉选择器
@@ -1130,7 +1132,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       return DropdownMenuItem(
         value: index,
         child: Text(
-          formula.fileName.replaceAll('.md', ''),
+          _formulaName(formula),
           style: TextStyle(color: cs.onSurface, fontSize: 13),
         ),
       );
@@ -1138,7 +1140,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
     final selectedFormula = matchedFormulas[
         _selectedFormulaIndex.clamp(0, matchedFormulas.length - 1)];
-    final title = '配方：${selectedFormula.fileName.replaceAll('.md', '')}';
+    final title = '配方：${_formulaName(selectedFormula)}';
 
     return Column(
       children: [
@@ -1164,7 +1166,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
             ),
           ),
         ),
-        _buildFormulaCard(title, selectedFormula.rawContent),
+        _buildFormulaCard(title, selectedFormula),
       ],
     );
   }
@@ -1176,7 +1178,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         .join('\n');
   }
 
-  Widget _buildFormulaCard(String title, String rawContent) {
+  Widget _buildFormulaCard(String title, ProductItem formula) {
+    final document = formula.formulaDocument;
+    if (document != null) return StructuredFormulaCard(document: document);
+    final rawContent = formula.rawContent;
     final cs = Theme.of(context).colorScheme;
     // 将复杂文本解析逻辑下沉到独立解析器，UI 层仅做渲染。
     final displayContent = FormulaContentParser.parse(rawContent);
@@ -1258,7 +1263,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final cs = Theme.of(context).colorScheme;
     final folderAccent = _folderAccent(cs);
     // 去掉 frontmatter 部分，只留 body
-    final bodyContent = _extractMarkdownBody(widget.product.rawContent);
+    final bodyContent = widget.product.formulaDocument == null
+        ? _extractMarkdownBody(widget.product.rawContent)
+        : '';
     final matchedFormulas = linkedFormulasForProduct(
       widget.product,
       widget.formulas,
@@ -1426,11 +1433,16 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                 // 配方可见性与辅助双链清理共用同一精确关联结果。
                 if (widget.product.folder == '产品列表')
                   _buildLinkedFormulas(matchedFormulas),
-                // MD 内容（不含 frontmatter）
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                  child: _markdownView(markdownContent),
-                ),
+                if (widget.product.folder == '产品配方')
+                  _buildFormulaCard(
+                      '配方：${widget.product.fileName}', widget.product),
+                // Product/performance Markdown is unchanged; recipes use their
+                // explicit structured/legacy card, never derived Markdown.
+                if (widget.product.folder != '产品配方')
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                    child: _markdownView(markdownContent),
+                  ),
               ],
             ),
           );

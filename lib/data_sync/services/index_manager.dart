@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:yaml/yaml.dart';
 import '../../models/product_item.dart';
 import '../../utils/natural_sort.dart';
+import '../../utils/formula_protocol_codec.dart';
+import '../../utils/formula_catalog_validator.dart';
 
 const officialRulesPath = '产品列表/标签同义词规则.md';
 
@@ -23,6 +25,11 @@ class DataSnapshot {
 class IndexManager {
   Future<DataSnapshot> prepare(Map<String, String> files) async {
     if (!kIsWeb) return compute(parseOfficialFiles, files);
+    return prepareBatched(files);
+  }
+
+  /// Used on Web; validate references once after the complete catalog is joined.
+  Future<DataSnapshot> prepareBatched(Map<String, String> files) async {
     final products = <ProductItem>[],
         applications = <ProductItem>[],
         formulas = <ProductItem>[];
@@ -31,7 +38,7 @@ class IndexManager {
     final entries = files.entries.toList();
     for (var offset = 0; offset < entries.length; offset += 32) {
       final batch =
-          parseOfficialFiles(Map.fromEntries(entries.skip(offset).take(32)));
+          _parseOfficialBatch(Map.fromEntries(entries.skip(offset).take(32)));
       products.addAll(batch.products);
       applications.addAll(batch.applications);
       formulas.addAll(batch.formulas);
@@ -39,6 +46,7 @@ class IndexManager {
       rules = batch.rules ?? rules;
       await Future<void>.delayed(Duration.zero);
     }
+    validateFormulaCatalog(products, formulas);
     return DataSnapshot(
         products: List.unmodifiable(products),
         applications: List.unmodifiable(applications),
@@ -49,6 +57,12 @@ class IndexManager {
 }
 
 DataSnapshot parseOfficialFiles(Map<String, String> files) {
+  final snapshot = _parseOfficialBatch(files);
+  validateFormulaCatalog(snapshot.products, snapshot.formulas);
+  return snapshot;
+}
+
+DataSnapshot _parseOfficialBatch(Map<String, String> files) {
   final products = <ProductItem>[],
       applications = <ProductItem>[],
       formulas = <ProductItem>[];
@@ -56,11 +70,14 @@ DataSnapshot parseOfficialFiles(Map<String, String> files) {
   String? rules;
   for (final entry in files.entries) {
     final path = entry.key;
-    final content = entry.value.startsWith('\uFEFF')
+    final structured = path.startsWith('产品配方/') &&
+        FormulaProtocolCodec.hasStructuredMarker(entry.value);
+    final content = !structured && entry.value.startsWith('\uFEFF')
         ? entry.value.substring(1)
         : entry.value;
     if (content.trim().isEmpty) throw FormatException('空白资料: $path');
-    if (content.startsWith('---\n') || content.startsWith('---\r\n')) {
+    if (!structured &&
+        (content.startsWith('---\n') || content.startsWith('---\r\n'))) {
       final lines = const LineSplitter().convert(content);
       final end = lines.indexWhere((l) => l.trim() == '---', 1);
       if (end < 0) throw FormatException('资料前置字段未结束: $path');

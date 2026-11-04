@@ -8,6 +8,7 @@ import 'services/diff_engine.dart';
 import 'services/index_manager.dart';
 import 'services/source_manager.dart';
 import 'storage/storage_adapter.dart';
+import '../utils/formula_catalog_validator.dart';
 
 enum SyncStage {
   idle,
@@ -283,9 +284,14 @@ class DataSyncService extends ChangeNotifier {
               details.contains('Application upgrade required') ||
               details.contains('Unsupported schema')
           ? '当前客户端不支持该资料版本或签名密钥，请升级应用。已保留本地资料。'
-          : details.contains('尚未配置')
-              ? '官方数据源或签名公钥尚未配置。'
-              : '更新未完成，已保留本地资料。请检查网络后重试更新。';
+          : details.contains('structured-') ||
+                  details.contains('recipe-') ||
+                  details.contains('main-owner') ||
+                  details.contains('display-mismatch')
+              ? '配方资料校验未通过，整代更新已拒绝；已保留本地有效资料。'
+              : details.contains('尚未配置')
+                  ? '官方数据源或签名公钥尚未配置。'
+                  : '更新未完成，已保留本地资料。请检查网络后重试更新。';
       try {
         await storage.writeText(
             'logs/last_failure',
@@ -337,9 +343,16 @@ class DataSyncService extends ChangeNotifier {
       }
       final raw = await storage.read(content.key(file.sha256));
       if (raw == null) throw StateError('读取资料失败：${file.path}');
-      files[file.path] = utf8.decode(raw);
+      // Dart UTF-8 decoding strips a leading BOM; preserve it for the strict
+      // recipe envelope gate. Legacy/product normalization stays in the index.
+      final bom =
+          raw.length >= 3 && raw[0] == 0xef && raw[1] == 0xbb && raw[2] == 0xbf;
+      files[file.path] = '${bom ? '\uFEFF' : ''}${utf8.decode(raw)}';
     }
-    return indexManager.prepare(files);
+    final next = await indexManager.prepare(files);
+    validateFormulaCatalog(next.products, next.formulas,
+        requireStructured: manifest.schemaVersion == 2);
+    return next;
   }
 
   // Old CAS objects are intentionally retained. No automatic GC runs until a
