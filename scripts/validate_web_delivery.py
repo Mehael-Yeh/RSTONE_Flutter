@@ -37,7 +37,7 @@ def main():
         assert e.code==302;location=e.headers['Location']
     with urllib.request.urlopen(req(location),timeout=120) as r:raw=r.read()
     if artifact.get('digest'):assert artifact['digest']=='sha256:'+sha(raw)
-    names={'index.html','main.dart.js','flutter_bootstrap.js','version.json','assets/data_sync_config.json'};files={}
+    names={'index.html','main.dart.js','flutter_bootstrap.js','version.json','assets/assets/data_sync_config.json'};files={}
     with zipfile.ZipFile(io.BytesIO(raw)) as outer:
         assert outer.namelist()==['artifact.tar']
         with tarfile.open(fileobj=io.BytesIO(outer.read('artifact.tar')),mode='r:*') as tar:
