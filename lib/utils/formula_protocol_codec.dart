@@ -36,6 +36,11 @@ class FormulaProtocolCodec {
   static FormulaDocument? readOptional(String text, {bool required = false}) =>
       required || hasStructuredMarker(text) ? decode(utf8.encode(text)) : null;
 
+  static const renderer = 'rstone-recipe-markdown/1';
+  static const rendererV2 = 'rstone-recipe-markdown/2';
+  static String rendererFor(FormulaDocument model) =>
+      model.schemaVersion == FormulaDocument.schemaV2 ? rendererV2 : renderer;
+
   static const maxFile = 16 * 1024 * 1024,
       maxHeader = 512 * 1024,
       maxDepth = 16;
@@ -64,7 +69,7 @@ class FormulaProtocolCodec {
     _depth(value, 0);
     if (value is Map &&
         value['schema'] is String &&
-        value['schema'] != FormulaDocument.schema) {
+        !FormulaDocument.supportsSchema(value['schema'])) {
       throw const FormatException('unsupported-structured-schema');
     }
     final model = FormulaDocument.fromJson(value);
@@ -88,7 +93,10 @@ class FormulaProtocolCodec {
     }
     lines.addAll(
         ['', '## 配方', _row(model.columns), '| --- | --- | --- | --- | --- |']);
-    lines.addAll(model.rows.map(_row));
+    lines.addAll(model.rows.map((row) => model.schemaVersion ==
+            FormulaDocument.schemaV2
+        ? '| ${ingredientParts(row[0], model.associatedProducts).map((p) => p.target == null ? entityText(p.text) : '[[产品列表/${p.target}]]').join()} | ${row.skip(1).map(entityText).join(' | ')} |'
+        : _row(row)));
     for (final block in model.content) {
       if (block is FormulaNote) {
         lines.addAll(['', entityText(block.text)]);
@@ -102,6 +110,36 @@ class FormulaProtocolCodec {
       }
     }
     return '${lines.join('\n')}\n';
+  }
+
+  /// Frozen left-to-right scan; invalid candidates are consumed, not rescanned.
+  static List<({String text, String? target})> ingredientParts(
+      String text, List<String> associated) {
+    final parts = <({String text, String? target})>[];
+    var cursor = 0;
+    while (cursor < text.length) {
+      final open = text.indexOf('[[', cursor);
+      final close = open < 0 ? -1 : text.indexOf(']]', open + 2);
+      if (open < 0 || close < 0) {
+        parts.add((text: text.substring(cursor), target: null));
+        break;
+      }
+      if (open > cursor) {
+        parts.add((text: text.substring(cursor, open), target: null));
+      }
+      final target = text.substring(open + 2, close);
+      final valid = RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$')
+              .hasMatch(target) &&
+          associated.contains(target) &&
+          (open == 0 || (text[open - 1] != '[' && text[open - 1] != r'\')) &&
+          (close + 2 == text.length || text[close + 2] != ']');
+      parts.add((
+        text: text.substring(open, close + 2),
+        target: valid ? target : null
+      ));
+      cursor = close + 2;
+    }
+    return parts;
   }
 
   static String entityText(String text) =>

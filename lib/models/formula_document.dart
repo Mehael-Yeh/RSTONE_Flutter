@@ -1,6 +1,10 @@
 /// Immutable facts for rstone-recipe/1. No Markdown interpretation or approval.
 final class FormulaDocument {
   static const schema = 'rstone-recipe/1';
+  static const schemaV2 = 'rstone-recipe/2';
+  static bool supportsSchema(dynamic value) =>
+      value == schema || value == schemaV2;
+  final String schemaVersion;
   static const maxItems = 1000, maxUtf16 = 4096;
   final String recipeId, title, classification, ownerProduct;
   final List<String> associatedProducts, columns, preTable;
@@ -8,6 +12,7 @@ final class FormulaDocument {
   final List<FormulaBlock> content;
 
   FormulaDocument._(
+      this.schemaVersion,
       this.recipeId,
       this.title,
       this.classification,
@@ -32,7 +37,7 @@ final class FormulaDocument {
       'content'
     });
     final m = value as Map;
-    _require(m['schema'] == schema);
+    _require(supportsSchema(m['schema']));
     final id = _text(m['recipeId'], nonempty: true);
     _require(RegExp(r'^[A-Za-z0-9._-]{1,128}$').hasMatch(id));
     final title = _text(m['title'], nonempty: true);
@@ -72,12 +77,12 @@ final class FormulaDocument {
         _require(false);
       }
     }
-    return FormulaDocument._(id, title, role, owner, refs, columns,
-        List.unmodifiable(rows), pre, List.unmodifiable(blocks));
+    return FormulaDocument._(m['schema'] as String, id, title, role, owner,
+        refs, columns, List.unmodifiable(rows), pre, List.unmodifiable(blocks));
   }
 
   Map<String, dynamic> toJson() => {
-        'schema': schema,
+        'schema': schemaVersion,
         'recipeId': recipeId,
         'title': title,
         'classification': classification,

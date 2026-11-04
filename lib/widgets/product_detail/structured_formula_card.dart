@@ -1,14 +1,38 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/formula_document.dart';
+import '../../utils/formula_protocol_codec.dart';
 import '../../services/share_file.dart';
 import 'formula_presentation.dart';
 import 'formula_png_renderer.dart';
 
 class StructuredFormulaCard extends StatelessWidget {
   final FormulaDisplayView view;
-  StructuredFormulaCard({super.key, required FormulaDocument document})
+  final bool Function(String)? canOpenProduct;
+  final ValueChanged<String>? onOpenProduct;
+  StructuredFormulaCard(
+      {super.key,
+      required FormulaDocument document,
+      this.canOpenProduct,
+      this.onOpenProduct})
       : view = FormulaDisplayView(document);
+
+  Widget _ingredient(String text, TextStyle style) {
+    final parts = FormulaProtocolCodec.ingredientParts(
+        text, view.document.associatedProducts);
+    if (onOpenProduct == null ||
+        !parts.any((p) =>
+            p.target != null && canOpenProduct?.call(p.target!) == true)) {
+      return Text(text, style: style, textScaler: TextScaler.noScaling);
+    }
+    return _IngredientLinks(
+        text: text,
+        style: style,
+        associated: view.document.associatedProducts,
+        canOpenProduct: canOpenProduct!,
+        onOpenProduct: onOpenProduct!);
+  }
 
   Future<void> _share(BuildContext context) async {
     try {
@@ -85,13 +109,18 @@ class StructuredFormulaCard extends StatelessWidget {
                                     : cs.surface,
                                 border: Border.all(
                                     color: cs.outlineVariant, width: 0.5)),
-                            child: Text(view.cells[r][c],
-                                style: FormulaTableLayout.style.copyWith(
-                                    color: cs.onSurface,
-                                    fontWeight: r == 0
-                                        ? FontWeight.bold
-                                        : FontWeight.normal),
-                                textScaler: TextScaler.noScaling),
+                            child: r > 0 && c == 0
+                                ? _ingredient(
+                                    view.cells[r][c],
+                                    FormulaTableLayout.style
+                                        .copyWith(color: cs.onSurface))
+                                : Text(view.cells[r][c],
+                                    style: FormulaTableLayout.style.copyWith(
+                                        color: cs.onSurface,
+                                        fontWeight: r == 0
+                                            ? FontWeight.bold
+                                            : FontWeight.normal),
+                                    textScaler: TextScaler.noScaling),
                           )
                       ]),
                   ])),
@@ -104,4 +133,81 @@ class StructuredFormulaCard extends StatelessWidget {
           ],
         ]));
   }
+}
+
+/// Inline spans keep exactly the same shaping/wrapping as the measured text.
+/// This state owns every recognizer, including when a cell changes documents.
+class _IngredientLinks extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+  final List<String> associated;
+  final bool Function(String) canOpenProduct;
+  final ValueChanged<String> onOpenProduct;
+  const _IngredientLinks(
+      {required this.text,
+      required this.style,
+      required this.associated,
+      required this.canOpenProduct,
+      required this.onOpenProduct});
+  @override
+  State<_IngredientLinks> createState() => _IngredientLinksState();
+}
+
+class _IngredientLinksState extends State<_IngredientLinks> {
+  final _recognizers = <TapGestureRecognizer>[];
+  late List<InlineSpan> _spans;
+
+  void _clear() {
+    for (final recognizer in _recognizers) {
+      recognizer.dispose();
+    }
+    _recognizers.clear();
+  }
+
+  void _updateSpans() {
+    _clear();
+    _spans = [
+      for (final part in FormulaProtocolCodec.ingredientParts(
+          widget.text, widget.associated))
+        if (part.target != null && widget.canOpenProduct(part.target!))
+          TextSpan(
+              text: part.text,
+              style:
+                  widget.style.copyWith(decoration: TextDecoration.underline),
+              recognizer: _recognizer(part.target!))
+        else
+          TextSpan(text: part.text),
+    ];
+  }
+
+  TapGestureRecognizer _recognizer(String target) {
+    final recognizer = TapGestureRecognizer()
+      ..onTap = () {
+        if (widget.canOpenProduct(target)) widget.onOpenProduct(target);
+      };
+    _recognizers.add(recognizer);
+    return recognizer;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _updateSpans();
+  }
+
+  @override
+  void didUpdateWidget(covariant _IngredientLinks oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updateSpans();
+  }
+
+  @override
+  void dispose() {
+    _clear();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Text.rich(TextSpan(children: _spans),
+      style: widget.style, textScaler: TextScaler.noScaling);
 }
