@@ -1,203 +1,180 @@
-/// Converts formula tables copied from Markdown or spreadsheet apps into a
-/// validated Markdown table string.
+/// User-input adapter, not an official facts parser. Raw cells remain strings.
 class FormulaTableClipboardParser {
   FormulaTableClipboardParser._();
-
   static FormulaTableParseResult parse(String input) {
-    final normalized = input
-        .replaceAll('\r\n', '\n')
-        .replaceAll('\r', '\n')
-        .trim();
-    if (normalized.isEmpty) {
+    if (input.trim().isEmpty) {
       return const FormulaTableParseResult.failure('剪切板为空，请先复制配方表格');
     }
-
-    final markdown = _parseMarkdownTable(normalized);
-    if (markdown != null) return markdown;
-
-    final spreadsheet = _parseSpreadsheetTable(normalized);
-    if (spreadsheet != null) return spreadsheet;
-
-    return const FormulaTableParseResult.failure(
-      '未识别到有效表格，请复制包含“原料编号、投入数、百分比”等列的 Markdown 表格或 Excel 表格',
-    );
+    try {
+      final text = input.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+      final List<List<String>> records;
+      if (text.trimLeft().startsWith('|')) {
+        final lines = text.split('\n');
+        while (lines.isNotEmpty && lines.first.trim().isEmpty) {
+          lines.removeAt(0);
+        }
+        while (lines.isNotEmpty && lines.last.trim().isEmpty) {
+          lines.removeLast();
+        }
+        if (lines.length < 3) throw const FormatException('表格无效');
+        final parsed = lines.map(_markdownRow).toList();
+        if (!parsed[1]
+            .every((c) => RegExp(r'^:?-{3,}:?$').hasMatch(c.trim()))) {
+          throw const FormatException('表格分隔行无效');
+        }
+        records = [parsed.first, ...parsed.skip(2)];
+      } else {
+        records = _tsv(text);
+      }
+      if (records.length < 2) throw const FormatException('表格明细为空');
+      final originalHeader = records.first;
+      final header = originalHeader.map((h) => h.trim()).toList();
+      if (header.length != 5 ||
+          header[0] != '原料编号' ||
+          !const {'投入数', '投入数(g)', '投入数（g)'}.contains(header[1]) ||
+          header[2] != '百分比(%)' ||
+          header[3] != '供应商' ||
+          header[4] != '备注') {
+        throw const FormatException('表头无效：需完整五列原料编号、投入数、百分比、供应商、备注');
+      }
+      final rows = records.skip(1).toList();
+      for (final row in rows) {
+        if (row.length != 5) {
+          throw const FormatException('行宽无效：每行必须恰好五列，不补列或截列');
+        }
+        if (row[0].isEmpty || row[1].isEmpty) {
+          throw const FormatException('原料编号与投入数不能为空');
+        }
+      }
+      final columns = [...header];
+      if (columns[1] == '投入数（g)') columns[1] = '投入数(g)';
+      return FormulaTableParseResult._success(header, columns, rows);
+    } on FormatException catch (e) {
+      return FormulaTableParseResult.failure(e.message);
+    }
   }
 
-  static FormulaTableParseResult? _parseMarkdownTable(String input) {
-    final lines = input
-        .split('\n')
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
-    if (lines.length < 3 || !lines.every((line) => line.contains('|'))) {
-      return null;
+  static List<String> _markdownRow(String line) {
+    var text = line.trim();
+    if (!text.startsWith('|') || !text.endsWith('|')) {
+      throw const FormatException('Markdown行需首尾分隔符');
     }
-
-    final rows = lines
-        .map(_splitMarkdownRow)
-        .where((row) => row.isNotEmpty)
-        .toList();
-    if (rows.length < 3 || !_isMarkdownSeparatorRow(rows[1])) return null;
-
-    final header = rows.first;
-    final dataRows = rows.skip(2).toList();
-    return _validateAndBuild(header, dataRows);
-  }
-
-  static FormulaTableParseResult? _parseSpreadsheetTable(String input) {
-    final lines = input
-        .split('\n')
-        .map((line) => line.trimRight())
-        .where((line) => line.trim().isNotEmpty)
-        .toList();
-    if (lines.length < 2 || !lines.any((line) => line.contains('\t'))) {
-      return null;
-    }
-
-    final rows = lines
-        .map((line) => line.split('\t').map((cell) => cell.trim()).toList())
-        .toList();
-    final header = rows.first;
-    final dataRows = rows.skip(1).toList();
-    return _validateAndBuild(header, dataRows);
-  }
-
-  static FormulaTableParseResult _validateAndBuild(
-    List<String> header,
-    List<List<String>> dataRows,
-  ) {
-    final normalizedHeader = header.map((cell) => cell.trim()).toList();
-    if (normalizedHeader.length < 3 || !_hasRequiredHeaders(normalizedHeader)) {
-      return const FormulaTableParseResult.failure(
-        '表头无效：至少需要包含原料编号、投入数和百分比列',
-      );
-    }
-
-    final width = normalizedHeader.length;
-    final normalizedRows = <List<String>>[];
-    for (final row in dataRows) {
-      final normalizedRow = _normalizeWidth(row, width);
-      if (normalizedRow.every((cell) => cell.trim().isEmpty)) continue;
-      normalizedRows.add(normalizedRow);
-    }
-
-    if (normalizedRows.isEmpty) {
-      return const FormulaTableParseResult.failure('表格无效：未找到配方明细行');
-    }
-
-    final invalidRowIndex = normalizedRows.indexWhere(
-      (row) => row.first.trim().isEmpty,
-    );
-    if (invalidRowIndex >= 0) {
-      return FormulaTableParseResult.failure(
-        '第 ${invalidRowIndex + 1} 行原料编号为空，请检查表格内容',
-      );
-    }
-
-    final amountIndex = _findHeaderIndex(
-      normalizedHeader,
-      const ['投入', '用量', '重量'],
-    );
-    if (amountIndex != -1) {
-      final invalidAmountIndex = normalizedRows.indexWhere(
-        (row) => !_looksLikeNumber(row[amountIndex]),
-      );
-      if (invalidAmountIndex >= 0) {
-        return FormulaTableParseResult.failure(
-          '第 ${invalidAmountIndex + 1} 行投入数无效，请检查表格内容',
-        );
+    text = text.substring(1, text.length - 1);
+    final cells = <String>[];
+    var cell = StringBuffer();
+    var wiki = false;
+    for (var i = 0; i < text.length; i++) {
+      if (text[i] == r'\' &&
+          i + 1 < text.length &&
+          (text[i + 1] == '|' || text[i + 1] == r'\')) {
+        cell.write(text[++i]);
+      } else if (text.startsWith('[[', i)) {
+        wiki = true;
+        cell.write('[[');
+        i++;
+      } else if (text.startsWith(']]', i)) {
+        wiki = false;
+        cell.write(']]');
+        i++;
+      } else if (text[i] == '|' && !wiki) {
+        cells.add(_unpad(cell.toString()));
+        cell = StringBuffer();
+      } else {
+        cell.write(text[i]);
       }
     }
+    cells.add(_unpad(cell.toString()));
+    return cells;
+  }
 
-    final percentIndex = _findHeaderIndex(
-      normalizedHeader,
-      const ['百分比', '比例', '%'],
-    );
-    if (percentIndex != -1) {
-      final invalidPercentIndex = normalizedRows.indexWhere(
-        (row) => !_looksLikeNumber(row[percentIndex]),
-      );
-      if (invalidPercentIndex >= 0) {
-        return FormulaTableParseResult.failure(
-          '第 ${invalidPercentIndex + 1} 行百分比无效，请检查表格内容',
-        );
+  // One syntactic padding space, not arbitrary business whitespace.
+  static String _unpad(String s) {
+    if (s.startsWith(' ')) s = s.substring(1);
+    if (s.endsWith(' ')) s = s.substring(0, s.length - 1);
+    return s;
+  }
+
+  static List<List<String>> _tsv(String text) {
+    final records = <List<String>>[];
+    var row = <String>[], cell = StringBuffer();
+    var quoted = false, closed = false;
+    for (var i = 0; i < text.length; i++) {
+      final c = text[i];
+      if (quoted) {
+        if (c == '"') {
+          if (i + 1 < text.length && text[i + 1] == '"') {
+            cell.write('"');
+            i++;
+          } else {
+            quoted = false;
+            closed = true;
+          }
+        } else {
+          cell.write(c);
+        }
+      } else if (c == '\t' || c == '\n') {
+        row.add(cell.toString());
+        cell = StringBuffer();
+        closed = false;
+        if (c == '\n') {
+          records.add(row);
+          row = [];
+        }
+      } else if (c == '"' && cell.isEmpty && !closed) {
+        quoted = true;
+      } else {
+        if (closed) throw const FormatException('引号单元格后有额外字符');
+        cell.write(c);
       }
     }
-
-    return FormulaTableParseResult.success(
-      _buildMarkdownTable(normalizedHeader, normalizedRows),
-    );
-  }
-
-  static List<String> _splitMarkdownRow(String line) {
-    var row = line.trim();
-    if (row.startsWith('|')) row = row.substring(1);
-    if (row.endsWith('|')) row = row.substring(0, row.length - 1);
-    return row.split('|').map((cell) => cell.trim()).toList();
-  }
-
-  static bool _isMarkdownSeparatorRow(List<String> row) {
-    if (row.isEmpty) return false;
-    return row.every(
-      (cell) => RegExp(r'^:?-{3,}:?$').hasMatch(cell.replaceAll(' ', '')),
-    );
-  }
-
-  static bool _hasRequiredHeaders(List<String> header) {
-    final hasMaterial = _findHeaderIndex(header, const ['原料']) != -1;
-    final hasAmount = _findHeaderIndex(header, const ['投入', '用量', '重量']) != -1;
-    final hasPercent = _findHeaderIndex(header, const ['百分比', '比例', '%']) != -1;
-    return hasMaterial && hasAmount && hasPercent;
-  }
-
-  static int _findHeaderIndex(List<String> header, List<String> keywords) {
-    return header.indexWhere((cell) => keywords.any(cell.contains));
-  }
-
-  static List<String> _normalizeWidth(List<String> row, int width) {
-    final normalized = row.map((cell) => cell.trim()).toList();
-    if (normalized.length > width) return normalized.take(width).toList();
-    return [...normalized, ...List.filled(width - normalized.length, '')];
-  }
-
-  static bool _looksLikeNumber(String value) {
-    final normalized = value.trim().replaceAll(',', '').replaceAll('%', '');
-    if (normalized.isEmpty) return false;
-    return double.tryParse(normalized) != null;
-  }
-
-  static String _buildMarkdownTable(
-    List<String> header,
-    List<List<String>> rows,
-  ) {
-    final buffer = StringBuffer();
-    buffer.writeln('| ${header.map(_escapeMarkdownCell).join(' | ')} |');
-    buffer.writeln('| ${header.map((_) => '---').join(' | ')} |');
-    for (final row in rows) {
-      buffer.writeln('| ${row.map(_escapeMarkdownCell).join(' | ')} |');
+    if (quoted) throw const FormatException('未结束的引号单元格');
+    if (cell.isNotEmpty || row.isNotEmpty || closed) {
+      row.add(cell.toString());
+      records.add(row);
     }
-    return buffer.toString().trimRight();
+    return records;
   }
 
-  static String _escapeMarkdownCell(String cell) {
-    return cell.trim().replaceAll('|', r'\|');
-  }
+  static String toTsv(List<String> columns, List<List<String>> rows) =>
+      [columns, ...rows]
+          .map((row) => row
+              .map((s) => s.contains(RegExp('[\\t\\n"]'))
+                  ? '"${s.replaceAll('"', '""')}"'
+                  : s)
+              .join('\t'))
+          .join('\n');
 }
 
 class FormulaTableParseResult {
   final bool isValid;
-  final String? markdown;
   final String? errorMessage;
+  final List<String> columns;
+  final List<List<String>> rows;
+  final List<String> _inputHeader;
+  const FormulaTableParseResult.failure(String message)
+      : isValid = false,
+        errorMessage = message,
+        columns = const [],
+        rows = const [],
+        _inputHeader = const [];
+  FormulaTableParseResult._success(
+      List<String> header, List<String> columns, List<List<String>> rows)
+      : isValid = true,
+        errorMessage = null,
+        _inputHeader = List.unmodifiable(header),
+        columns = List.unmodifiable(columns),
+        rows = List.unmodifiable(rows.map((r) => List<String>.unmodifiable(r)));
 
-  const FormulaTableParseResult._({
-    required this.isValid,
-    this.markdown,
-    this.errorMessage,
-  });
+  /// Lossless editable interchange, including quoted TAB/LF and trailing cells.
+  String get tsv => FormulaTableClipboardParser.toTsv(columns, rows);
 
-  const FormulaTableParseResult.success(String markdown)
-      : this._(isValid: true, markdown: markdown);
-
-  const FormulaTableParseResult.failure(String errorMessage)
-      : this._(isValid: false, errorMessage: errorMessage);
+  /// Legacy display-only convenience; never parse this to determine facts.
+  String? get markdown => !isValid
+      ? null
+      : [
+          '| ${_inputHeader.join(' | ')} |',
+          '| --- | --- | --- | --- | --- |',
+          ...rows.map((r) =>
+              '| ${r.map((s) => s.replaceAll(r'\', r'\\').replaceAll('|', r'\|')).join(' | ')} |')
+        ].join('\n');
 }

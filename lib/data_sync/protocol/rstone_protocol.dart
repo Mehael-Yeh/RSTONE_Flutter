@@ -41,11 +41,12 @@ class DataFile {
 
 class VerifiedManifest {
   final int sequence;
+  final int schemaVersion;
   final String dataVersion;
   final String manifestSha256;
   final List<DataFile> files;
-  const VerifiedManifest._(
-      this.sequence, this.dataVersion, this.manifestSha256, this.files);
+  const VerifiedManifest._(this.sequence, this.schemaVersion, this.dataVersion,
+      this.manifestSha256, this.files);
 }
 
 List<int> _base64(String text, int size) {
@@ -166,8 +167,16 @@ Future<VerifiedManifest> verifyManifest({
           type: KeyPairType.ed25519));
   _need(await Ed25519().verify(manifestBytes, signature: signature),
       'Invalid Ed25519 signature');
-  _need(manifest['schemaVersion'] == 1 && manifest['schemaVersion'] is int,
+  _need(
+      manifest['schemaVersion'] is int &&
+          const {1, 2}.contains(manifest['schemaVersion']),
       'Unsupported schema');
+  if (manifest['schemaVersion'] == 2) {
+    _need(
+        manifest['minAppVersion'] is String &&
+            _compatible(manifest['minAppVersion'] as String, '2.0.2'),
+        'Schema 2 requires minAppVersion >= 2.0.2');
+  }
   _need(
       manifest['minAppVersion'] is String &&
           _compatible(appVersion, manifest['minAppVersion'] as String),
@@ -233,8 +242,8 @@ Future<VerifiedManifest> verifyManifest({
   if (sequence == highestSequence) {
     _need(digest == acceptedManifestSha256, 'Same-sequence manifest conflict');
   }
-  return VerifiedManifest._(sequence, manifest['dataVersion'] as String, digest,
-      List.unmodifiable(files));
+  return VerifiedManifest._(sequence, manifest['schemaVersion'] as int,
+      manifest['dataVersion'] as String, digest, List.unmodifiable(files));
 }
 
 Future<bool> verifyObject(DataFile file, Uint8List raw) async =>

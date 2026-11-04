@@ -11,6 +11,7 @@ class DataManifest {
   DataManifest._(
       this.verified, this.latestBytes, this.manifestBytes, this.signatureBytes);
   int get sequence => verified.sequence;
+  int get schemaVersion => verified.schemaVersion;
   String get dataVersion => verified.dataVersion;
   String get hash => verified.manifestSha256;
   List<DataFile> get files => verified.files;

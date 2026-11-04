@@ -14,6 +14,9 @@ import '../data_sync/storage/storage_adapter.dart';
 import '../data_sync/storage/storage_factory.dart';
 import '../data_sync/storage/legacy_migration.dart';
 import '../models/product_item.dart';
+import '../models/formula_document.dart';
+import '../utils/formula_protocol_codec.dart';
+import '../utils/formula_catalog_validator.dart';
 import '../utils/grade_lookup.dart';
 import '../utils/natural_sort.dart';
 
@@ -25,7 +28,7 @@ class ObsidianDataService extends ChangeNotifier {
   final bool migrateLegacy;
   ObsidianDataService(
       {DataSyncService? syncService,
-      this.appVersion = '2.0.1',
+      this.appVersion = '2.0.2',
       this.migrateLegacy = true,
       this.bootstrapRules})
       : sync = syncService,
@@ -33,6 +36,10 @@ class ObsidianDataService extends ChangeNotifier {
 
   List<ProductItem> _products = [], _applications = [], _formulas = [];
   final Map<String, ProductItem> _userItems = {};
+  final Map<String, String> _quarantinedFormulas = {};
+  final Map<String, Uint8List> _quarantinedOriginals = {};
+  Map<String, String> get quarantinedFormulas =>
+      Map.unmodifiable(_quarantinedFormulas);
   DataSnapshot _official = const DataSnapshot();
   final Map<String, String> _tdsByProduct = {}, _tdsByGrade = {};
   final Map<String, List<String>> _missingReferences = {};
@@ -133,6 +140,11 @@ class ObsidianDataService extends ChangeNotifier {
       final byPath = {
         for (final item in official) protocolCaseFold(item.filePath): item
       };
+      // An invalid overlay reserves its path: never silently reveal a same-name
+      // official formula under a quarantined personal original.
+      for (final path in _quarantinedFormulas.keys) {
+        byPath.remove(protocolCaseFold(path));
+      }
       for (final entry in _userItems.entries) {
         if (entry.key.startsWith('$folder/')) {
           byPath[protocolCaseFold(entry.key)] = entry.value;
@@ -144,6 +156,29 @@ class ObsidianDataService extends ChangeNotifier {
 
     _products = merge(_official.products, '产品列表');
     _applications = merge(_official.applications, '产品应用');
+    final overlayPaths = {..._userItems.keys, ..._quarantinedFormulas.keys}
+        .map(protocolCaseFold)
+        .toSet();
+    final ids = {
+      for (final f in _official.formulas)
+        if (!overlayPaths.contains(protocolCaseFold(f.filePath)) &&
+            f.formulaDocument != null)
+          f.formulaDocument!.recipeId
+    };
+    for (final entry in _userItems.entries.toList()) {
+      final d = entry.value.formulaDocument;
+      if (d == null) continue;
+      try {
+        validateFormulaCatalog(_products, [entry.value], official: false);
+        if (!ids.add(d.recipeId)) {
+          throw const FormatException('duplicate-personal-recipe-id');
+        }
+      } on FormatException {
+        _quarantine(
+            entry.key, Uint8List.fromList(utf8.encode(entry.value.rawContent)));
+        _userItems.remove(entry.key);
+      }
+    }
     _formulas = merge(_official.formulas, '产品配方');
     _tdsByProduct.clear();
     _tdsByGrade.clear();
@@ -625,7 +660,21 @@ ${_joinTagsToYamlList(tags)}
     validateLogicalPath(path);
     final parsed = ProductItem.fromMdContent('user/$path', markdown,
         origin: DataOrigin.user);
+    if (folder == '产品配方') {
+      if (parsed.formulaDocument == null) {
+        throw const FormatException('structured-recipe-required-for-new-save');
+      }
+      validateFormulaCatalog(_products, [parsed],
+          requireStructured: true, official: false);
+      final id = parsed.formulaDocument!.recipeId;
+      if (_formulas.any(
+          (f) => f.fileName != name && f.formulaDocument?.recipeId == id)) {
+        throw const FormatException('duplicate-personal-recipe-id');
+      }
+    }
     await _store.writeText('user/$path', markdown);
+    _quarantinedFormulas.remove(path);
+    _quarantinedOriginals.remove(path);
     _userItems[path] = parsed;
     _composeSnapshot();
     notifyListeners();
@@ -646,6 +695,11 @@ ${_joinTagsToYamlList(tags)}
     await _saveUserItem('产品应用', name.trim(), markdown);
   }
 
+  Future<void> addFormulaDocument(FormulaDocument document) =>
+      addFormulaMarkdown(
+          name: document.title,
+          markdown: utf8.decode(FormulaProtocolCodec.encode(document)));
+
   Future<void> addFormulaMarkdown(
       {required String name, required String markdown}) async {
     if (name.trim().isEmpty) throw ArgumentError('产品配方名称不能为空');
@@ -664,26 +718,52 @@ ${_joinTagsToYamlList(tags)}
   }
 
   Future<int> clearAllManualMarkdownData() async {
-    final paths = _userItems.keys.toList();
+    // This explicit user action clears even isolated originals. Reload and
+    // normal synchronization never delete or rewrite those originals.
+    final paths = {..._userItems.keys, ..._quarantinedOriginals.keys}.toList();
     for (final path in paths) {
       await _store.remove('user/$path');
       _userItems.remove(path);
+      _quarantinedFormulas.remove(path);
+      _quarantinedOriginals.remove(path);
     }
     _composeSnapshot();
     notifyListeners();
     return paths.length;
   }
 
+  void _quarantine(String path, Uint8List original) {
+    _quarantinedFormulas[path] = '个人配方格式无效，已隔离；原文保留，可导出后修复。';
+    _quarantinedOriginals[path] = original;
+    _addLog('个人配方已隔离：$path（原文保留，未使用同名官方配方）');
+  }
+
+  Future<void> reloadUserItems() async {
+    await _loadUserItems();
+    _composeSnapshot();
+    notifyListeners();
+  }
+
   Future<void> _loadUserItems() async {
     _userItems.clear();
+    _quarantinedFormulas.clear();
+    _quarantinedOriginals.clear();
     for (final key in await _store.keys('user/')) {
       if (!key.endsWith('.md')) continue;
       final path = key.substring('user/'.length);
-      validateLogicalPath(path);
-      final content = await _store.readText(key);
-      if (content != null) {
+      final raw = await _store.read(key);
+      if (raw == null) continue;
+      try {
+        validateLogicalPath(path);
+        final bom = raw.length >= 3 &&
+            raw[0] == 0xef &&
+            raw[1] == 0xbb &&
+            raw[2] == 0xbf;
+        final text = '${bom ? '\uFEFF' : ''}${utf8.decode(raw)}';
         _userItems[path] =
-            ProductItem.fromMdContent(key, content, origin: DataOrigin.user);
+            ProductItem.fromMdContent(key, text, origin: DataOrigin.user);
+      } on FormatException {
+        _quarantine(path, raw);
       }
     }
   }
@@ -693,6 +773,9 @@ ${_joinTagsToYamlList(tags)}
     for (final entry in _userItems.entries) {
       final bytes = utf8.encode(entry.value.rawContent);
       archive.addFile(ArchiveFile(entry.key, bytes.length, bytes));
+    }
+    for (final entry in _quarantinedOriginals.entries) {
+      archive.addFile(ArchiveFile(entry.key, entry.value.length, entry.value));
     }
     if (archive.isEmpty) return null;
     final bytes = ZipEncoder().encode(archive);

@@ -140,6 +140,13 @@ List<ProductItem> linkedFormulasForProduct(
   final matched = <String, ProductItem>{};
   for (final formula in formulas) {
     if (formula.folder != '产品配方') continue;
+    final structured = formula.formulaDocument;
+    if (structured != null) {
+      if (structured.associatedProducts.contains(product.fileName)) {
+        matched.putIfAbsent(formula.fileName, () => formula);
+      }
+      continue;
+    }
     final stem = formula.fileName.replaceFirst(RegExp(r'\.md$'), '');
     final grade = stem.replaceFirst(_legacyFinish, '');
     final participants = {

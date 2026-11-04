@@ -270,22 +270,19 @@ tags:
       expect(result.markdown, contains('| TPO | 1.00 | 1.000% | 巴斯夫 | 三者预溶 |'));
     });
 
-    test('converts Excel copied tab-separated formula tables to Markdown', () {
+    // Protocol v1 requires all five explicit cells; the old four-column fixture
+    // is retained as a rejection test, not silently padded or truncated.
+    test(
+        'rejects incomplete four-column spreadsheet instead of inventing cells',
+        () {
       const clipboard = '原料编号\t投入数（g)\t百分比(%)\t供应商\n'
           'RD919-23\t70.00 \t0.78 \t锐石 \n'
           'TEGO 810\t0.10 \t0.00 \t德固赛 \n';
 
       final result = FormulaTableClipboardParser.parse(clipboard);
 
-      expect(result.isValid, isTrue);
-      expect(
-          result.markdown,
-          '''
-| 原料编号 | 投入数（g) | 百分比(%) | 供应商 |
-| --- | --- | --- | --- |
-| RD919-23 | 70.00 | 0.78 | 锐石 |
-| TEGO 810 | 0.10 | 0.00 | 德固赛 |'''
-              .trim());
+      expect(result.isValid, isFalse);
+      expect(result.errorMessage, contains('五列'));
     });
 
     test('rejects tables without required formula headers', () {

@@ -3,9 +3,8 @@ library;
 
 import 'package:flutter/material.dart';
 import '../utils/compat_color.dart';
-import 'package:flutter/services.dart';
 import '../models/product_item.dart';
-import '../utils/formula_table_clipboard_parser.dart';
+import '../widgets/formula_editor_dialog.dart';
 import '../utils/natural_sort.dart';
 import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
@@ -106,109 +105,9 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
 
   Future<void> _showAddFormulaDialog() async {
     _closePullButtons();
-    final nameController = TextEditingController();
-    final tableController = TextEditingController(
-      text: '| 原料编号 | 投入数（g) | 百分比(%) | 供应商 | 备注 |\n'
-          '| --- | --- | --- | --- | --- |\n'
-          '| 示例原料A | 0.00 | 0.000% | | |\n'
-          '| 示例原料B | 0.00 | 0.000% | | |',
-    );
-
-    Future<void> pasteFormulaTableFromClipboard() async {
-      final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-      if (!mounted) return;
-
-      final result =
-          FormulaTableClipboardParser.parse(clipboardData?.text ?? '');
-      if (!result.isValid) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result.errorMessage ?? '剪切板表格无效')),
-        );
-        return;
-      }
-
-      final markdown = result.markdown!;
-      tableController.value = TextEditingValue(
-        text: markdown,
-        selection: TextSelection.collapsed(offset: markdown.length),
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已从剪切板读取配方表格')),
-      );
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(
-          '新增产品配方',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-        ),
-        content: SizedBox(
-          width: 680,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                style: const TextStyle(fontSize: 13),
-                decoration: _roundedInputDecoration(labelText: '名称'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: tableController,
-                minLines: 8,
-                maxLines: 14,
-                style: const TextStyle(fontSize: 13),
-                decoration: _roundedInputDecoration(
-                  labelText: '配方 Markdown 表格',
-                  hintText: '支持粘贴 Markdown 表格，或点击下方按钮读取 Excel 复制的表格',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          Row(
-            children: [
-              OutlinedButton.icon(
-                onPressed: pasteFormulaTableFromClipboard,
-                icon: const Icon(Icons.content_paste, size: 16),
-                label: const Text('从剪切板获取', style: TextStyle(fontSize: 12)),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('取消', style: TextStyle(fontSize: 13)),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('保存', style: TextStyle(fontSize: 13)),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    try {
-      final markdown = widget.dataService.buildFormulaMarkdownTemplate(
-        tableMarkdown: tableController.text,
-      );
-      await widget.dataService.addFormulaMarkdown(
-        name: nameController.text.trim(),
-        markdown: markdown,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('产品配方已新增')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('新增失败：$e')));
-    }
+    await showDialog<void>(
+        context: context,
+        builder: (_) => FormulaEditorDialog(dataService: widget.dataService));
   }
 
   Future<void> _showAddApplicationDialog() async {
@@ -462,7 +361,41 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('产品应用'),
+        bottom: widget.dataService.quarantinedFormulas.isEmpty
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(64),
+                child: ListTile(
+                  dense: true,
+                  title: Text(
+                      '${widget.dataService.quarantinedFormulas.length} 份个人配方已隔离；原文保留，可导出后修复。',
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error)),
+                  trailing: IconButton(
+                      tooltip: '查看隔离详情',
+                      icon: const Icon(Icons.warning_amber),
+                      onPressed: () => showDialog<void>(
+                          context: context,
+                          builder: (dialogContext) => AlertDialog(
+                                title: const Text('个人配方隔离详情'),
+                                content: SingleChildScrollView(
+                                    child: SelectableText(widget
+                                        .dataService.quarantinedFormulas.entries
+                                        .map((e) => '${e.key}：${e.value}')
+                                        .join('\n\n'))),
+                                actions: [
+                                  TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(dialogContext),
+                                      child: const Text('关闭'))
+                                ],
+                              ))),
+                )),
         actions: [
+          IconButton(
+              tooltip: '新增产品配方',
+              icon: const Icon(Icons.add),
+              onPressed: _showAddFormulaDialog),
           PopupMenuButton<bool>(
             icon: const Icon(Icons.sort_by_alpha),
             onSelected: _onSortDirectionChanged,

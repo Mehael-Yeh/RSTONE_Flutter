@@ -1,3 +1,6 @@
+import 'formula_document.dart';
+import '../utils/formula_protocol_codec.dart';
+
 /// 产品/应用数据模型
 ///
 /// 用于表示产品列表和产品应用两大类数据。
@@ -16,6 +19,7 @@ class ProductItem {
     return wikiMatch?.group(1)?.trim() ?? unquoted;
   }
 
+  final FormulaDocument? formulaDocument;
   final String fileName; // 文件名（不含路径）
   final DataOrigin origin;
   final List<String> unresolvedProductReferences;
@@ -45,6 +49,7 @@ class ProductItem {
   final String? baseMaterial; // 基材
 
   ProductItem({
+    this.formulaDocument,
     this.origin = DataOrigin.unknown,
     this.unresolvedProductReferences = const [],
     required this.fileName,
@@ -77,14 +82,34 @@ class ProductItem {
       {DataOrigin origin = DataOrigin.unknown,
       List<String> unresolvedProductReferences = const []}) {
     final fileName = filePath.split('/').last.replaceAll('.md', '');
-    final folder = filePath.contains('产品列表')
-        ? '产品列表'
-        : filePath.contains('产品应用')
-            ? '产品应用'
-            : filePath.contains('产品配方')
-                ? '产品配方'
-                : '未知';
+    final recipePath =
+        filePath.startsWith('产品配方/') || filePath.startsWith('user/产品配方/');
+    final folder = recipePath
+        ? '产品配方'
+        : filePath.contains('产品列表')
+            ? '产品列表'
+            : filePath.contains('产品应用')
+                ? '产品应用'
+                : filePath.contains('产品配方')
+                    ? '产品配方'
+                    : '未知';
 
+    if (folder == '产品配方') {
+      final document = FormulaProtocolCodec.readOptional(content);
+      if (document != null) {
+        final exactStem =
+            filePath.split('/').last.replaceFirst(RegExp(r'\.md$'), '');
+        return ProductItem(
+            fileName: exactStem,
+            filePath: filePath,
+            folder: folder,
+            rawContent: content,
+            origin: origin,
+            formulaDocument: document,
+            unresolvedProductReferences: unresolvedProductReferences,
+            frontmatter: Map.unmodifiable(document.toJson()));
+      }
+    }
     Map<String, dynamic> frontmatter = {};
     List<String> tags = [];
     String? engineer;
