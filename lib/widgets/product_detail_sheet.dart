@@ -1180,7 +1180,26 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
   Widget _buildFormulaCard(String title, ProductItem formula) {
     final document = formula.formulaDocument;
-    if (document != null) return StructuredFormulaCard(document: document);
+    if (document != null) {
+      ProductItem? exactProduct(String target) {
+        final matches = widget.productCatalog
+            .where((p) => p.folder == '产品列表' && p.fileName == target)
+            .toList();
+        return matches.length == 1 ? matches.single : null;
+      }
+
+      return StructuredFormulaCard(
+          document: document,
+          canOpenProduct: (target) => exactProduct(target) != null,
+          onOpenProduct: (target) {
+            final product = exactProduct(target);
+            if (product != null) {
+              ProductDetailSheet.show(context, product,
+                  productCatalog: widget.productCatalog,
+                  formulas: widget.formulas);
+            }
+          });
+    }
     final rawContent = formula.rawContent;
     final cs = Theme.of(context).colorScheme;
     // 将复杂文本解析逻辑下沉到独立解析器，UI 层仅做渲染。

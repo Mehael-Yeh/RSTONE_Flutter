@@ -1,14 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/formula_document.dart';
+import '../../utils/formula_protocol_codec.dart';
 import '../../services/share_file.dart';
 import 'formula_presentation.dart';
 import 'formula_png_renderer.dart';
 
 class StructuredFormulaCard extends StatelessWidget {
   final FormulaDisplayView view;
-  StructuredFormulaCard({super.key, required FormulaDocument document})
+  final bool Function(String)? canOpenProduct;
+  final ValueChanged<String>? onOpenProduct;
+  StructuredFormulaCard(
+      {super.key,
+      required FormulaDocument document,
+      this.canOpenProduct,
+      this.onOpenProduct})
       : view = FormulaDisplayView(document);
+
+  Widget _ingredient(String text, TextStyle style) {
+    final parts = FormulaProtocolCodec.ingredientParts(
+        text, view.document.associatedProducts);
+    if (onOpenProduct == null ||
+        !parts.any((p) =>
+            p.target != null && canOpenProduct?.call(p.target!) == true)) {
+      return Text(text, style: style, textScaler: TextScaler.noScaling);
+    }
+    return Text.rich(
+        TextSpan(children: [
+          for (final p in parts)
+            if (p.target != null && canOpenProduct?.call(p.target!) == true)
+              WidgetSpan(
+                  alignment: PlaceholderAlignment.baseline,
+                  baseline: TextBaseline.alphabetic,
+                  child: GestureDetector(
+                      key: ValueKey('recipe-link:${p.target}'),
+                      onTap: () => onOpenProduct!(p.target!),
+                      child: Text(p.text,
+                          style: style.copyWith(
+                              decoration: TextDecoration.underline),
+                          textScaler: TextScaler.noScaling)))
+            else
+              TextSpan(text: p.text),
+        ]),
+        style: style,
+        textScaler: TextScaler.noScaling);
+  }
 
   Future<void> _share(BuildContext context) async {
     try {
@@ -85,13 +121,18 @@ class StructuredFormulaCard extends StatelessWidget {
                                     : cs.surface,
                                 border: Border.all(
                                     color: cs.outlineVariant, width: 0.5)),
-                            child: Text(view.cells[r][c],
-                                style: FormulaTableLayout.style.copyWith(
-                                    color: cs.onSurface,
-                                    fontWeight: r == 0
-                                        ? FontWeight.bold
-                                        : FontWeight.normal),
-                                textScaler: TextScaler.noScaling),
+                            child: r > 0 && c == 0
+                                ? _ingredient(
+                                    view.cells[r][c],
+                                    FormulaTableLayout.style
+                                        .copyWith(color: cs.onSurface))
+                                : Text(view.cells[r][c],
+                                    style: FormulaTableLayout.style.copyWith(
+                                        color: cs.onSurface,
+                                        fontWeight: r == 0
+                                            ? FontWeight.bold
+                                            : FontWeight.normal),
+                                    textScaler: TextScaler.noScaling),
                           )
                       ]),
                   ])),
