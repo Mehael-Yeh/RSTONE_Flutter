@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/formula_document.dart';
@@ -25,25 +26,12 @@ class StructuredFormulaCard extends StatelessWidget {
             p.target != null && canOpenProduct?.call(p.target!) == true)) {
       return Text(text, style: style, textScaler: TextScaler.noScaling);
     }
-    return Text.rich(
-        TextSpan(children: [
-          for (final p in parts)
-            if (p.target != null && canOpenProduct?.call(p.target!) == true)
-              WidgetSpan(
-                  alignment: PlaceholderAlignment.baseline,
-                  baseline: TextBaseline.alphabetic,
-                  child: GestureDetector(
-                      key: ValueKey('recipe-link:${p.target}'),
-                      onTap: () => onOpenProduct!(p.target!),
-                      child: Text(p.text,
-                          style: style.copyWith(
-                              decoration: TextDecoration.underline),
-                          textScaler: TextScaler.noScaling)))
-            else
-              TextSpan(text: p.text),
-        ]),
+    return _IngredientLinks(
+        text: text,
         style: style,
-        textScaler: TextScaler.noScaling);
+        associated: view.document.associatedProducts,
+        canOpenProduct: canOpenProduct!,
+        onOpenProduct: onOpenProduct!);
   }
 
   Future<void> _share(BuildContext context) async {
@@ -145,4 +133,81 @@ class StructuredFormulaCard extends StatelessWidget {
           ],
         ]));
   }
+}
+
+/// Inline spans keep exactly the same shaping/wrapping as the measured text.
+/// This state owns every recognizer, including when a cell changes documents.
+class _IngredientLinks extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+  final List<String> associated;
+  final bool Function(String) canOpenProduct;
+  final ValueChanged<String> onOpenProduct;
+  const _IngredientLinks(
+      {required this.text,
+      required this.style,
+      required this.associated,
+      required this.canOpenProduct,
+      required this.onOpenProduct});
+  @override
+  State<_IngredientLinks> createState() => _IngredientLinksState();
+}
+
+class _IngredientLinksState extends State<_IngredientLinks> {
+  final _recognizers = <TapGestureRecognizer>[];
+  late List<InlineSpan> _spans;
+
+  void _clear() {
+    for (final recognizer in _recognizers) {
+      recognizer.dispose();
+    }
+    _recognizers.clear();
+  }
+
+  void _updateSpans() {
+    _clear();
+    _spans = [
+      for (final part in FormulaProtocolCodec.ingredientParts(
+          widget.text, widget.associated))
+        if (part.target != null && widget.canOpenProduct(part.target!))
+          TextSpan(
+              text: part.text,
+              style:
+                  widget.style.copyWith(decoration: TextDecoration.underline),
+              recognizer: _recognizer(part.target!))
+        else
+          TextSpan(text: part.text),
+    ];
+  }
+
+  TapGestureRecognizer _recognizer(String target) {
+    final recognizer = TapGestureRecognizer()
+      ..onTap = () {
+        if (widget.canOpenProduct(target)) widget.onOpenProduct(target);
+      };
+    _recognizers.add(recognizer);
+    return recognizer;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _updateSpans();
+  }
+
+  @override
+  void didUpdateWidget(covariant _IngredientLinks oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updateSpans();
+  }
+
+  @override
+  void dispose() {
+    _clear();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Text.rich(TextSpan(children: _spans),
+      style: widget.style, textScaler: TextScaler.noScaling);
 }
