@@ -4,15 +4,15 @@ import 'package:rst_flutter/services/obsidian_data_service.dart';
 
 void main() {
   test(
-      'new consumer declares 2.0.2 in default, executable fallback and pubspec',
+      'new consumer declares 2.0.5 in default, executable fallback and pubspec',
       () {
-    expect(ObsidianDataService().appVersion, '2.0.2');
+    expect(ObsidianDataService().appVersion, '2.0.5');
     expect(File('lib/main.dart').readAsStringSync(),
-        contains("defaultValue: '2.0.2'"));
+        contains("defaultValue: '2.0.5'"));
     final match =
         RegExp(r'^version:\s*(\d+\.\d+\.\d+)\+(\d+)\s*$', multiLine: true)
             .firstMatch(File('pubspec.yaml').readAsStringSync())!;
-    expect(match[1], '2.0.2');
+    expect(match[1], '2.0.5');
     // Never emit the full build code in assertions or logs.
     expect(
         int.parse(match[2]!) > 0 && int.parse(match[2]!) <= 2100000000, isTrue);
