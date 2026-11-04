@@ -28,7 +28,7 @@ class ObsidianDataService extends ChangeNotifier {
   final bool migrateLegacy;
   ObsidianDataService(
       {DataSyncService? syncService,
-      this.appVersion = '2.0.2',
+      this.appVersion = '2.0.5',
       this.migrateLegacy = true,
       this.bootstrapRules})
       : sync = syncService,
