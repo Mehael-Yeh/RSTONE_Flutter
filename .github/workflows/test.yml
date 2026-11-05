@@ -1,38 +1,54 @@
-name: Validate application shell
+name: QA only - product scroll AOT profile proxy
 on:
   workflow_dispatch:
+    inputs:
+      baseline_sha:
+        description: Exact 40 lowercase hex App source (maintenance baseline has same list sources as 2.0.4)
+        required: true
+        type: string
+        default: '8c77edb71cd32a287302d5d24d6faed07a3a855d'
+      candidate_sha:
+        description: Exact reviewed candidate 40 lowercase hex App source (no moving ref)
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
 jobs:
-  test:
+  profile-proxy:
+    if: startsWith(github.ref, 'refs/heads/qa/profile-scroll-')
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BASELINE_SHA: ${{ inputs.baseline_sha }}
+      CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+      PYTHONDONTWRITEBYTECODE: '1'
     steps:
+      - name: Reject anything except distinct exact source SHAs
+        run: |
+          python3 - <<'PY'
+          import os,re
+          a=os.environ['BASELINE_SHA']; b=os.environ['CANDIDATE_SHA']
+          assert re.fullmatch('[0-9a-f]{40}',a) and re.fullmatch('[0-9a-f]{40}',b) and a != b
+          PY
       - uses: actions/checkout@v4
-      - run: python3 -m unittest discover -s scripts -p 'test_*.py'
-      - run: python3 scripts/validate_data_sync_config.py
-      - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.32.8'
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test --reporter expanded
-      - run: flutter test --platform chrome test/browser_storage_test.dart
-      - run: |
-          RSTONE_APP_VERSION=$(python3 -c 'import re; print(re.search(r"^version:\s*([^+\s]+)", open("pubspec.yaml").read(), re.M).group(1))')
-          flutter build web --release --no-web-resources-cdn --dart-define=APP_VERSION="$RSTONE_APP_VERSION"
-          python3 scripts/prepare_web_offline.py
-  android-integration:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    strategy:
-      matrix:
-        include:
-          - edition: full
-            lite: 'false'
-          - edition: lite
-            lite: 'true'
-    steps:
+          ref: ${{ github.sha }}
+          path: qa-tooling
+          persist-credentials: false
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.baseline_sha }}
+          path: baseline
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          path: candidate
+          persist-credentials: false
+      - name: Stdlib evidence and synthetic protocol self-tests (not performance results)
+        working-directory: qa-tooling/qa_scroll_profile
+        run: python3 -B -m unittest test_verify -v
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -42,8 +58,7 @@ jobs:
           flutter-version: '3.32.8'
           channel: stable
           cache: true
-      - run: flutter pub get
-      - name: Enable Android emulator hardware acceleration
+      - name: Enable Android emulator hardware acceleration (existing test workflow)
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -53,4 +68,12 @@ jobs:
           api-level: 35
           arch: x86_64
           emulator-boot-timeout: 300
-          script: flutter test integration_test/native_sync_test.dart --flavor ${{ matrix.edition }} --dart-define=RSTONE_LITE=${{ matrix.lite }} -d emulator-5554
+          script: python3 qa-tooling/qa_scroll_profile/run_compare.py --baseline "$BASELINE_SHA" --candidate "$CANDIDATE_SHA" --workspace "$GITHUB_WORKSPACE"
+      - name: Keep only QA measurement evidence (no APK or business assets)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-product-scroll-profile-proxy
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 7
