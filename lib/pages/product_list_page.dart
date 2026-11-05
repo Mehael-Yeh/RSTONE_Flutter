@@ -4,7 +4,6 @@ library;
 import 'package:flutter/material.dart';
 import '../utils/compat_color.dart';
 import '../models/product_item.dart';
-import '../utils/natural_sort.dart';
 import '../utils/obsidian_tag_validator.dart';
 import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
@@ -96,8 +95,10 @@ class _ProductListPageState extends State<ProductListPage> {
 
   void _finishPullGesture() {
     final shouldShow = _pullExtent >= _pullTriggerHeight;
+    final next = shouldShow ? _pullButtonHeight : 0.0;
+    if (_pullExtent == next) return;
     setState(() {
-      _pullExtent = shouldShow ? _pullButtonHeight : 0;
+      _pullExtent = next;
     });
   }
 
@@ -367,6 +368,12 @@ class _ProductListPageState extends State<ProductListPage> {
   @override
   void didUpdateWidget(covariant ProductListPage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.dataService != widget.dataService) {
+      oldWidget.dataService.removeListener(_onDataChanged);
+      _dataRevision = widget.dataService.revision;
+      widget.dataService.addListener(_onDataChanged);
+      ProductDetailSheet.hideIfOpen(context);
+    }
     if (oldWidget.pageChangeSignal != widget.pageChangeSignal) {
       setState(() {
         _noteResetSignal++;
@@ -375,7 +382,7 @@ class _ProductListPageState extends State<ProductListPage> {
     }
   }
 
-  List<ProductItem> _getSortedItems() {
+  List<ProductItem> _getFilteredItems() {
     final filtered = widget.dataService.products.where((item) {
       if (_typeFilter == '水性') {
         return item.tags.any((tag) => tag.contains('水性'));
@@ -386,27 +393,13 @@ class _ProductListPageState extends State<ProductListPage> {
       return true;
     }).toList();
 
-    if (_sortColumn == null) return filtered;
-
-    final sorted = List<ProductItem>.from(filtered);
-    sorted.sort((a, b) {
-      final aFields = a.getTableFields();
-      final bFields = b.getTableFields();
-
-      final aVal = aFields[_sortColumn] ?? '';
-      final bVal = bFields[_sortColumn] ?? '';
-
-      final result = compareNaturalText(aVal, bVal);
-      return _sortDescending ? -result : result;
-    });
-
-    return sorted;
+    return filtered;
   }
 
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
-    final items = _getSortedItems();
+    final items = _getFilteredItems();
 
     return Scaffold(
       appBar: AppBar(
@@ -549,6 +542,8 @@ class _ProductListPageState extends State<ProductListPage> {
                         items: items,
                         productCatalog: widget.dataService.products,
                         formulas: widget.dataService.formulas,
+                        formulaAssociations:
+                            widget.dataService.formulaAssociations,
                         tdsByProduct: widget.dataService.tdsByProduct,
                         tdsForProduct: widget.dataService.tdsForProduct,
                         defaultColumns: _columns,
@@ -562,6 +557,7 @@ class _ProductListPageState extends State<ProductListPage> {
                         preferencesService: widget.preferencesService,
                         currentSortColumn: _sortColumn,
                         sortDescending: _sortDescending,
+                        preserveLegacyProductSortTies: true,
                         noteResetSignal: _noteResetSignal,
                         isManualItem: widget.dataService.isManualItem,
                         onDeleteManualItem: _deleteManualItem,

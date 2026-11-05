@@ -19,6 +19,7 @@ import '../utils/formula_protocol_codec.dart';
 import '../utils/formula_catalog_validator.dart';
 import '../utils/grade_lookup.dart';
 import '../utils/natural_sort.dart';
+import '../utils/formula_association.dart';
 
 class ObsidianDataService extends ChangeNotifier {
   DataSyncService? sync;
@@ -52,6 +53,18 @@ class ObsidianDataService extends ChangeNotifier {
   Future<void>? _initializing;
   final List<String> _logs = [];
   int revision = 0;
+  // Service-owned, bounded to the latest revision (including user overlays).
+  FormulaAssociationIndex? _formulaAssociations;
+  int? _associationRevision;
+  FormulaAssociationIndex get formulaAssociations {
+    if (_associationRevision != revision || _formulaAssociations == null) {
+      _formulaAssociations =
+          FormulaAssociationIndex(productCatalog: products, formulas: formulas);
+      _associationRevision = revision;
+    }
+    return _formulaAssociations!;
+  }
+
   String? initializationError;
   List<ProductItem> get products => List.unmodifiable(_products);
   List<ProductItem> get applications => List.unmodifiable(_applications);

@@ -28,6 +28,7 @@ class ProductDetailSheet extends StatefulWidget {
   final ProductItem product;
   final List<ProductItem> productCatalog;
   final List<ProductItem> formulas;
+  final FormulaAssociationIndex? formulaAssociations;
   final String? tdsContent;
   static bool _isShowing = false;
 
@@ -36,6 +37,7 @@ class ProductDetailSheet extends StatefulWidget {
     required this.product,
     required this.productCatalog,
     this.formulas = const [],
+    this.formulaAssociations,
     this.tdsContent,
   });
 
@@ -45,6 +47,7 @@ class ProductDetailSheet extends StatefulWidget {
     ProductItem product, {
     required List<ProductItem> productCatalog,
     List<ProductItem> formulas = const [],
+    FormulaAssociationIndex? formulaAssociations,
     String? tdsContent,
   }) async {
     if (_isShowing) {
@@ -62,6 +65,7 @@ class ProductDetailSheet extends StatefulWidget {
         product: product,
         productCatalog: productCatalog,
         formulas: formulas,
+        formulaAssociations: formulaAssociations,
         tdsContent: tdsContent,
       ),
     ).whenComplete(() {
@@ -1285,11 +1289,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final bodyContent = widget.product.formulaDocument == null
         ? _extractMarkdownBody(widget.product.rawContent)
         : '';
-    final matchedFormulas = linkedFormulasForProduct(
-      widget.product,
-      widget.formulas,
-      productCatalog: widget.productCatalog,
-    );
+    final matchedFormulas =
+        widget.formulaAssociations?.forProduct(widget.product) ??
+            linkedFormulasForProduct(
+              widget.product,
+              widget.formulas,
+              productCatalog: widget.productCatalog,
+            );
     final markdownContent = matchedFormulas.isNotEmpty
         ? _removeStandaloneWikiLines(bodyContent)
         : bodyContent;

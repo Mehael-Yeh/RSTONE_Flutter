@@ -162,3 +162,70 @@ List<ProductItem> linkedFormulasForProduct(
   }
   return matched.values.toList();
 }
+
+/// Immutable associations for one complete catalog snapshot. No global cache.
+/// Legacy documents are parsed once per snapshot, not once per visible row.
+class FormulaAssociationIndex {
+  final Map<ProductItem, List<ProductItem>> _byProduct;
+
+  FormulaAssociationIndex._(this._byProduct);
+
+  factory FormulaAssociationIndex({
+    required Iterable<ProductItem> productCatalog,
+    required Iterable<ProductItem> formulas,
+  }) {
+    final products =
+        productCatalog.where((item) => item.folder == '产品列表').toList();
+    final canonical = {for (final p in products) gradeLookupKey(p.fileName)};
+    final exact = <String, Set<ProductItem>>{};
+    final legacy = <String, Set<ProductItem>>{};
+    final matches = <ProductItem, Map<String, ProductItem>>{};
+    for (final product in products) {
+      matches[product] = {};
+      exact.putIfAbsent(product.fileName, () => {}).add(product);
+      final identities = {gradeLookupKey(product.fileName)};
+      final experimental = product.experimentalCode;
+      if (experimental?.isNotEmpty == true &&
+          !canonical.contains(gradeLookupKey(experimental!))) {
+        identities.add(gradeLookupKey(experimental));
+      }
+      for (final key in identities) {
+        legacy.putIfAbsent(key, () => {}).add(product);
+      }
+    }
+    for (final formula in formulas) {
+      if (formula.folder != '产品配方') continue;
+      final targets = <ProductItem>{};
+      final document = formula.formulaDocument;
+      if (document != null) {
+        for (final grade in document.associatedProducts) {
+          targets.addAll(exact[grade] ?? const <ProductItem>{});
+        }
+      } else {
+        final participants = {
+          ..._declaredGradeKeys(formula.rawContent),
+          ..._ingredientGradeKeys(formula.rawContent),
+        };
+        final grade = formula.fileName
+            .replaceFirst(RegExp(r'\.md$'), '')
+            .replaceFirst(_legacyFinish, '');
+        if (participants.isEmpty && _completeGrade.hasMatch(grade)) {
+          participants.add(gradeLookupKey(grade));
+        }
+        for (final key in participants) {
+          targets.addAll(legacy[key] ?? const <ProductItem>{});
+        }
+      }
+      for (final product in targets) {
+        matches[product]!.putIfAbsent(formula.fileName, () => formula);
+      }
+    }
+    return FormulaAssociationIndex._(Map.unmodifiable({
+      for (final entry in matches.entries)
+        entry.key: List<ProductItem>.unmodifiable(entry.value.values),
+    }));
+  }
+
+  List<ProductItem> forProduct(ProductItem product) =>
+      _byProduct[product] ?? const [];
+}

@@ -19,6 +19,7 @@ class ObsidianTable extends StatefulWidget {
   /// 完整产品目录，不能使用已筛选的 [items] 代替。
   final List<ProductItem> productCatalog;
   final List<ProductItem> formulas;
+  final FormulaAssociationIndex? formulaAssociations;
   final Map<String, String> tdsByProduct;
   final String? Function(String)? tdsForProduct;
   final List<String> defaultColumns;
@@ -29,6 +30,10 @@ class ObsidianTable extends StatefulWidget {
   final Function(bool) onSortDirectionChanged;
   final String? currentSortColumn;
   final bool sortDescending;
+
+  /// ProductListPage historically sorted twice with an unstable sort. Preserve
+  /// that exact tie order only when equal keys occur; other callers sorted once.
+  final bool preserveLegacyProductSortTies;
   final PreferencesService preferencesService;
   final int noteResetSignal;
   final bool Function(ProductItem item)? isManualItem;
@@ -39,6 +44,7 @@ class ObsidianTable extends StatefulWidget {
     required this.items,
     required this.productCatalog,
     required this.formulas,
+    this.formulaAssociations,
     required this.tdsByProduct,
     this.tdsForProduct,
     required this.defaultColumns,
@@ -53,6 +59,7 @@ class ObsidianTable extends StatefulWidget {
     this.noteResetSignal = 0,
     this.currentSortColumn,
     this.sortDescending = false,
+    this.preserveLegacyProductSortTies = false,
   });
 
   @override
@@ -176,12 +183,25 @@ class _ObsidianTableState extends State<ObsidianTable> {
     final sortCol = widget.currentSortColumn!;
     final sorted = List<ProductItem>.from(widget.items);
 
-    sorted.sort((a, b) {
-      final aVal = a.getTableFields()[sortCol] ?? '';
-      final bVal = b.getTableFields()[sortCol] ?? '';
+    final values = {
+      for (final item in sorted) item: item.getTableFields()[sortCol] ?? '',
+    };
+    int compare(ProductItem a, ProductItem b) {
+      final aVal = values[a]!;
+      final bVal = values[b]!;
       final result = compareNaturalText(aVal, bVal);
       return widget.sortDescending ? -result : result;
-    });
+    }
+
+    sorted.sort(compare);
+    if (widget.preserveLegacyProductSortTies) {
+      for (var i = 1; i < sorted.length; i++) {
+        if (compare(sorted[i - 1], sorted[i]) == 0) {
+          sorted.sort(compare);
+          break;
+        }
+      }
+    }
 
     return sorted;
   }
@@ -231,8 +251,9 @@ class _ObsidianTableState extends State<ObsidianTable> {
   }
 
   Widget? _formulaBadge(ProductItem item) {
-    final count = linkedFormulasForProduct(item, widget.formulas,
-            productCatalog: widget.productCatalog)
+    final count = (widget.formulaAssociations?.forProduct(item) ??
+            linkedFormulasForProduct(item, widget.formulas,
+                productCatalog: widget.productCatalog))
         .length;
     if (count == 0) return null;
     final cs = Theme.of(context).colorScheme;
@@ -388,6 +409,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
               item,
               productCatalog: widget.productCatalog,
               formulas: widget.formulas,
+              formulaAssociations: widget.formulaAssociations,
               tdsContent: _tdsOf(item),
             ),
             onNoteTap: () => _openNoteEditor(item),
@@ -539,6 +561,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                         item,
                         productCatalog: widget.productCatalog,
                         formulas: widget.formulas,
+                        formulaAssociations: widget.formulaAssociations,
                         tdsContent: _tdsOf(item),
                       ),
                       child: Container(
