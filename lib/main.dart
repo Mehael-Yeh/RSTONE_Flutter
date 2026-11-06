@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'utils/app_shapes.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/services.dart';
@@ -77,6 +78,15 @@ class _RstoneAppState extends State<RstoneApp> {
     _themeSeedColor = Color(widget.preferencesService.getThemeSeedColorValue());
   }
 
+  dynamic _buildCompatDialogTheme() {
+    const theme = DialogTheme(shape: AppShapes.rounded);
+    try {
+      return (theme as dynamic).data;
+    } on NoSuchMethodError {
+      return theme;
+    }
+  }
+
   ThemeMode _themeModeFromString(String mode) {
     switch (mode) {
       case 'light':
@@ -134,7 +144,41 @@ class _RstoneAppState extends State<RstoneApp> {
         ),
       ),
       cardTheme: _buildCompatCardTheme(colorScheme),
+      dialogTheme: _buildCompatDialogTheme(),
+      chipTheme: const ChipThemeData(shape: AppShapes.rounded),
+      popupMenuTheme: const PopupMenuThemeData(shape: AppShapes.rounded),
+      menuTheme: const MenuThemeData(
+        style: MenuStyle(shape: WidgetStatePropertyAll(AppShapes.rounded)),
+      ),
+      dropdownMenuTheme: const DropdownMenuThemeData(
+        menuStyle: MenuStyle(shape: WidgetStatePropertyAll(AppShapes.rounded)),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(shape: AppShapes.rounded),
+      inputDecorationTheme: const InputDecorationTheme(
+        border: AppShapes.input,
+      ),
+      filledButtonTheme: const FilledButtonThemeData(
+        style: ButtonStyle(shape: WidgetStatePropertyAll(AppShapes.rounded)),
+      ),
+      textButtonTheme: const TextButtonThemeData(
+        style: ButtonStyle(shape: WidgetStatePropertyAll(AppShapes.rounded)),
+      ),
+      outlinedButtonTheme: const OutlinedButtonThemeData(
+        style: ButtonStyle(shape: WidgetStatePropertyAll(AppShapes.rounded)),
+      ),
+      elevatedButtonTheme: const ElevatedButtonThemeData(
+        style: ButtonStyle(shape: WidgetStatePropertyAll(AppShapes.rounded)),
+      ),
+      checkboxTheme: const CheckboxThemeData(shape: AppShapes.rounded),
+      tooltipTheme: TooltipThemeData(
+        decoration: ShapeDecoration(
+          color: colorScheme.inverseSurface,
+          shape: AppShapes.rounded,
+        ),
+        textStyle: TextStyle(color: colorScheme.onInverseSurface),
+      ),
       navigationBarTheme: NavigationBarThemeData(
+        indicatorShape: AppShapes.rounded,
         // 底部导航使用低层级容器色，保证与内容区域层级分离。
         backgroundColor: colorScheme.surfaceContainerLow,
         indicatorColor: colorScheme.secondaryContainer,
@@ -148,6 +192,7 @@ class _RstoneAppState extends State<RstoneApp> {
         }),
       ),
       snackBarTheme: SnackBarThemeData(
+        shape: AppShapes.rounded,
         behavior: SnackBarBehavior.floating,
         backgroundColor: colorScheme.inverseSurface,
         contentTextStyle: TextStyle(color: colorScheme.onInverseSurface),
@@ -159,9 +204,7 @@ class _RstoneAppState extends State<RstoneApp> {
     final theme = CardTheme(
       elevation: 0,
       color: colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: AppShapes.rounded,
     );
     // New Flutter releases split inherited CardTheme from CardThemeData.
     // Keep the existing visual values on both supported API shapes.

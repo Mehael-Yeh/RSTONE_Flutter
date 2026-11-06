@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import '../utils/app_shapes.dart';
 import '../utils/compat_color.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:printing/printing.dart';
@@ -367,9 +368,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             backgroundColor: cs.surfaceContainerHigh,
             surfaceTintColor: cs.surfaceTint,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-            ),
+            shape: AppShapes.rounded,
             clipBehavior: Clip.antiAlias,
             child: SizedBox(
               width: dialogWidth,
@@ -821,7 +820,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
             color: cs.secondary, backgroundColor: cs.surfaceContainerHighest),
         codeblockDecoration: BoxDecoration(
           color: cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppShapes.borderRadius,
         ),
         blockquoteDecoration: BoxDecoration(
           border: Border(
@@ -867,7 +866,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
         color: cs.surfaceContainer,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppShapes.borderRadius,
         border: Border.all(color: cs.outlineVariant),
       ),
       child: Column(
@@ -909,7 +908,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                         ? InkWell(
                             onTap: () => setState(() =>
                                 _selectedApplicationFormulaName = e.value),
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: AppShapes.borderRadius,
                             child: Text(
                               e.value,
                               style: TextStyle(
@@ -945,6 +944,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                     ? null
                     : DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
+                          borderRadius: AppShapes.borderRadius,
                           value: _selectedApplicationFormulaName,
                           isExpanded: true,
                           items: [
@@ -1005,7 +1005,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppShapes.borderRadius,
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
@@ -1136,6 +1136,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       selectedFormula,
       selector: DropdownButtonHideUnderline(
         child: DropdownButton<int>(
+          borderRadius: AppShapes.borderRadius,
           value: _selectedFormulaIndex.clamp(0, matchedFormulas.length - 1),
           isExpanded: true,
           dropdownColor: cs.surfaceContainerHigh,
@@ -1193,7 +1194,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
         color: cs.surfaceContainer,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppShapes.borderRadius,
         border: Border.all(color: cs.outlineVariant),
       ),
       child: Column(
@@ -1289,7 +1290,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
             decoration: BoxDecoration(
               color: cs.surface,
               borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
+                  AppShapes.handlePill,
             ),
             child: ListView(
               controller: scrollController,
@@ -1304,7 +1305,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: cs.outlineVariant,
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: AppShapes.borderRadius,
                     ),
                   ),
                 ),
@@ -1318,7 +1319,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                             horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: folderAccent.withCompatOpacity(0.16),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: AppShapes.borderRadius,
                         ),
                         child: Text(
                           widget.product.folder,
@@ -1346,7 +1347,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                         Padding(
                           padding: const EdgeInsets.only(right: 4),
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: AppShapes.borderRadius,
                             onTap: _isGeneratingTds ? null : _handlePreviewTds,
                             onLongPress:
                                 _isGeneratingTds ? null : _handleShareTds,
@@ -1355,7 +1356,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                                   horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: cs.secondaryContainer,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: AppShapes.borderRadius,
                               ),
                               child: _isGeneratingTds
                                   ? SizedBox(
@@ -1404,7 +1405,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                               horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: cs.secondaryContainer,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: AppShapes.borderRadius,
                           ),
                           child: Text(
                             tag,

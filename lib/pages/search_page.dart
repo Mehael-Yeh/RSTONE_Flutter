@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../utils/app_shapes.dart';
 import '../utils/compat_color.dart';
 import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
@@ -229,17 +230,17 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
                 filled: true,
                 fillColor: cs.surfaceContainerHigh,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: AppShapes.borderRadius,
                   borderSide: BorderSide(
                       color: cs.outlineVariant.withCompatOpacity(0.5)),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: AppShapes.borderRadius,
                   borderSide: BorderSide(
                       color: cs.outlineVariant.withCompatOpacity(0.5)),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: AppShapes.borderRadius,
                   borderSide:
                       BorderSide(color: cs.primary.withCompatOpacity(0.5)),
                 ),
@@ -332,7 +333,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: BoxDecoration(
                 color: cs.secondaryContainer,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: AppShapes.borderRadius,
               ),
               child: Text(alias,
                   maxLines: 1,

@@ -2,9 +2,11 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../utils/app_shapes.dart';
 import '../utils/compat_color.dart';
 import '../models/product_item.dart';
 import '../widgets/formula_editor_dialog.dart';
+import '../widgets/formula_draft_list_dialog.dart';
 import '../utils/natural_sort.dart';
 import '../services/obsidian_data_service.dart';
 import '../services/preferences_service.dart';
@@ -59,6 +61,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   void _onDataChanged() {
     if (!mounted || _dataRevision == widget.dataService.revision) return;
     _dataRevision = widget.dataService.revision;
+    if (widget.dataService.applications.isEmpty) _pullExtent = 0;
     ProductDetailSheet.hideIfOpen(context);
     setState(() {});
   }
@@ -69,20 +72,12 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     _dataRevision = widget.dataService.revision;
     widget.dataService.addListener(_onDataChanged);
     // 不在这里调用MediaQuery，延迟到didChangeDependencies
-    FocusManager.instance.addListener(_handleFocusLost);
   }
 
   @override
   void dispose() {
     widget.dataService.removeListener(_onDataChanged);
-    FocusManager.instance.removeListener(_handleFocusLost);
     super.dispose();
-  }
-
-  void _handleFocusLost() {
-    if (FocusManager.instance.primaryFocus == null) {
-      _closePullButtons();
-    }
   }
 
   void _updatePullByOverscroll(double overscroll) {
@@ -92,10 +87,9 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   }
 
   void _finishPullGesture() {
-    final shouldShow = _pullExtent >= _pullTriggerHeight;
-    setState(() {
-      _pullExtent = shouldShow ? _pullButtonHeight : 0;
-    });
+    final next = _pullExtent >= _pullTriggerHeight ? _pullButtonHeight : 0.0;
+    if (_pullExtent == next) return;
+    setState(() => _pullExtent = next);
   }
 
   void _closePullButtons() {
@@ -104,14 +98,12 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   }
 
   Future<void> _showAddFormulaDialog() async {
-    _closePullButtons();
     await showDialog<void>(
         context: context,
         builder: (_) => FormulaEditorDialog(dataService: widget.dataService));
   }
 
   Future<void> _showAddApplicationDialog() async {
-    _closePullButtons();
     final nameController = TextEditingController();
     final tagsController = TextEditingController();
     final primerController = TextEditingController();
@@ -130,7 +122,11 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildTwoFieldRow(nameController, '名称', primerController, '底漆'),
+                _buildRoundedField(nameController, '名称'),
+                ExpansionTile(
+                  title: const Text('补充应用资料（可选）'),
+                  children: [
+                _buildRoundedField(primerController, '底漆（可选）'),
                 const SizedBox(height: 10),
                 _buildTwoFieldRow(midController, '中漆', topController, '面漆'),
                 const SizedBox(height: 10),
@@ -138,9 +134,11 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                   controller: tagsController,
                   style: const TextStyle(fontSize: 13),
                   decoration: _roundedInputDecoration(
-                    labelText: 'tags（空格分隔）',
+                    labelText: '标签（可选，空格分隔）',
                     hintText: '例如 水性 高光',
                   ),
+                ),
+                  ],
                 ),
               ],
             ),
@@ -201,15 +199,15 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
       hintStyle: TextStyle(
           fontSize: 12, color: cs.onSurfaceVariant.withCompatOpacity(0.85)),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppShapes.borderRadius,
         borderSide: BorderSide(color: cs.outlineVariant),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppShapes.borderRadius,
         borderSide: BorderSide(color: cs.outlineVariant),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppShapes.borderRadius,
         borderSide: BorderSide(color: cs.primary, width: 1.6),
       ),
       isDense: true,
@@ -327,6 +325,13 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
   @override
   void didUpdateWidget(covariant ProductApplicationsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.dataService != widget.dataService) {
+      oldWidget.dataService.removeListener(_onDataChanged);
+      _pullExtent = 0;
+      _dataRevision = widget.dataService.revision;
+      widget.dataService.addListener(_onDataChanged);
+      ProductDetailSheet.hideIfOpen(context);
+    }
     if (oldWidget.pageChangeSignal != widget.pageChangeSignal) {
       setState(() {
         _noteResetSignal++;
@@ -358,7 +363,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
     final isMobile = MediaQuery.of(context).size.width < 600;
     final items = _getSortedItems();
 
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
         title: const Text('产品应用'),
         bottom: widget.dataService.quarantinedFormulas.isEmpty
@@ -396,6 +401,11 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
               tooltip: '新增产品配方',
               icon: const Icon(Icons.add),
               onPressed: _showAddFormulaDialog),
+          IconButton(
+              tooltip: '待补充配方',
+              icon: const Icon(Icons.edit_note),
+              onPressed: () => showDialog<void>(context: context,
+                  builder: (_) => FormulaDraftListDialog(dataService: widget.dataService))),
           PopupMenuButton<bool>(
             icon: const Icon(Icons.sort_by_alpha),
             onSelected: _onSortDirectionChanged,
@@ -438,9 +448,13 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
             )
           : GestureDetector(
               behavior: HitTestBehavior.translucent,
+              // Handles a deliberate upward drag on the module itself. The
+              // table's own scrollable wins its descendant gesture arena.
+              onVerticalDragUpdate: (details) {
+                if (details.delta.dy < 0) _closePullButtons();
+              },
               onTap: () {
                 FocusManager.instance.primaryFocus?.unfocus();
-                _closePullButtons();
               },
               child: Column(
                 children: [
@@ -460,8 +474,7 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                                 .clamp(0.0, 1.0),
                             child: Card(
                               margin: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                              shape: AppShapes.rounded,
                               clipBehavior: Clip.antiAlias,
                               child: Row(
                                 children: [
@@ -516,8 +529,17 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                   Expanded(
                     child: NotificationListener<ScrollNotification>(
                       onNotification: (notification) {
-                        if (notification.metrics.pixels >
-                            notification.metrics.minScrollExtent + 0.5) {
+                        if (notification.metrics.axis != Axis.vertical) {
+                          return false;
+                        }
+                        if (notification is ScrollUpdateNotification &&
+                            notification.dragDetails != null &&
+                            (notification.scrollDelta ?? 0) > 0) {
+                          _closePullButtons();
+                        }
+                        if (notification is OverscrollNotification &&
+                            notification.dragDetails != null &&
+                            notification.overscroll > 0) {
                           _closePullButtons();
                         }
                         if (notification is OverscrollNotification &&
@@ -556,6 +578,16 @@ class _ProductApplicationsPageState extends State<ProductApplicationsPage> {
                 ],
               ),
             ),
+    );
+    return PopScope<Object?>(
+      canPop: _pullExtent == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        // Modal routes own their back events; never collapse behind a dialog.
+        if (!didPop && (ModalRoute.of(context)?.isCurrent ?? false)) {
+          _closePullButtons();
+        }
+      },
+      child: scaffold,
     );
   }
 }

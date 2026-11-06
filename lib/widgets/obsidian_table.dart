@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../utils/app_shapes.dart';
 import '../utils/compat_color.dart';
 import '../models/product_item.dart';
 import '../utils/grade_lookup.dart';
@@ -271,7 +272,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
         decoration: BoxDecoration(
           color: cs.secondaryContainer,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: AppShapes.borderRadius,
         ),
         child: Text('配方 $count',
             style: TextStyle(fontSize: 10, color: cs.onSecondaryContainer)),
@@ -638,7 +639,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                             decoration: BoxDecoration(
                                               color: cs.secondaryContainer,
                                               borderRadius:
-                                                  BorderRadius.circular(6),
+                                                  AppShapes.borderRadius,
                                             ),
                                             child: Text(
                                               item.productStatus!,

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Startup window matches the app surface so the logo never sits in a
+         foreign white frame. -->
+    <color name="splash_background">#FFFBFE</color>
+</resources>

@@ -1,17 +1,17 @@
-import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/formula_document.dart';
-import '../data_sync/protocol/rstone_protocol.dart' show parseUniqueJson;
+import '../models/product_item.dart';
 import '../services/obsidian_data_service.dart';
 import '../utils/formula_table_clipboard_parser.dart';
+import '../utils/app_shapes.dart';
 
-/// New personal recipes always save the same closed model as official recipes.
-/// Advanced narrative input is explicit ordered JSON, never inferred Markdown.
+/// Name-only reminders are personal drafts, isolated from full recipe schemas.
 class FormulaEditorDialog extends StatefulWidget {
   final ObsidianDataService dataService;
-  const FormulaEditorDialog({super.key, required this.dataService});
+  final ProductItem? draft;
+  const FormulaEditorDialog({super.key, required this.dataService, this.draft});
   @override
   State<FormulaEditorDialog> createState() => _FormulaEditorDialogState();
 }
@@ -20,16 +20,18 @@ class _FormulaEditorDialogState extends State<FormulaEditorDialog> {
   final _title = TextEditingController(),
       _owner = TextEditingController(),
       _refs = TextEditingController();
-  final _input = TextEditingController(text: '原料编号\t投入数(g)\t百分比(%)\t供应商\t备注\n');
-  final _pre = TextEditingController(text: '[]'),
-      _content = TextEditingController(text: '[]');
+  final _input =
+      TextEditingController(text: '原料编号\t投入数(g)\t百分比(%)\t供应商\t备注\n');
+  final _pre = TextEditingController(), _content = TextEditingController();
   late final String _recipeId;
   String _classification = 'unverified';
   String? _error;
   bool _saving = false;
+
   @override
   void initState() {
     super.initState();
+    _title.text = widget.draft?.fileName ?? '';
     final random = Random.secure();
     // Generated once for this creation, not from mutable title/BOM or a clock.
     _recipeId =
@@ -56,10 +58,26 @@ class _FormulaEditorDialogState extends State<FormulaEditorDialog> {
     setState(() => _error = null);
   }
 
+  /// True only when the user supplied real recipe content in any optional field.
+  bool get _hasDetails =>
+      [_owner, _refs, _pre, _content].any((c) => c.text.trim().isNotEmpty) ||
+      _classification != 'unverified' ||
+      _input.text.trim() != '原料编号\t投入数(g)\t百分比(%)\t供应商\t备注';
+
   Future<void> _save() async {
     if (_saving) return;
     setState(() => _saving = true);
     try {
+      // Name-only saves a personal reminder. It never fabricates a BOM.
+      if (!_hasDetails) {
+        if (widget.draft == null) {
+          await widget.dataService.addFormulaDraft(_title.text);
+          if (mounted) Navigator.pop(context);
+        } else {
+          setState(() => _error = '还没有填写配方内容；保留待补充记录请点“取消”。');
+        }
+        return;
+      }
       final table = FormulaTableClipboardParser.parse(_input.text);
       if (!table.isValid) {
         setState(() => _error = table.errorMessage);
@@ -71,73 +89,109 @@ class _FormulaEditorDialogState extends State<FormulaEditorDialog> {
         'title': _title.text,
         'classification': _classification,
         'ownerProduct': _owner.text,
-        'associatedProducts':
-            _refs.text.split('\n').where((s) => s.isNotEmpty).toList(),
+        'associatedProducts': {
+          _owner.text,
+          ..._refs.text.split('\n').where((s) => s.isNotEmpty),
+        }.toList(),
         'columns': table.columns,
         'rows': table.rows,
-        'preTable': parseUniqueJson(Uint8List.fromList(utf8.encode(_pre.text))),
-        'content':
-            parseUniqueJson(Uint8List.fromList(utf8.encode(_content.text))),
+        'preTable': _pre.text
+            .split('\n')
+            .where((s) => s.trim().isNotEmpty)
+            .toList(),
+        'content': _content.text.trim().isEmpty
+            ? []
+            : [
+                {
+                  'kind': 'process',
+                  'label': '操作步骤',
+                  'steps': _content.text
+                      .split('\n')
+                      .where((s) => s.trim().isNotEmpty)
+                      .toList()
+                }
+              ],
       });
-      await widget.dataService.addFormulaDocument(d);
+      if (widget.draft != null) {
+        final cleaned =
+            await widget.dataService.completeFormulaDraft(widget.draft!, d);
+        if (!cleaned && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content:
+                  Text('完整配方已保存，待补充记录暂未移除。请勿重复补充，可稍后移除待补充记录。')));
+        }
+      } else {
+        await widget.dataService.addFormulaDocument(d);
+      }
       if (mounted) Navigator.pop(context);
     } catch (_) {
       if (mounted) {
-        setState(() => _error = '保存失败：请检查名称、完整型号引用、五列或有序JSON结构。原文未覆盖。');
+        setState(() => _error =
+            '未保存，请检查名称是否重复或含特殊符号；填写完整配方时还需选择有效产品并提供真实原料表。原资料未覆盖。');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
+  Widget _field(TextEditingController c, String key, String label,
+          {int lines = 1, String? hint, bool readOnly = false}) =>
+      Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextField(
+              key: ValueKey(key),
+              controller: c,
+              readOnly: readOnly,
+              minLines: lines,
+              maxLines: lines == 1 ? 1 : lines + 3,
+              decoration: InputDecoration(
+                  labelText: label,
+                  hintText: hint,
+                  border: const OutlineInputBorder(
+                      borderRadius: AppShapes.borderRadius))));
+
+  List<Widget> _completeFields() => [
+        _field(_owner, 'recipe-owner', '对应产品（完整型号）'),
+        _field(_refs, 'recipe-associations', '其他用到的产品（可选，每行一个）',
+            lines: 2),
+        DropdownButtonFormField<String>(
+            value: _classification,
+            decoration: const InputDecoration(labelText: '性质（不代表批准）'),
+            borderRadius: AppShapes.borderRadius,
+            items: const [
+              DropdownMenuItem(value: 'unverified', child: Text('未验证')),
+              DropdownMenuItem(value: 'main', child: Text('主方')),
+              DropdownMenuItem(value: 'example', child: Text('示例')),
+              DropdownMenuItem(value: 'reference', child: Text('参考'))
+            ],
+            onChanged: (s) => setState(() => _classification = s!)),
+        const SizedBox(height: 12),
+        _field(_input, 'recipe-input', '原料表（从表格复制粘贴即可）',
+            lines: 5,
+            hint: '原料编号、投入数、百分比、供应商、备注；不缺列，不截列'),
+        OutlinedButton.icon(
+            onPressed: _paste,
+            icon: const Icon(Icons.content_paste),
+            label: const Text('从剪切板获取')),
+        const SizedBox(height: 12),
+        _field(_pre, 'recipe-pre', '配方说明（可选，每行一条）', lines: 2),
+        _field(_content, 'recipe-content', '操作步骤（可选，每行一步）', lines: 3),
+      ];
+
   @override
   Widget build(BuildContext context) {
-    Widget field(TextEditingController c, String key, String label,
-            {int lines = 1, String? hint}) =>
-        Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: TextField(
-                key: ValueKey(key),
-                controller: c,
-                minLines: lines,
-                maxLines: lines == 1 ? 1 : lines + 3,
-                decoration: InputDecoration(
-                    labelText: label,
-                    hintText: hint,
-                    border: const OutlineInputBorder())));
     return AlertDialog(
-        title: const Text('新增产品配方'),
+        title: Text(widget.draft == null ? '新增产品配方' : '补充配方'),
         content: SizedBox(
             width: 680,
             child: SingleChildScrollView(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-              field(_title, 'recipe-title', '名称'),
-              field(_owner, 'recipe-owner', '主产品完整型号'),
-              field(_refs, 'recipe-associations', '关联产品（每行一个，须包含主产品）',
-                  lines: 2),
-              DropdownButtonFormField<String>(
-                  value: _classification,
-                  decoration: const InputDecoration(labelText: '性质（不代表批准）'),
-                  items: const [
-                    DropdownMenuItem(value: 'unverified', child: Text('未验证')),
-                    DropdownMenuItem(value: 'main', child: Text('主方')),
-                    DropdownMenuItem(value: 'example', child: Text('示例')),
-                    DropdownMenuItem(value: 'reference', child: Text('参考'))
-                  ],
-                  onChanged: (s) => setState(() => _classification = s!)),
-              const SizedBox(height: 12),
-              field(_input, 'recipe-input', '五列表格（TSV或Markdown）',
-                  lines: 5, hint: '原料编号、投入数、百分比、供应商、备注；不缺列，不截列'),
-              OutlinedButton.icon(
-                  onPressed: _paste,
-                  icon: const Icon(Icons.content_paste),
-                  label: const Text('从剪切板获取')),
-              const SizedBox(height: 12),
-              field(_pre, 'recipe-pre', '前置说明（JSON字符串数组，可选）', lines: 2),
-              field(_content, 'recipe-content', '有序说明和工艺（JSON数组，可选）',
-                  lines: 3,
-                  hint:
-                      '[{"kind":"note","text":"说明"},{"kind":"process","label":"工艺","steps":["条目"]}]'),
+              _field(_title, 'recipe-title', '名称',
+                  readOnly: widget.draft != null),
+              const Text('只填名称可保存为个人待补充配方，不含原料，也不代表可复现实方。'),
+              ExpansionTile(
+                  title: const Text('填写完整配方（可选）'),
+                  children: _completeFields()),
               if (_error != null)
                 Text(_error!,
                     key: const ValueKey('recipe-error'),

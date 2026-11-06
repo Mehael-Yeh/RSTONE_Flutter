@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rst_flutter/pages/product_applications_page.dart';
@@ -60,14 +61,25 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(
         find.byKey(const ValueKey('recipe-title')), '个人合成配方');
+    await tester.tap(find.text('填写完整配方（可选）'));
+    await tester.pumpAndSettle();
     await tester.enterText(
         find.byKey(const ValueKey('recipe-owner')), 'RS87654321-Q5');
     await tester.enterText(
         find.byKey(const ValueKey('recipe-associations')), 'RS87654321-Q5');
-    await tester.enterText(find.byKey(const ValueKey('recipe-input')),
-        '原料编号\t投入数(g)\t百分比(%)\t供应商\t备注\nwater\t10-12\t\t\t" a|b\nnext "');
-    await tester.enterText(find.byKey(const ValueKey('recipe-content')),
-        '[{"kind":"note","text":"说明"},{"kind":"process","label":"分支甲","steps":["先加水","再混合"]}]');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform, (call) async => call.method == 'Clipboard.getData'
+            ? {'text': '原料编号\t投入数(g)\t百分比(%)\t供应商\t备注\nwater\t10-12\t\t\t" a|b\nnext "'}
+            : null);
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+    await tester.ensureVisible(find.text('从剪切板获取'));
+    await tester.tap(find.text('从剪切板获取'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('recipe-pre')));
+    await tester.enterText(find.byKey(const ValueKey('recipe-pre')), '说明');
+    await tester.ensureVisible(find.byKey(const ValueKey('recipe-content')));
+    await tester.enterText(find.byKey(const ValueKey('recipe-content')), '先加水\n再混合');
     final save = find.byKey(const ValueKey('recipe-save'));
     await tester.ensureVisible(save);
     await tester.tap(save);
@@ -77,7 +89,8 @@ void main() {
     expect(d.rows, [
       ['water', '10-12', '', '', ' a|b\nnext ']
     ]);
-    expect(d.content, hasLength(2));
+    expect(d.preTable, ['说明']);
+    expect(d.content.single.toJson(), {'kind': 'process', 'label': '操作步骤', 'steps': ['先加水', '再混合']});
     expect(d.classification, 'unverified');
     expect(d.recipeId, startsWith('personal-'));
     app.dispose();

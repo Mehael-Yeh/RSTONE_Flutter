@@ -4,6 +4,7 @@ library;
 import 'dart:convert';
 import 'package:yaml/yaml.dart';
 import 'package:flutter/material.dart';
+import '../utils/app_shapes.dart';
 import '../utils/compat_color.dart';
 import '../models/product_item.dart';
 import '../utils/obsidian_tag_validator.dart';
@@ -63,6 +64,7 @@ class _ProductListPageState extends State<ProductListPage> {
   void _onDataChanged() {
     if (!mounted || _dataRevision == widget.dataService.revision) return;
     _dataRevision = widget.dataService.revision;
+    if (widget.dataService.products.isEmpty) _pullExtent = 0;
     ProductDetailSheet.hideIfOpen(context);
     setState(() {});
   }
@@ -73,20 +75,12 @@ class _ProductListPageState extends State<ProductListPage> {
     _dataRevision = widget.dataService.revision;
     widget.dataService.addListener(_onDataChanged);
     // 不在这里调用MediaQuery，延迟到build中
-    FocusManager.instance.addListener(_handleFocusLost);
   }
 
   @override
   void dispose() {
     widget.dataService.removeListener(_onDataChanged);
-    FocusManager.instance.removeListener(_handleFocusLost);
     super.dispose();
-  }
-
-  void _handleFocusLost() {
-    if (FocusManager.instance.primaryFocus == null) {
-      _closePullButton();
-    }
   }
 
   void _updatePullByOverscroll(double overscroll) {
@@ -192,7 +186,6 @@ class _ProductListPageState extends State<ProductListPage> {
   }
 
   Future<void> _showAddProductDialog([ProductItem? item]) async {
-    _closePullButton();
     if (item != null && item.origin != DataOrigin.user) return;
     final front = item == null
         ? null
@@ -260,15 +253,19 @@ class _ProductListPageState extends State<ProductListPage> {
               children: [
                 _buildRoundedField(
                   controller: codeController,
-                  label: '文件名',
+                  label: '名称',
                   hint: '输入自定义产品名称',
                 ),
+                ExpansionTile(
+                  title: const Text('补充产品资料（可选）'),
+                  initiallyExpanded: item != null,
+                  children: [
                 const SizedBox(height: 10),
                 TextField(
                   controller: tagsController,
                   style: const TextStyle(fontSize: 13),
                   decoration: _roundedInputDecoration(
-                    labelText: 'tags',
+                    labelText: '标签（可选）',
                     hintText: '用空格分隔，例如 水性 高光',
                   ),
                 ),
@@ -290,6 +287,8 @@ class _ProductListPageState extends State<ProductListPage> {
                 const SizedBox(height: 10),
                 _buildTwoFieldRow(
                     benchmarkController, '对标', viscosityController, '粘度'),
+                  ],
+                ),
               ],
             ),
           ),
@@ -403,15 +402,15 @@ class _ProductListPageState extends State<ProductListPage> {
       hintStyle: TextStyle(
           fontSize: 12, color: cs.onSurfaceVariant.withCompatOpacity(0.85)),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppShapes.borderRadius,
         borderSide: BorderSide(color: cs.outlineVariant),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppShapes.borderRadius,
         borderSide: BorderSide(color: cs.outlineVariant),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppShapes.borderRadius,
         borderSide: BorderSide(color: cs.primary, width: 1.6),
       ),
       isDense: true,
@@ -535,6 +534,7 @@ class _ProductListPageState extends State<ProductListPage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.dataService != widget.dataService) {
       oldWidget.dataService.removeListener(_onDataChanged);
+      _pullExtent = 0;
       _dataRevision = widget.dataService.revision;
       widget.dataService.addListener(_onDataChanged);
       ProductDetailSheet.hideIfOpen(context);
@@ -566,7 +566,7 @@ class _ProductListPageState extends State<ProductListPage> {
     final isMobile = MediaQuery.of(context).size.width < 600;
     final items = _getFilteredItems();
 
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
         title: const Text('产品列表'),
         actions: [
@@ -641,9 +641,13 @@ class _ProductListPageState extends State<ProductListPage> {
             )
           : GestureDetector(
               behavior: HitTestBehavior.translucent,
+              // Handles a deliberate upward drag on the module itself. The
+              // table's own scrollable wins its descendant gesture arena.
+              onVerticalDragUpdate: (details) {
+                if (details.delta.dy < 0) _closePullButton();
+              },
               onTap: () {
                 FocusManager.instance.primaryFocus?.unfocus();
-                _closePullButton();
               },
               child: Column(
                 children: [
@@ -663,13 +667,12 @@ class _ProductListPageState extends State<ProductListPage> {
                                 .clamp(0.0, 1.0),
                             child: Card(
                               margin: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                              shape: AppShapes.rounded,
                               color: Theme.of(context)
                                   .colorScheme
                                   .secondaryContainer,
                               child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: AppShapes.borderRadius,
                                 onTap: _showAddProductDialog,
                                 child: Center(
                                   child: Text(
@@ -689,8 +692,17 @@ class _ProductListPageState extends State<ProductListPage> {
                   Expanded(
                     child: NotificationListener<ScrollNotification>(
                       onNotification: (notification) {
-                        if (notification.metrics.pixels >
-                            notification.metrics.minScrollExtent + 0.5) {
+                        if (notification.metrics.axis != Axis.vertical) {
+                          return false;
+                        }
+                        if (notification is ScrollUpdateNotification &&
+                            notification.dragDetails != null &&
+                            (notification.scrollDelta ?? 0) > 0) {
+                          _closePullButton();
+                        }
+                        if (notification is OverscrollNotification &&
+                            notification.dragDetails != null &&
+                            notification.overscroll > 0) {
                           _closePullButton();
                         }
                         if (notification is OverscrollNotification &&
@@ -733,6 +745,16 @@ class _ProductListPageState extends State<ProductListPage> {
                 ],
               ),
             ),
+    );
+    return PopScope<Object?>(
+      canPop: _pullExtent == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        // Modal routes own their back events; never collapse behind a dialog.
+        if (!didPop && (ModalRoute.of(context)?.isCurrent ?? false)) {
+          _closePullButton();
+        }
+      },
+      child: scaffold,
     );
   }
 }

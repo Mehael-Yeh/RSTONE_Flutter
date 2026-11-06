@@ -6,6 +6,7 @@ import '../services/share_file.dart';
 import '../data_sync/data_sync_service.dart';
 
 import 'package:flutter/material.dart';
+import '../utils/app_shapes.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../utils/compat_color.dart';
 import 'package:flutter/services.dart';
@@ -351,7 +352,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       height: 64,
                       decoration: BoxDecoration(
                         color: workingColor,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: AppShapes.borderRadius,
                         border: Border.all(
                           color: Theme.of(context).colorScheme.outlineVariant,
                         ),
@@ -395,7 +396,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       decoration: const InputDecoration(
                         labelText: 'HEX 颜色值',
                         hintText: '#FF8A00',
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(borderRadius: AppShapes.borderRadius),
                       ),
                     ),
                   ],
@@ -765,7 +766,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         border: Border.all(
                             color:
                                 Theme.of(context).colorScheme.outlineVariant),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: AppShapes.borderRadius,
                       ),
                       child: SingleChildScrollView(
                         child: SelectableText(
@@ -790,7 +791,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     maxLines: null,
                     textAlignVertical: TextAlignVertical.top,
                     decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(borderRadius: AppShapes.borderRadius),
                       labelText: '新增自定义规则',
                       hintText: '# 支持注释行\nPA、PA6、PA66 -> 尼龙',
                     ),

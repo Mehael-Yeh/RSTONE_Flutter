@@ -22,6 +22,10 @@ class ProductItem {
 
   final FormulaDocument? formulaDocument;
 
+  /// A personal reminder, never a reproducible recipe or a product reference.
+  bool get isFormulaDraft => origin == DataOrigin.user &&
+      filePath.startsWith('user/配方草稿/');
+
   /// Personal recipe references bound to origin + logical path at save time.
   /// Null denotes legacy documents; empty means fail-closed.
   final Map<String, String>? formulaProductRecords;
@@ -89,6 +93,21 @@ class ProductItem {
       Map<String, String>? formulaProductRecords,
       List<String> unresolvedProductReferences = const []}) {
     final storedName = filePath.split('/').last;
+    if (filePath.startsWith('user/配方草稿/')) {
+      if (origin != DataOrigin.user) {
+        throw const FormatException('personal-draft-only');
+      }
+      final draft = jsonDecode(content);
+      final name = storedName.replaceFirst(RegExp(r'\.md$'), '');
+      if (draft is! Map || draft.length != 2 ||
+          draft['schema'] != 'personal-recipe-draft/1' ||
+          draft['title'] != name) {
+        throw const FormatException('invalid-personal-draft');
+      }
+      return ProductItem(fileName: name, filePath: filePath,
+          folder: '配方草稿', rawContent: content, origin: origin,
+          frontmatter: const {});
+    }
     final fileName = origin == DataOrigin.user || filePath.startsWith('user/')
         ? storedName.replaceFirst(RegExp(r'\.md$'), '')
         : storedName.replaceAll('.md', '');
@@ -279,6 +298,9 @@ class ProductItem {
       }
     }
 
+    if (origin == DataOrigin.user) {
+      tags = tags.where((tag) => tag.isNotEmpty).toList();
+    }
     return ProductItem(
       origin: origin,
       formulaProductRecords: formulaProductRecords,
