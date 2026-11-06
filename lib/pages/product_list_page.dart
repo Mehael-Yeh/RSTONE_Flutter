@@ -200,8 +200,11 @@ class _ProductListPageState extends State<ProductListPage> {
         text: item == null
             ? ''
             : item.filePath.split('/').last.replaceFirst(RegExp(r'\.md$'), ''));
-    final tagsController =
-        TextEditingController(text: item?.tags.join(' ') ?? '');
+    final decodedTags = original['tags'];
+    final tagsController = TextEditingController(
+        text: decodedTags is List && decodedTags.every((tag) => tag is String)
+            ? decodedTags.cast<String>().join(' ')
+            : item?.tags.join(' ') ?? '');
     final engineerController = field('工程师');
     final expCodeController = field('实验牌号');
     final solidController = field('固含');
