@@ -169,7 +169,10 @@ class _ProductListPageState extends State<ProductListPage> {
     };
     TextEditingController field(String key) =>
         TextEditingController(text: initial[key] ?? '');
-    final codeController = TextEditingController(text: item?.fileName ?? '');
+    final codeController = TextEditingController(
+        text: item == null
+            ? ''
+            : item.filePath.split('/').last.replaceFirst(RegExp(r'\.md$'), ''));
     final tagsController =
         TextEditingController(text: item?.tags.join(' ') ?? '');
     final engineerController = field('工程师');

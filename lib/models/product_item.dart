@@ -88,7 +88,10 @@ class ProductItem {
       {DataOrigin origin = DataOrigin.unknown,
       Map<String, String>? formulaProductRecords,
       List<String> unresolvedProductReferences = const []}) {
-    final fileName = filePath.split('/').last.replaceAll('.md', '');
+    final storedName = filePath.split('/').last;
+    final fileName = origin == DataOrigin.user || filePath.startsWith('user/')
+        ? storedName.replaceFirst(RegExp(r'\.md$'), '')
+        : storedName.replaceAll('.md', '');
     final recipePath =
         filePath.startsWith('产品配方/') || filePath.startsWith('user/产品配方/');
     final folder = recipePath
