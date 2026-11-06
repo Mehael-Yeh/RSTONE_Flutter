@@ -28,18 +28,23 @@ class PersonalProductTransaction {
     final before = j['before'] as String, after = j['after'] as String;
     _validate(oldPath);
     _validate(newPath);
-    final old = await storage.readText(oldPath);
-    final next = await storage.readText(newPath);
-    if ((old != null && old != before && old != after) ||
+    // readText decodes away a UTF-8 BOM. Compare the exact stored bytes
+    // against journal text encoded back to bytes, including any original BOM.
+    final beforeBytes = utf8.encode(before), afterBytes = utf8.encode(after);
+    final old = await storage.read(oldPath);
+    final next = await storage.read(newPath);
+    if ((old != null &&
+            !sameBytes(old, beforeBytes) &&
+            !sameBytes(old, afterBytes)) ||
         (next != null &&
-            next != after &&
+            !sameBytes(next, afterBytes) &&
             !(protocolCaseFold(oldPath) == protocolCaseFold(newPath) &&
-                next == before))) {
+                sameBytes(next, beforeBytes)))) {
       throw StateError('personal-transaction-conflict');
     }
     // Remove target first: also safe on a case-insensitive native filesystem.
     if (newPath != oldPath && next != null) await storage.remove(newPath);
-    if (await storage.readText(oldPath) != before) {
+    if (!sameBytes(await storage.read(oldPath), beforeBytes)) {
       await storage.writeText(oldPath, before);
     }
     await storage.remove(journalKey);
@@ -50,7 +55,7 @@ class PersonalProductTransaction {
     _validate(oldPath);
     _validate(newPath);
     await recover();
-    if (await storage.readText(oldPath) != before) {
+    if (!sameBytes(await storage.read(oldPath), utf8.encode(before))) {
       throw StateError('stale-personal-product');
     }
     final conflicts = (await storage.keys('user/产品列表/')).where((key) =>

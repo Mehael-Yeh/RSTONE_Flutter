@@ -166,6 +166,13 @@ class _ProductListPageState extends State<ProductListPage> {
   Future<void> _showAddProductDialog([ProductItem? item]) async {
     _closePullButton();
     if (item != null && item.origin != DataOrigin.user) return;
+    final front = item == null
+        ? null
+        : RegExp(r'^\uFEFF?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)')
+            .firstMatch(item.rawContent);
+    final original = front == null
+        ? <dynamic, dynamic>{}
+        : _editableProductMetadata(front.group(1)!);
     final initial = <String, String?>{
       '工程师': item?.engineer,
       '实验牌号': item?.experimentalCode,
@@ -180,6 +187,13 @@ class _ProductListPageState extends State<ProductListPage> {
       '对标': item?.benchmark,
       '粘度': item?.viscosity,
     };
+    for (final key in initial.keys.toList()) {
+      final value = original[key];
+      if (original.containsKey(key) &&
+          (value == null || value is String || value is num || value is bool)) {
+        initial[key] = value?.toString() ?? '';
+      }
+    }
     TextEditingController field(String key) =>
         TextEditingController(text: initial[key] ?? '');
     final codeController = TextEditingController(
@@ -290,26 +304,25 @@ class _ProductListPageState extends State<ProductListPage> {
       } else {
         // Preserve unknown YAML metadata (including typed map keys) and body.
         // Quote edited scalars so ':' or '#' never become YAML syntax.
-        final front = RegExp(r'^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)')
-            .firstMatch(item.rawContent);
-        final original = front == null
-            ? <String, dynamic>{}
-            : _editableProductMetadata(front.group(1)!);
+        dynamic editedValue(String key, TextEditingController controller) =>
+            original.containsKey(key) && controller.text == (initial[key] ?? '')
+                ? original[key]
+                : controller.text.trim();
         final metadata = <dynamic, dynamic>{
           ...original,
           'tags': normalizedTags,
-          '工程师': engineerController.text.trim(),
-          '实验牌号': expCodeController.text.trim(),
-          '固含': solidController.text.trim(),
-          '羟值': hydroxylController.text.trim(),
-          '官能度': functionalityController.text.trim(),
-          '硬度': hardnessController.text.trim(),
-          '光泽(60°)': glossController.text.trim(),
-          '水煮': boilController.text.trim(),
-          '水接触角': contactAngleController.text.trim(),
-          '技术源': sourceController.text.trim(),
-          '对标': benchmarkController.text.trim(),
-          '粘度': viscosityController.text.trim(),
+          '工程师': editedValue('工程师', engineerController),
+          '实验牌号': editedValue('实验牌号', expCodeController),
+          '固含': editedValue('固含', solidController),
+          '羟值': editedValue('羟值', hydroxylController),
+          '官能度': editedValue('官能度', functionalityController),
+          '硬度': editedValue('硬度', hardnessController),
+          '光泽(60°)': editedValue('光泽(60°)', glossController),
+          '水煮': editedValue('水煮', boilController),
+          '水接触角': editedValue('水接触角', contactAngleController),
+          '技术源': editedValue('技术源', sourceController),
+          '对标': editedValue('对标', benchmarkController),
+          '粘度': editedValue('粘度', viscosityController),
         };
         final body = front == null
             ? item.rawContent
@@ -330,7 +343,8 @@ class _ProductListPageState extends State<ProductListPage> {
                   : _yamlMetadataValue(key);
           return '$renderedKey: ${_yamlMetadataValue(entry.value)}';
         });
-        markdown = '---\n${lines.join('\n')}\n---\n$body';
+        final bom = item.rawContent.startsWith('\uFEFF') ? '\uFEFF' : '';
+        markdown = '$bom---\n${lines.join('\n')}\n---\n$body';
         await widget.dataService.updateProductMarkdown(
             item: item, code: codeController.text.trim(), markdown: markdown);
       }
