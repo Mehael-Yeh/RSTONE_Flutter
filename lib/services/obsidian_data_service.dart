@@ -214,9 +214,13 @@ class ObsidianDataService extends ChangeNotifier {
       }
     }
     _missingReferences.clear();
+    // A name-only pending draft is not a usable recipe: it must not make an
+    // application reference look resolvable and silence the missing warning.
     final known = {
       ..._products.map((p) => p.fileName.toLowerCase()),
-      ..._formulas.map((p) => p.fileName.toLowerCase())
+      ..._formulas
+          .where((p) => !p.isFormulaDraft)
+          .map((p) => p.fileName.toLowerCase())
     };
     for (final app in _applications) {
       final missing = app.linkedWikiReferences
