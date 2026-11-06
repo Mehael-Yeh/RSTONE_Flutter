@@ -47,11 +47,12 @@ class MarkdownTableParser {
         return normalizeWikiLinks(cell.trim());
       }).toList();
 
-      // 去掉由首尾 "|" 引入的空列。
-      while (columns.isNotEmpty && columns.first.isEmpty) {
+      // Each boundary contributes just one empty cell. Actual empty cells,
+      // including the first ingredient or trailing supplier/notes, must stay.
+      if (columns.isNotEmpty && columns.first.isEmpty) {
         columns.removeAt(0);
       }
-      while (columns.isNotEmpty && columns.last.isEmpty) {
+      if (columns.isNotEmpty && columns.last.isEmpty) {
         columns.removeLast();
       }
 

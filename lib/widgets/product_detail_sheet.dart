@@ -1206,7 +1206,15 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               if (tableBodyRows.isEmpty) return;
               await Clipboard.setData(ClipboardData(
                   text: FormulaTableClipboardParser.toTsv(
-                      tableBodyRows.first, tableBodyRows.skip(1).toList())));
+                      tableBodyRows.first,
+                      tableBodyRows.skip(1).map((row) => [
+                        ...row,
+                        // Legacy Markdown displays omitted trailing cells as
+                        // blanks; copy the same complete header-width row.
+                        if (row.length < tableBodyRows.first.length)
+                          ...List<String>.filled(
+                              tableBodyRows.first.length - row.length, ''),
+                      ]).toList())));
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('已复制完整五列（TSV）')));
