@@ -5,7 +5,16 @@ List<String> presentFormulaProcess(List<String> steps) {
   final output = <String>[];
   final separator = RegExp(r'[ \t]{2,}');
   List<String> fields(String text) => text.trim().split(separator);
-  final label = RegExp(r'^[A-Za-z\u3400-\u9fff][A-Za-z\u3400-\u9fff ]*$');
+  // A rectangle does not prove that its first instruction is a header.
+  // Only known, ordered curing-table field sets may become labeled rows.
+  const recognizedHeaders = [
+    ['固化段类型', '波段标识', '推荐能量密度', '补充说明'],
+    ['工段', '波段', '能量', '说明'],
+  ];
+  bool recognized(List<String> row) => recognizedHeaders.any((header) =>
+      row.length == header.length &&
+      List.generate(header.length, (c) => row[c] == header[c])
+          .every((same) => same));
   var i = 0;
   while (i < steps.length) {
     final first = fields(steps[i]);
@@ -18,7 +27,7 @@ List<String> presentFormulaProcess(List<String> steps) {
       final rectangular = rows.length >= 3 &&
           first.length <= 6 &&
           first.toSet().length == first.length &&
-          first.every(label.hasMatch) &&
+          recognized(first) &&
           rows.every((row) =>
               row.length == first.length && row.every((v) => v.isNotEmpty)) &&
           rows.skip(1).every((row) =>
