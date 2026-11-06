@@ -301,8 +301,15 @@ class _ProductListPageState extends State<ProductListPage> {
         final body = front == null
             ? item.rawContent
             : item.rawContent.substring(front.end);
+        // The line-oriented reader needs its fixed, safe field labels bare.
+        // All other keys are literals, not YAML syntax or implicit scalars.
+        const literalFieldLabels = {
+          'tags', '工程师', '实验牌号', '固含', '羟值', '官能度', '硬度',
+          '光泽(60°)', '水煮', '水接触角', '技术源', '对标', '粘度',
+          '产品状态', '底漆', '中漆', '面漆', '基材',
+        };
         markdown =
-            '---\n${metadata.entries.map((e) => '${e.key}: ${jsonEncode(e.value)}').join('\n')}\n---\n$body';
+            '---\n${metadata.entries.map((e) => '${literalFieldLabels.contains(e.key) ? e.key : jsonEncode(e.key)}: ${jsonEncode(e.value)}').join('\n')}\n---\n$body';
         await widget.dataService.updateProductMarkdown(
             item: item, code: codeController.text.trim(), markdown: markdown);
       }
