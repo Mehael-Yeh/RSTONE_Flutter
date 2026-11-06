@@ -111,12 +111,12 @@ class _ProductListPageState extends State<ProductListPage> {
     });
   }
 
-  Map<String, dynamic> _editableProductMetadata(String frontmatter) {
+  Map<dynamic, dynamic> _editableProductMetadata(String frontmatter) {
     try {
       final parsed = loadYaml(frontmatter);
       return {
         if (parsed is YamlMap)
-          for (final entry in parsed.entries) entry.key.toString(): entry.value,
+          for (final entry in parsed.entries) entry.key: entry.value,
       };
     } on YamlException {
       // Older add forms accepted literal scalars through the line-based model.
@@ -131,13 +131,13 @@ class _ProductListPageState extends State<ProductListPage> {
           blocks.last.add(line);
         }
       }
-      final recovered = <String, dynamic>{};
+      final recovered = <dynamic, dynamic>{};
       for (final block in blocks) {
         try {
           final parsed = loadYaml(block.join('\n'));
           if (parsed is YamlMap) {
             for (final entry in parsed.entries) {
-              recovered[entry.key.toString()] = entry.value;
+              recovered[entry.key] = entry.value;
             }
           }
         } on YamlException {
@@ -148,6 +148,19 @@ class _ProductListPageState extends State<ProductListPage> {
       }
       return recovered;
     }
+  }
+
+  String _yamlMetadataValue(dynamic value) {
+    if (value is Map) {
+      return '{${value.entries.map((e) => '? ${_yamlMetadataValue(e.key)} : ${_yamlMetadataValue(e.value)}').join(', ')}}';
+    }
+    if (value is List) {
+      return '[${value.map(_yamlMetadataValue).join(', ')}]';
+    }
+    if (value is double && !value.isFinite) {
+      return value.isNaN ? '.nan' : (value.isNegative ? '-.inf' : '.inf');
+    }
+    return jsonEncode(value);
   }
 
   Future<void> _showAddProductDialog([ProductItem? item]) async {
@@ -275,14 +288,14 @@ class _ProductListPageState extends State<ProductListPage> {
         await widget.dataService.addProductMarkdown(
             code: codeController.text.trim(), markdown: markdown);
       } else {
-        // JSON maps are valid YAML. Preserve unknown metadata and the full body;
-        // quote edited scalars so ':' or '#' never become YAML syntax.
+        // Preserve unknown YAML metadata (including typed map keys) and body.
+        // Quote edited scalars so ':' or '#' never become YAML syntax.
         final front = RegExp(r'^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)')
             .firstMatch(item.rawContent);
         final original = front == null
             ? <String, dynamic>{}
             : _editableProductMetadata(front.group(1)!);
-        final metadata = <String, dynamic>{
+        final metadata = <dynamic, dynamic>{
           ...original,
           'tags': normalizedTags,
           '工程师': engineerController.text.trim(),
@@ -308,8 +321,16 @@ class _ProductListPageState extends State<ProductListPage> {
           '光泽(60°)', '水煮', '水接触角', '技术源', '对标', '粘度',
           '产品状态', '底漆', '中漆', '面漆', '基材',
         };
-        markdown =
-            '---\n${metadata.entries.map((e) => '${literalFieldLabels.contains(e.key) ? e.key : jsonEncode(e.key)}: ${jsonEncode(e.value)}').join('\n')}\n---\n$body';
+        final lines = metadata.entries.map((entry) {
+          final key = entry.key;
+          final renderedKey = literalFieldLabels.contains(key)
+              ? key
+              : key is Map || key is List
+                  ? '? ${_yamlMetadataValue(key)}\n'
+                  : _yamlMetadataValue(key);
+          return '$renderedKey: ${_yamlMetadataValue(entry.value)}';
+        });
+        markdown = '---\n${lines.join('\n')}\n---\n$body';
         await widget.dataService.updateProductMarkdown(
             item: item, code: codeController.text.trim(), markdown: markdown);
       }
