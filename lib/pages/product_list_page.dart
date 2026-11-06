@@ -111,6 +111,45 @@ class _ProductListPageState extends State<ProductListPage> {
     });
   }
 
+  Map<String, dynamic> _editableProductMetadata(String frontmatter) {
+    try {
+      final parsed = loadYaml(frontmatter);
+      return {
+        if (parsed is YamlMap)
+          for (final entry in parsed.entries) entry.key.toString(): entry.value,
+      };
+    } on YamlException {
+      // Older add forms accepted literal scalars through the line-based model.
+      // Recover each top-level field independently, preserving valid nested
+      // metadata and quoting invalid legacy scalar text on the next save.
+      final start = RegExp(r'^([^\s:#][^:]*):[ \t]*(.*)$');
+      final blocks = <List<String>>[];
+      for (final line in frontmatter.split('\n')) {
+        if (start.hasMatch(line)) {
+          blocks.add([line]);
+        } else if (blocks.isNotEmpty) {
+          blocks.last.add(line);
+        }
+      }
+      final recovered = <String, dynamic>{};
+      for (final block in blocks) {
+        try {
+          final parsed = loadYaml(block.join('\n'));
+          if (parsed is YamlMap) {
+            for (final entry in parsed.entries) {
+              recovered[entry.key.toString()] = entry.value;
+            }
+          }
+        } on YamlException {
+          final match = start.firstMatch(block.first)!;
+          recovered[match.group(1)!.trim()] =
+              [match.group(2)!, ...block.skip(1)].join('\n').trimRight();
+        }
+      }
+      return recovered;
+    }
+  }
+
   Future<void> _showAddProductDialog([ProductItem? item]) async {
     _closePullButton();
     if (item != null && item.origin != DataOrigin.user) return;
@@ -237,10 +276,11 @@ class _ProductListPageState extends State<ProductListPage> {
         // quote edited scalars so ':' or '#' never become YAML syntax.
         final front = RegExp(r'^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)')
             .firstMatch(item.rawContent);
-        final original = front == null ? null : loadYaml(front.group(1)!);
+        final original = front == null
+            ? <String, dynamic>{}
+            : _editableProductMetadata(front.group(1)!);
         final metadata = <String, dynamic>{
-          if (original is YamlMap)
-            for (final e in original.entries) e.key.toString(): e.value,
+          ...original,
           'tags': normalizedTags,
           '工程师': engineerController.text.trim(),
           '实验牌号': expCodeController.text.trim(),

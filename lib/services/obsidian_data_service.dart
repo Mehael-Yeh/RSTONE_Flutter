@@ -361,18 +361,18 @@ class ObsidianDataService extends ChangeNotifier {
     return '''
 ---
 ${_joinTagsToYamlList(tags)}
-工程师: $engineer
-实验牌号: $experimentalCode
-固含: $solidContent
-羟值: $hydroxylValue
-官能度: $functionality
-硬度: $hardness
-光泽(60°): $gloss60
-水煮: $boilResistance
-水接触角: $waterContactAngle
-技术源: $technologySource
-对标: $benchmark
-粘度: $viscosity
+工程师: ${jsonEncode(engineer)}
+实验牌号: ${jsonEncode(experimentalCode)}
+固含: ${jsonEncode(solidContent)}
+羟值: ${jsonEncode(hydroxylValue)}
+官能度: ${jsonEncode(functionality)}
+硬度: ${jsonEncode(hardness)}
+光泽(60°): ${jsonEncode(gloss60)}
+水煮: ${jsonEncode(boilResistance)}
+水接触角: ${jsonEncode(waterContactAngle)}
+技术源: ${jsonEncode(technologySource)}
+对标: ${jsonEncode(benchmark)}
+粘度: ${jsonEncode(viscosity)}
 ---
 '''
         .trim();
