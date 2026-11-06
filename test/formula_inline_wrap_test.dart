@@ -100,22 +100,22 @@ void main() {
         wrapDocument(ingredient: 'mix [[$target]][[$target]] + [[UNKNOWN]]');
     await pump(first, 'old');
     expect(ingredientLinks(tester, card).length, 2);
-    await tapIngredientText(tester, card, '[[$target]]');
+    await tapIngredientText(tester, card, target);
     expect(calls, ['old:$target']);
     await pump(first, 'new');
-    await tapIngredientText(tester, card, '[[$target]]', occurrence: 1);
+    await tapIngredientText(tester, card, target, occurrence: 1);
     expect(calls, ['old:$target', 'new:$target']);
     await tapIngredientText(tester, card, '[[UNKNOWN]]');
     expect(calls.length, 2);
     await pump(first, 'revoked', allow: false);
     expect(ingredientLinks(tester, card), isEmpty);
-    await tapIngredientText(tester, card, '[[$target]]');
+    await tapIngredientText(tester, card, target);
     expect(calls.length, 2);
     await pump(
         wrapDocument(ingredient: 'replacement with no link'), 'replacement');
     expect(ingredientLinks(tester, card), isEmpty);
     await pump(first, 'restored');
-    await tapIngredientText(tester, card, '[[$target]]');
+    await tapIngredientText(tester, card, target);
     expect(calls.last, 'restored:$target');
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();

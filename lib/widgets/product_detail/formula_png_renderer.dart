@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import '../../models/formula_document.dart';
 import 'formula_presentation.dart';
+import 'process_presentation.dart';
 
 final class FormulaPaintText {
   final String text;
@@ -65,7 +66,7 @@ class FormulaPngRenderer {
       }
       if (b is FormulaProcess) {
         paragraph(b.label, bold: true);
-        for (final s in b.steps) {
+        for (final s in presentFormulaProcess(b.steps)) {
           paragraph(s);
         }
       }

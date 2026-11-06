@@ -160,7 +160,11 @@ void main() {
                 product: product, productCatalog: [product], formulas: [f]))));
     await tester.pumpAndSettle();
     expect(find.text('合成厂商'), findsOneWidget);
-    expect(find.text('[[RS87654321-Q5]]'), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(StructuredFormulaCard),
+            matching: find.text('RS87654321-Q5', findRichText: true)),
+        findsOneWidget);
     expect(find.text('  keep|pipe\nsecond line  '), findsOneWidget);
     expect(find.text('配制与施工（工艺分支1）：'), findsOneWidget);
     expect(find.text('尾段原文，不得移动到工艺之前。'), findsOneWidget);

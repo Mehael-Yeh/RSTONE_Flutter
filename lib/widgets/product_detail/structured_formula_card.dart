@@ -2,10 +2,12 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/formula_document.dart';
-import '../../utils/formula_protocol_codec.dart';
+
 import '../../services/share_file.dart';
 import 'formula_presentation.dart';
+import 'process_presentation.dart';
 import 'formula_png_renderer.dart';
+import 'formula_pinned_table.dart';
 
 class StructuredFormulaCard extends StatelessWidget {
   final FormulaDisplayView view;
@@ -19,12 +21,12 @@ class StructuredFormulaCard extends StatelessWidget {
       : view = FormulaDisplayView(document);
 
   Widget _ingredient(String text, TextStyle style) {
-    final parts = FormulaProtocolCodec.ingredientParts(
-        text, view.document.associatedProducts);
+    final parts = formulaDisplayParts(text, view.document.associatedProducts);
     if (onOpenProduct == null ||
         !parts.any((p) =>
             p.target != null && canOpenProduct?.call(p.target!) == true)) {
-      return Text(text, style: style, textScaler: TextScaler.noScaling);
+      return Text(parts.map((p) => p.text).join(),
+          style: style, textScaler: TextScaler.noScaling);
     }
     return _IngredientLinks(
         text: text,
@@ -53,7 +55,6 @@ class StructuredFormulaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final layout = FormulaTableLayout(view);
     final d = view.document;
     Widget paragraph(String text, {bool bold = false}) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -86,49 +87,45 @@ class StructuredFormulaCard extends StatelessWidget {
                 onPressed: () => _share(context)),
           ]),
           for (final p in d.preTable) paragraph(p),
-          SingleChildScrollView(
-              key: ValueKey('recipe-scroll:${d.recipeId}'),
-              scrollDirection: Axis.horizontal,
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var r = 0; r < view.cells.length; r++)
-                      Row(children: [
-                        for (var c = 0; c < 5; c++)
-                          Container(
-                            key: ValueKey('recipe-cell:${d.recipeId}:$r:$c'),
-                            width: layout.widths[c],
-                            height: layout.heights[r],
-                            alignment: Alignment.centerLeft,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: FormulaTableLayout.cellPadding,
-                                vertical: 8),
-                            decoration: BoxDecoration(
-                                color: r == 0
-                                    ? cs.surfaceContainerHigh
-                                    : cs.surface,
-                                border: Border.all(
-                                    color: cs.outlineVariant, width: 0.5)),
-                            child: r > 0 && c == 0
-                                ? _ingredient(
-                                    view.cells[r][c],
-                                    FormulaTableLayout.style
-                                        .copyWith(color: cs.onSurface))
-                                : Text(view.cells[r][c],
-                                    style: FormulaTableLayout.style.copyWith(
-                                        color: cs.onSurface,
-                                        fontWeight: r == 0
-                                            ? FontWeight.bold
-                                            : FontWeight.normal),
-                                    textScaler: TextScaler.noScaling),
-                          )
-                      ]),
-                  ])),
+          LayoutBuilder(builder: (context, constraints) {
+            final layout = FormulaTableLayout(view,
+                firstColumnMax: constraints.maxWidth * .55);
+            return FormulaPinnedTable(
+                key: ValueKey('recipe-table:${d.recipeId}'),
+                id: d.recipeId,
+                widths: layout.widths,
+                heights: layout.heights,
+                cell: (r, c) => Container(
+                      key: ValueKey('recipe-cell:${d.recipeId}:$r:$c'),
+                      width: layout.widths[c],
+                      height: layout.heights[r],
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: FormulaTableLayout.cellPadding,
+                          vertical: 8),
+                      decoration: BoxDecoration(
+                          color: r == 0 ? cs.surfaceContainerHigh : cs.surface,
+                          border:
+                              Border.all(color: cs.outlineVariant, width: .5)),
+                      child: r > 0 && c == 0
+                          ? _ingredient(
+                              d.rows[r - 1][c],
+                              FormulaTableLayout.style
+                                  .copyWith(color: cs.onSurface))
+                          : Text(view.cells[r][c],
+                              style: FormulaTableLayout.style.copyWith(
+                                  color: cs.onSurface,
+                                  fontWeight: r == 0
+                                      ? FontWeight.bold
+                                      : FontWeight.normal),
+                              textScaler: TextScaler.noScaling),
+                    ));
+          }),
           for (final block in d.content) ...[
             if (block is FormulaNote) paragraph(block.text),
             if (block is FormulaProcess) ...[
               paragraph(block.label, bold: true),
-              for (final s in block.steps) paragraph(s),
+              for (final s in presentFormulaProcess(block.steps)) paragraph(s),
             ],
           ],
         ]));
@@ -167,8 +164,7 @@ class _IngredientLinksState extends State<_IngredientLinks> {
   void _updateSpans() {
     _clear();
     _spans = [
-      for (final part in FormulaProtocolCodec.ingredientParts(
-          widget.text, widget.associated))
+      for (final part in formulaDisplayParts(widget.text, widget.associated))
         if (part.target != null && widget.canOpenProduct(part.target!))
           TextSpan(
               text: part.text,

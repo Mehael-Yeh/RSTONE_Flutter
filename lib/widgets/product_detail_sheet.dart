@@ -15,6 +15,8 @@ import '../services/tds_pdf_service.dart';
 import 'product_detail/formula_content_parser.dart';
 import 'product_detail/markdown_table_parser.dart';
 import 'product_detail/structured_formula_card.dart';
+import 'product_detail/formula_presentation.dart';
+import 'product_detail/formula_pinned_table.dart';
 
 /// 产品详情底部弹窗
 ///
@@ -514,10 +516,9 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   }) async {
     if (rows.isEmpty) return;
     try {
-      const double rowHeight = 36.0;
-      const double headerHeight = 40.0;
-      const double cellPaddingH = 16.0;
-      const double colMinWidth = 80.0;
+      rows = rows.map((row) => row.map(formulaDisplayText).toList()).toList();
+      final geometry = _legacyGeometry(rows);
+      final headerHeight = geometry.heights.first;
       const double scale = 2.0; // 2x 分辨率提升清晰度
       final cs = Theme.of(context).colorScheme;
       final backgroundColor = cs.surface;
@@ -534,14 +535,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
       final colCount = header.length;
 
-      // 计算每列宽度（根据内容）
-      List<double> colWidths = List.filled(colCount, colMinWidth);
-      for (final row in rows) {
-        for (int i = 0; i < row.length && i < colCount; i++) {
-          final len = row[i].length * 10.0 + cellPaddingH * 2;
-          if (len > colWidths[i]) colWidths[i] = len.clamp(colMinWidth, 300.0);
-        }
-      }
+      final colWidths = geometry.widths;
       final totalWidth = colWidths.reduce((a, b) => a + b) + 4;
       // 计算标题高度（缩放后已是逻辑像素，直接用）
       double titleHeight = 0;
@@ -571,8 +565,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         tp.layout(maxWidth: totalWidth - 24);
         extraHeight = tp.height + 16; // 上下各 8px padding
       }
-      final tableHeight = headerHeight + dataRows.length * rowHeight + 4;
+      final tableHeight = geometry.heights.fold<double>(0, (a, b) => a + b) + 4;
       final totalHeight = titleHeight + tableHeight + extraHeight;
+      if (totalWidth * scale > 32768 ||
+          totalHeight * scale > 32768 ||
+          totalWidth * totalHeight * scale * scale > 64000000) {
+        throw const FormatException('recipe-image-resource-limit');
+      }
 
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
@@ -618,9 +617,10 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       }
 
       // 绘制数据行（表格从 titleHeight 开始）
+      var y = titleHeight + headerHeight;
       for (int r = 0; r < dataRows.length; r++) {
         final row = dataRows[r];
-        final y = titleHeight + headerHeight + r * rowHeight;
+        final rowHeight = geometry.heights[r + 1];
         if (r.isOdd) {
           canvas.drawRect(
             Rect.fromLTWH(0, y, totalWidth, rowHeight),
@@ -633,6 +633,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               rowHeight, bodyTextColor, false);
           x += colWidths[i];
         }
+        y += rowHeight;
       }
 
       // 边框
@@ -689,181 +690,87 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
   void _drawCell(Canvas canvas, String text, double x, double y, double w,
       double h, Color color, bool bold) {
-    final tp = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    tp.layout(maxWidth: w - 8);
-    tp.paint(canvas, Offset(x + 8, y + (h - tp.height) / 2));
+    final tp = FormulaTableLayout.painter(text, bold, color: color)
+      ..layout(maxWidth: w - 21);
+    tp.paint(canvas, Offset(x + 10.5, y + (h - tp.height) / 2));
+    tp.dispose();
   }
 
-  double _textWidth(String text, double fontSize) {
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: TextStyle(fontSize: fontSize)),
-      textDirection: TextDirection.ltr,
-    );
-    tp.layout();
-    return tp.width;
+  ({List<double> widths, List<double> heights}) _legacyGeometry(
+      List<List<String>> rows,
+      {double firstMax = 280}) {
+    final count = rows.first.length;
+    final widths = List<double>.filled(count, 88);
+    for (var r = 0; r < rows.length; r++) {
+      for (var c = 0; c < count; c++) {
+        final p = FormulaTableLayout.painter(
+            c < rows[r].length ? rows[r][c] : '', r == 0)
+          ..layout();
+        widths[c] = math.max(widths[c], (p.width + 21).clamp(88, 280));
+        p.dispose();
+      }
+    }
+    widths[0] = math.min(widths[0], firstMax);
+    final heights = <double>[];
+    for (var r = 0; r < rows.length; r++) {
+      var height = 36.0;
+      for (var c = 0; c < count; c++) {
+        final p = FormulaTableLayout.painter(
+            c < rows[r].length ? rows[r][c] : '', r == 0)
+          ..layout(maxWidth: widths[c] - 21);
+        height = math.max(height, (p.height + 17).ceilToDouble());
+        p.dispose();
+      }
+      heights.add(height);
+    }
+    return (widths: widths, heights: heights);
   }
 
-  /// 渲染配方 markdown 表格（完全自定义渲染，列宽自动适配内容）
-  /// [tableContent] 应为去掉 frontmatter 后的纯 markdown 表格内容
-  /// [extraContent] 表格外的文字（如 blockquote 施工比例），渲染在表格下方，宽度与表格总列宽一致
+  /// Legacy parsing and matching remain unchanged; geometry is display-only.
   Widget _buildMdTable(String tableContent, {String? extraContent}) {
     final cs = Theme.of(context).colorScheme;
-    final rows = _parseTable(tableContent);
+    final rows = _parseTable(tableContent)
+        .map((row) => row.map(formulaDisplayText).toList())
+        .toList();
     if (rows.isEmpty) return const SizedBox.shrink();
-
-    final header = rows.first;
-    final colCount = header.length;
-    final dataRows = rows.length > 1 ? rows.sublist(1) : <List<String>>[];
-
-    // 计算每列最小宽度（根据内容）
-    const double minColWidth = 60.0;
-    const double maxColWidth = 300.0;
-    const double cellHPadding = 12.0;
-    const double rowHeight = 36.0;
-    const double headerHeight = 38.0;
-
-    List<double> colWidths = List.filled(colCount, minColWidth);
-    void measureCol(int col, String text) {
-      final w = _textWidth(text, 12) + cellHPadding * 2;
-      if (w > colWidths[col]) {
-        colWidths[col] = w.clamp(minColWidth, maxColWidth);
-      }
-    }
-
-    for (int i = 0; i < colCount; i++) {
-      measureCol(i, header[i]);
-    }
-    for (final row in dataRows) {
-      for (int i = 0; i < row.length; i++) {
-        measureCol(i, row[i]);
-      }
-    }
-    // 填充空列
-    while (colWidths.length < colCount) {
-      colWidths.add(minColWidth);
-    }
-    final totalTableWidth = colWidths.reduce((a, b) => a + b);
-
-    final borderColor = cs.outlineVariant;
-    final headerBg = cs.surfaceContainerHigh;
-    final rowAlt = cs.surfaceContainerLowest;
-    final rowBg = cs.surfaceContainer;
-    final headerText = cs.primary;
-    final cellText = cs.onSurface;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      decoration: BoxDecoration(
-        color: rowBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 表头行
-                _buildTableRow(header, colWidths, headerHeight, true,
-                    cellHPadding, headerBg, headerText, borderColor),
-                // 数据行
-                for (int ri = 0; ri < dataRows.length; ri++)
-                  _buildTableRow(
-                    dataRows[ri].length >= colCount
-                        ? dataRows[ri].take(colCount).toList()
-                        : List.generate(
-                            colCount,
-                            (i) =>
-                                i < dataRows[ri].length ? dataRows[ri][i] : ''),
-                    colWidths,
-                    rowHeight,
-                    false,
-                    cellHPadding,
-                    ri.isOdd ? rowAlt : rowBg,
-                    cellText,
-                    borderColor,
-                  ),
-              ],
-            ),
-          ),
-          // 表格下方的 blockquote 等额外文字，放入横向滚动容器，避免宽表撑爆布局
+    return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          LayoutBuilder(builder: (context, constraints) {
+            final grid =
+                _legacyGeometry(rows, firstMax: constraints.maxWidth * .55);
+            return FormulaPinnedTable(
+                id: 'legacy:${identityHashCode(rows)}',
+                widths: grid.widths,
+                heights: grid.heights,
+                cell: (r, c) => Container(
+                    width: grid.widths[c],
+                    height: grid.heights[r],
+                    alignment: Alignment.centerLeft,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                        color: r == 0
+                            ? cs.surfaceContainerHigh
+                            : cs.surfaceContainer,
+                        border:
+                            Border.all(color: cs.outlineVariant, width: .5)),
+                    child: Text(c < rows[r].length ? rows[r][c] : '',
+                        textScaler: TextScaler.noScaling,
+                        style: FormulaTableLayout.style.copyWith(
+                            color: cs.onSurface,
+                            fontWeight: r == 0
+                                ? FontWeight.bold
+                                : FontWeight.normal))));
+          }),
           if (extraContent != null && extraContent.trim().isNotEmpty)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: totalTableWidth,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                  child: Text(
-                    extraContent,
-                    style: TextStyle(
-                      color: cs.onSurfaceVariant,
-                      fontSize: 12,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableRow(
-      List<String> cells,
-      List<double> colWidths,
-      double height,
-      bool isHeader,
-      double hPadding,
-      Color bg,
-      Color textColor,
-      Color borderColor) {
-    double totalWidth = colWidths.reduce((a, b) => a + b);
-    return Container(
-      width: totalWidth,
-      decoration: BoxDecoration(
-        color: bg,
-        border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
-      ),
-      child: Row(
-        children: [
-          for (int i = 0; i < cells.length; i++)
-            Container(
-              width: colWidths[i],
-              height: height,
-              alignment: Alignment.centerLeft,
-              padding: EdgeInsets.symmetric(horizontal: hPadding),
-              decoration: BoxDecoration(
-                border: i > 0
-                    ? Border(left: BorderSide(color: borderColor, width: 0.5))
-                    : null,
-              ),
-              child: Text(
-                cells[i],
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 12,
-                  fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
+            Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(formulaDisplayText(extraContent),
+                    style: FormulaTableLayout.style
+                        .copyWith(color: cs.onSurfaceVariant),
+                    textScaler: TextScaler.noScaling)),
+        ]));
   }
 
   Widget _markdownView(String content) {

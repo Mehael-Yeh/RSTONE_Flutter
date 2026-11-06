@@ -24,7 +24,13 @@ void main() {
     });
     final d = FormulaDocument.fromJson(m);
     final view = FormulaDisplayView(d);
-    expect(view.cells.skip(1).toList(), d.rows);
+    expect(view.cells.skip(1).toList(), [
+      ['RS87654321-Q5', ...d.rows.first.skip(1)],
+      ...d.rows.skip(1),
+    ]);
+    expect(view.cells[1].skip(1).toList(), d.rows[0].skip(1).toList());
+    expect(d.toJson(), m);
+    expect(view.tsv, contains('[[RS87654321-Q5]]'));
     final png = await FormulaPngRenderer.render(view);
     final codec = await ui.instantiateImageCodec(png);
     final image = (await codec.getNextFrame()).image;

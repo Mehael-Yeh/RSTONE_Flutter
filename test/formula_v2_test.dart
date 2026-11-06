@@ -50,9 +50,9 @@ void main() {
                   formulas: [f]))));
       await tester.pumpAndSettle();
       final card = find.byType(StructuredFormulaCard);
-      expect(ingredientLinks(tester, card).map((span) => span.text),
-          ['[[RS222-X]]']);
-      await tapIngredientText(tester, card, '[[RS222-X]]');
+      expect(
+          ingredientLinks(tester, card).map((span) => span.text), ['RS222-X']);
+      await tapIngredientText(tester, card, 'RS222-X');
       await tester.pumpAndSettle();
       expect(find.text('EXACT SYNTHETIC DESTINATION'), findsOneWidget);
       expect(tester.takeException(), isNull);
