@@ -705,6 +705,7 @@ ${_joinTagsToYamlList(tags)}
       final name = _validatedProductName(code);
       final path = '产品列表/$name.md';
       validateLogicalPath(path);
+      if (name != item.fileName) _checkProductRenameDependencies(item);
       // Recover before reading preferences: an interrupted prior move may have
       // changed their keys even though this service still holds the old item.
       final transaction = PersonalProductTransaction(_store);
@@ -727,6 +728,40 @@ ${_joinTagsToYamlList(tags)}
       notifyListeners();
     } finally {
       _editingUserProduct = false;
+    }
+  }
+
+  void _checkProductRenameDependencies(ProductItem item) {
+    // Unknown personal recipe originals cannot prove independence. Only renames
+    // are blocked until those originals are repaired/removed; same-name edits
+    // remain possible. Do not guess references from invalid JSON or filenames.
+    if (_quarantinedFormulas.keys.any((p) => p.startsWith('产品配方/'))) {
+      throw StateError('请先修复或移除已隔离的个人配方，再更名产品');
+    }
+    final personal = _userItems.values
+        .where((p) => p.folder == '产品配方')
+        .toList();
+    // Reuse the real exact structured / legacy association and source-binding
+    // rules, not text search or a guessed recipe basename.
+    if (linkedFormulasForProduct(item, personal, productCatalog: _products)
+        .isNotEmpty) {
+      throw StateError('个人配方仍引用此产品，不能更名');
+    }
+    final record = '${item.origin.name}:${item.filePath}';
+    final hasOfficialFallback =
+        _official.products.any((p) => p.fileName == item.fileName);
+    for (final formula in personal) {
+      final d = formula.formulaDocument;
+      // Even a failed/empty binding cannot make a disappearing catalogue
+      // reference safe. Conversely an official-bound same-code fallback is not
+      // a reference to this personal record.
+      if (formula.formulaProductRecords?.values.contains(record) == true ||
+          (!hasOfficialFallback &&
+              d != null &&
+              (d.ownerProduct == item.fileName ||
+                  d.associatedProducts.contains(item.fileName)))) {
+        throw StateError('个人配方仍引用此产品，不能更名');
+      }
     }
   }
 
