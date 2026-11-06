@@ -1,0 +1,78 @@
+// Synthetic sales workflow only.
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:rst_flutter/pages/product_applications_page.dart';
+import 'package:rst_flutter/services/preferences_service.dart';
+import 'support/sync_fixture.dart';
+
+void main() {
+  testWidgets('pending list is visible without applications and opens real completion form', (tester) async {
+    tester.view.physicalSize = const Size(1000, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues({});
+    final prefs = PreferencesService();
+    await tester.runAsync(prefs.initialize);
+    final f = SignedFixture();
+    await tester.runAsync(f.initialize);
+    final s = (await tester.runAsync(f.memoryStorage))!;
+    final app = (await tester.runAsync(() => f.app(s)))!;
+    await tester.runAsync(() async {
+      await app.addFormulaDraft('SyntheticSales730001');
+      await f.publish(1, {'产品列表/RS87654321-Q5.md': product('synthetic')});
+      expect(await app.sync!.synchronize(), isTrue);
+      await app.reloadUserItems();
+    });
+    await tester.pumpWidget(MaterialApp(home: ProductApplicationsPage(dataService: app, preferencesService: prefs)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('待补充配方'));
+    await tester.pumpAndSettle();
+    expect(find.text('SyntheticSales730001'), findsOneWidget);
+    expect(find.byIcon(Icons.copy), findsNothing);
+    expect(find.byIcon(Icons.share), findsNothing);
+    await tester.tap(find.text('补充'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('填写完整配方（可选）'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const ValueKey('recipe-title'))).readOnly, isTrue);
+    await tester.enterText(find.byKey(const ValueKey('recipe-owner')), 'RS87654321-Q5');
+    await tester.enterText(find.byKey(const ValueKey('recipe-input')), '原料编号\t投入数(g)\t百分比(%)\t供应商\t备注\nsynthetic-water\t10\t\t\t');
+    await tester.enterText(find.byKey(const ValueKey('recipe-content')), '加入原料\n搅拌');
+    await tester.ensureVisible(find.byKey(const ValueKey('recipe-save')));
+    await tester.tap(find.byKey(const ValueKey('recipe-save')));
+    await tester.runAsync(() async { await Future<void>.delayed(const Duration(milliseconds: 150)); });
+    await tester.pumpAndSettle();
+    expect(app.formulas.where((p) => p.isFormulaDraft), isEmpty);
+    expect(app.formulas.single.formulaDocument!.rows.single.first, 'synthetic-water');
+    expect(app.formulas.single.formulaDocument!.content.single.toJson()['steps'], ['加入原料', '搅拌']);
+    expect(await tester.runAsync(() => s.readText('user/配方草稿/SyntheticSales730001.md')), isNull);
+    await tester.runAsync(app.reloadUserItems);
+    expect(app.formulas.single.formulaDocument, isNotNull);
+    await tester.runAsync(() => app.addFormulaDraft('SyntheticSales730002'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('补充'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('recipe-save')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('recipe-error')), findsOneWidget);
+    expect(app.formulas.where((p) => p.isFormulaDraft), hasLength(1));
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('移除待补充记录'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(app.formulas.where((p) => p.isFormulaDraft), hasLength(1));
+    await tester.tap(find.byTooltip('移除待补充记录'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('移除'));
+    await tester.runAsync(() async { await Future<void>.delayed(const Duration(milliseconds: 100)); });
+    await tester.pumpAndSettle();
+    expect(app.formulas.where((p) => p.isFormulaDraft), isEmpty);
+    expect(app.formulas.single.formulaDocument, isNotNull);
+    app.dispose();
+    await tester.runAsync(s.close);
+  });
+}

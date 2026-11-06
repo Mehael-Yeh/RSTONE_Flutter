@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../utils/app_shapes.dart';
 
 typedef NoteTapCallback = Future<void> Function();
 typedef DeleteTapCallback = Future<void> Function();
@@ -25,8 +26,8 @@ class NoteSwipeTile extends StatefulWidget {
     this.onDeleteTap,
     this.resetSignal = 0,
     this.noteButtonInsets = EdgeInsets.zero,
-    this.noteButtonBorderRadius = BorderRadius.zero,
-    this.deleteButtonBorderRadius = BorderRadius.zero,
+    this.noteButtonBorderRadius = AppShapes.borderRadius,
+    this.deleteButtonBorderRadius = AppShapes.borderRadius,
     this.noteButtonWidthFactor = 0.17,
     this.noteButtonRightOverlap = 10,
   });
@@ -262,7 +263,7 @@ class _NoteEditorDialogState extends State<NoteEditorDialog> {
           textAlignVertical: TextAlignVertical.top,
           decoration: const InputDecoration(
             hintText: '请输入记录内容',
-            border: OutlineInputBorder(),
+            border: OutlineInputBorder(borderRadius: AppShapes.borderRadius),
           ),
         ),
       ),

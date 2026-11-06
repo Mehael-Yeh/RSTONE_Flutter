@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../utils/app_shapes.dart';
 
 import 'compact_token_row.dart';
 import 'note_swipe_tile.dart';
@@ -52,19 +53,15 @@ class SwipeNoteItemCard extends StatelessWidget {
         onDeleteTap: onDeleteTap,
         resetSignal: noteResetSignal,
         noteButtonInsets: const EdgeInsets.symmetric(vertical: 1),
-        noteButtonBorderRadius: const BorderRadius.horizontal(
-          left: Radius.circular(12),
-        ),
-        deleteButtonBorderRadius: const BorderRadius.horizontal(
-          right: Radius.circular(12),
-        ),
+        noteButtonBorderRadius: AppShapes.left,
+        deleteButtonBorderRadius: AppShapes.right,
         child: Card(
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              AppShapes.rounded,
           margin: EdgeInsets.zero,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: AppShapes.borderRadius,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
               child: Row(
@@ -76,7 +73,7 @@ class SwipeNoteItemCard extends StatelessWidget {
                       height: 40,
                       decoration: BoxDecoration(
                         color: indicatorColor,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: AppShapes.borderRadius,
                       ),
                     ),
                   ),
@@ -133,7 +130,7 @@ class SwipeNoteItemCard extends StatelessWidget {
                                     horizontal: 5, vertical: 1),
                                 decoration: BoxDecoration(
                                   color: cs.secondaryContainer,
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: AppShapes.borderRadius,
                                 ),
                                 child: Text(
                                   statusLabel!,

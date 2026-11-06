@@ -195,6 +195,8 @@ class ObsidianDataService extends ChangeNotifier {
       }
     }
     _formulas = merge(_official.formulas, '产品配方');
+    // Drafts have their own namespace; a same-name official recipe stays visible.
+    _formulas.addAll(_userItems.values.where((p) => p.isFormulaDraft));
     _tdsByProduct.clear();
     _tdsByGrade.clear();
     _tdsByProduct.addAll(_official.tds);
@@ -769,10 +771,10 @@ ${_joinTagsToYamlList(tags)}
       String folder, String name, String markdown) async {
     final path = '$folder/$name.md';
     validateLogicalPath(path);
-    if (folder == '产品列表' &&
+    if ((folder == '产品列表' || folder == '产品应用') &&
         (await _store.keys('user/$folder/')).any(
             (key) => protocolCaseFold(key) == protocolCaseFold('user/$path'))) {
-      throw StateError('个人产品名称已存在');
+      throw StateError('个人资料名称已存在，未覆盖');
     }
     var parsed = ProductItem.fromMdContent('user/$path', markdown,
         origin: DataOrigin.user);
@@ -782,6 +784,10 @@ ${_joinTagsToYamlList(tags)}
       }
       validateFormulaCatalog(_products, [parsed],
           requireStructured: true, official: false);
+      if ((await _store.keys('user/产品配方/')).any((key) =>
+          protocolCaseFold(key) == protocolCaseFold('user/$path'))) {
+        throw StateError('个人配方名称已存在，未覆盖');
+      }
       final id = parsed.formulaDocument!.recipeId;
       if (_formulas.any(
           (f) => f.fileName != name && f.formulaDocument?.recipeId == id)) {
@@ -857,15 +863,62 @@ ${_joinTagsToYamlList(tags)}
   }
 
   Future<void> addApplicationMarkdown(
-      {required String name, required String markdown}) async {
-    if (name.trim().isEmpty) throw ArgumentError('产品应用名称不能为空');
-    await _saveUserItem('产品应用', name.trim(), markdown);
-  }
+      {required String name, required String markdown}) =>
+      _exclusiveUserMutation(() async {
+        await _saveUserItem('产品应用', _validatedProductName(name), markdown);
+      });
 
   Future<void> addFormulaDocument(FormulaDocument document) =>
       addFormulaMarkdown(
           name: document.title,
           markdown: utf8.decode(FormulaProtocolCodec.encode(document)));
+
+  Future<void> addFormulaDraft(String name) => _exclusiveUserMutation(() async {
+        final title = _validatedProductName(name);
+        final path = '配方草稿/$title.md';
+        // Reuse portable leaf rules, not the official allowed-root list.
+        validateLogicalPath('产品配方/$title.md');
+        if ((await _store.keys('user/配方草稿/')).any((key) =>
+            protocolCaseFold(key) == protocolCaseFold('user/$path'))) {
+          throw StateError('待补充配方名称已存在');
+        }
+        final raw = jsonEncode({'schema': 'personal-recipe-draft/1', 'title': title});
+        await _store.writeText('user/$path', raw);
+        _userItems[path] = ProductItem.fromMdContent('user/$path', raw,
+            origin: DataOrigin.user);
+        _composeSnapshot();
+        notifyListeners();
+      });
+
+  /// Returns false only when the real recipe saved but draft cleanup failed.
+  Future<bool> completeFormulaDraft(ProductItem draft, FormulaDocument document) =>
+      _exclusiveUserMutation(() async {
+        final path = draft.filePath.substring(5);
+        if (!draft.isFormulaDraft || !identical(_userItems[path], draft) ||
+            document.title != draft.fileName) {
+          throw StateError('待补充配方已变化，请重新打开');
+        }
+        final target = 'user/产品配方/${document.title}.md';
+        if ((await _store.keys('user/产品配方/')).any((key) =>
+            protocolCaseFold(key) == protocolCaseFold(target))) {
+          throw StateError('个人配方名称已存在，未覆盖');
+        }
+        // Full validation + source binding are exactly the existing recipe path.
+        // Persist the real recipe before removing the reminder: failures cannot
+        // destroy the draft. If cleanup fails both remain, visibly and safely.
+        await _saveUserItem('产品配方', document.title,
+            utf8.decode(FormulaProtocolCodec.encode(document)));
+        try {
+          await _store.remove(draft.filePath);
+        } catch (_) {
+          _addLog('完整个人配方已保存，待补充记录未能移除：${draft.fileName}');
+          return false;
+        }
+        _userItems.remove(path);
+        _composeSnapshot();
+        notifyListeners();
+        return true;
+      });
 
   Future<void> addFormulaMarkdown(
           {required String name, required String markdown}) =>
@@ -881,7 +934,9 @@ ${_joinTagsToYamlList(tags)}
         await PersonalProductTransaction(_store).recover();
         if (!isManualItem(item)) throw StateError('仅支持删除用户新增资料');
         final path = item.filePath.substring('user/'.length);
-        if (item.folder == '产品列表' && !identical(_userItems[path], item)) {
+        // Draft paths are not yet official roots; still require the live object.
+        if ((item.folder == '产品列表' || item.isFormulaDraft) &&
+            !identical(_userItems[path], item)) {
           throw StateError('stale-personal-product');
         }
         await _store.remove('user/$path');
@@ -934,7 +989,8 @@ ${_joinTagsToYamlList(tags)}
       final raw = await _store.read(key);
       if (raw == null) continue;
       try {
-        validateLogicalPath(path);
+        validateLogicalPath(path.startsWith('配方草稿/')
+            ? '产品配方/${path.substring('配方草稿/'.length)}' : path);
         final bom = raw.length >= 3 &&
             raw[0] == 0xef &&
             raw[1] == 0xbb &&

@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../../utils/app_shapes.dart';
 import 'package:flutter/services.dart';
 import '../../models/formula_document.dart';
 
@@ -70,7 +71,7 @@ class StructuredFormulaCard extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         decoration: BoxDecoration(
             border: Border.all(color: cs.outlineVariant),
-            borderRadius: BorderRadius.circular(8)),
+            borderRadius: AppShapes.borderRadius),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           FormulaCardHeader(
             title: d.title,

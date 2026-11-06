@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../utils/app_shapes.dart';
 import '../utils/compat_color.dart';
 
 /// 单行紧凑标签行：每个 token 使用独立圆角矩形包裹。
@@ -58,7 +59,7 @@ class CompactTokenRow extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: _chipBackgroundColor(cs, visible[index]),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: AppShapes.borderRadius,
                     border:
                         Border.all(color: _chipBorderColor(cs, visible[index])),
                   ),
