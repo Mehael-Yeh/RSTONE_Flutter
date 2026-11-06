@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'formula_document.dart';
 import '../utils/formula_protocol_codec.dart';
 
@@ -20,6 +21,10 @@ class ProductItem {
   }
 
   final FormulaDocument? formulaDocument;
+
+  /// Personal recipe references bound to origin + logical path at save time.
+  /// Null denotes legacy documents; empty means fail-closed.
+  final Map<String, String>? formulaProductRecords;
   final String fileName; // 文件名（不含路径）
   final DataOrigin origin;
   final List<String> unresolvedProductReferences;
@@ -50,6 +55,7 @@ class ProductItem {
 
   ProductItem({
     this.formulaDocument,
+    this.formulaProductRecords,
     this.origin = DataOrigin.unknown,
     this.unresolvedProductReferences = const [],
     required this.fileName,
@@ -80,8 +86,12 @@ class ProductItem {
   /// 从MD文件内容解析
   factory ProductItem.fromMdContent(String filePath, String content,
       {DataOrigin origin = DataOrigin.unknown,
+      Map<String, String>? formulaProductRecords,
       List<String> unresolvedProductReferences = const []}) {
-    final fileName = filePath.split('/').last.replaceAll('.md', '');
+    final storedName = filePath.split('/').last;
+    final fileName = origin == DataOrigin.user || filePath.startsWith('user/')
+        ? storedName.replaceFirst(RegExp(r'\.md$'), '')
+        : storedName.replaceAll('.md', '');
     final recipePath =
         filePath.startsWith('产品配方/') || filePath.startsWith('user/产品配方/');
     final folder = recipePath
@@ -106,6 +116,7 @@ class ProductItem {
             rawContent: content,
             origin: origin,
             formulaDocument: document,
+            formulaProductRecords: formulaProductRecords,
             unresolvedProductReferences: unresolvedProductReferences,
             frontmatter: Map.unmodifiable(document.toJson()));
       }
@@ -222,6 +233,37 @@ class ProductItem {
       }
     }
 
+    // Personal edit forms emit JSON-quoted YAML scalars. Decode those exactly
+    // without changing the historic official parser or stripping literal quotes.
+    if (origin == DataOrigin.user) {
+      String? scalar(String key, String? fallback) {
+        final line =
+            frontmatterLines.where((s) => s.startsWith('$key:')).lastOrNull;
+        if (line == null) return fallback;
+        try {
+          final value = jsonDecode(line.substring(key.length + 1).trim());
+          if (value is String) {
+            return RegExp(r'^\[\[(.+)\]\]$').firstMatch(value)?.group(1) ??
+                value;
+          }
+        } on FormatException {/* Historic plain scalars remain unchanged. */}
+        return fallback;
+      }
+
+      engineer = scalar('工程师', engineer);
+      experimentalCode = scalar('实验牌号', experimentalCode);
+      solidContent = scalar('固含', solidContent);
+      hydroxylValue = scalar('羟值', hydroxylValue);
+      functionality = scalar('官能度', functionality);
+      hardness = scalar('硬度', hardness);
+      gloss60 = scalar('光泽(60°)', gloss60);
+      boilResistance = scalar('水煮', boilResistance);
+      waterContactAngle = scalar('水接触角', waterContactAngle);
+      technologySource = scalar('技术源', technologySource);
+      benchmark = scalar('对标', benchmark);
+      viscosity = scalar('粘度', viscosity);
+    }
+
     // 解析tags的另一种格式
     if (tags.isEmpty) {
       final frontmatterContent = frontmatterLines.join('\n');
@@ -239,6 +281,7 @@ class ProductItem {
 
     return ProductItem(
       origin: origin,
+      formulaProductRecords: formulaProductRecords,
       unresolvedProductReferences: unresolvedProductReferences,
       fileName: fileName,
       filePath: filePath,

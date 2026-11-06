@@ -18,7 +18,7 @@ void main() {
     final recipe =
         ProductItem.fromMdContent('user/产品配方/我的产品列表.md配方.md', document(m));
     final app = ProductItem.fromMdContent(
-        '产品应用/synthetic.md', '---\n底漆: 我的产品列表.md配方\n---\n');
+        'user/产品应用/synthetic.md', '---\n底漆: 我的产品列表.md配方\n---\n');
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
             body: ProductDetailSheet(

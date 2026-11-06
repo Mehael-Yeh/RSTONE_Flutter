@@ -17,6 +17,10 @@ import 'product_detail/markdown_table_parser.dart';
 import 'product_detail/structured_formula_card.dart';
 import 'product_detail/formula_presentation.dart';
 import 'product_detail/formula_pinned_table.dart';
+import 'product_detail/formula_card_header.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import '../utils/formula_table_clipboard_parser.dart';
+import 'product_detail/application_formula_links.dart';
 
 /// 产品详情底部弹窗
 ///
@@ -453,14 +457,6 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     }
   }
 
-  List<ProductItem> _deduplicateFormulasByFileName(List<ProductItem> formulas) {
-    final unique = <String, ProductItem>{};
-    for (final formula in formulas) {
-      unique.putIfAbsent(formula.fileName, () => formula);
-    }
-    return unique.values.toList();
-  }
-
   bool _isWaterBasedProduct() {
     return widget.product.tags.any((tag) => tag.contains('水性'));
   }
@@ -492,6 +488,20 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     final linked = _getApplicationLinkedFormulas();
     if (linked.isNotEmpty) {
       _selectedApplicationFormulaName = _formulaName(linked.first);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ProductDetailSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.product.folder != '产品应用') return;
+    final linked = _getApplicationLinkedFormulas();
+    if (oldWidget.product.filePath != widget.product.filePath ||
+        oldWidget.product.origin != widget.product.origin ||
+        !linked
+            .any((f) => _formulaName(f) == _selectedApplicationFormulaName)) {
+      _selectedApplicationFormulaName =
+          linked.isEmpty ? null : _formulaName(linked.first);
     }
   }
 
@@ -777,10 +787,28 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     if (content.trim().isEmpty) return const SizedBox.shrink();
     final cs = Theme.of(context).colorScheme;
     // 把 Obsidian wiki 链接 [[XXX]] 转换为普通文字 XXX
-    final converted = MarkdownTableParser.normalizeWikiLinks(content);
+    final isApplication = widget.product.folder == '产品应用';
+    final converted = isApplication
+        ? applicationFormulaMarkdown(widget.product, widget.formulas, content)
+        : MarkdownTableParser.normalizeWikiLinks(content);
     return MarkdownBody(
       data: converted,
+      onTapLink: isApplication
+          ? (_, href, __) {
+              const prefix = 'application-recipe:';
+              if (href == null || !href.startsWith(prefix)) return;
+              final recipe = _getApplicationLinkedFormulas()
+                  .where((f) =>
+                      href == '$prefix${Uri.encodeComponent(f.fileName)}')
+                  .firstOrNull;
+              if (recipe != null) {
+                setState(() =>
+                    _selectedApplicationFormulaName = _formulaName(recipe));
+              }
+            }
+          : null,
       styleSheet: MarkdownStyleSheet(
+        a: TextStyle(color: cs.secondary, decoration: TextDecoration.underline),
         p: TextStyle(color: cs.onSurfaceVariant, fontSize: 14, height: 1.6),
         h1: TextStyle(
             color: cs.onSurface, fontSize: 20, fontWeight: FontWeight.bold),
@@ -820,7 +848,11 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
     void add(String label, String? value) {
       if (value != null && value.isNotEmpty) {
-        fields.add(MapEntry(label, value));
+        final raw = applicationFormulaField(widget.product, label, value);
+        final recipe =
+            resolveApplicationFormula(widget.product, widget.formulas, raw);
+        fields
+            .add(MapEntry(label, recipe == null ? raw : _formulaName(recipe)));
       }
     }
 
@@ -829,7 +861,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     add('面漆', widget.product.topCoat);
     add('基材', widget.product.baseMaterial);
 
-    if (fields.isEmpty) return const SizedBox.shrink();
+    if (fields.isEmpty && linkedByName.isEmpty) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -890,10 +922,13 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                               ),
                             ),
                           )
-                        : Text(
-                            e.value,
-                            style: TextStyle(color: cs.onSurface, fontSize: 13),
-                          ),
+                        : applicationFormulaTokens(
+                                    widget.product, widget.formulas, e.value)
+                                .isEmpty
+                            ? Text(e.value,
+                                style: TextStyle(
+                                    color: cs.onSurface, fontSize: 13))
+                            : _markdownView(e.value),
                   ),
                 ],
               );
@@ -906,6 +941,30 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
               child: _buildFormulaCard(
                 '配方：$_selectedApplicationFormulaName',
                 linkedByName[_selectedApplicationFormulaName!]!,
+                selector: linkedByName.length < 2
+                    ? null
+                    : DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedApplicationFormulaName,
+                          isExpanded: true,
+                          items: [
+                            for (final name in linkedByName.keys)
+                              DropdownMenuItem(
+                                  value: name,
+                                  child: Text(name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          color: cs.onSurface, fontSize: 13)))
+                          ],
+                          onChanged: (name) {
+                            if (name != null) {
+                              setState(
+                                  () => _selectedApplicationFormulaName = name);
+                            }
+                          },
+                        ),
+                      ),
               ),
             ),
           const SizedBox(height: 8),
@@ -919,7 +978,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
     if (widget.product.folder != '产品列表') return const SizedBox.shrink();
 
     final entries = <MapEntry<String, String>>[
-      if (widget.product.experimentalCode?.isNotEmpty == true)
+      if (!widget.product.displayName.toUpperCase().startsWith('RD') &&
+          widget.product.experimentalCode?.isNotEmpty == true)
         MapEntry('实验牌号', widget.product.experimentalCode!),
       if (widget.product.engineer?.isNotEmpty == true)
         MapEntry('工程师', widget.product.engineer!),
@@ -1011,16 +1071,32 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
   List<ProductItem> _getApplicationLinkedFormulas() {
     if (widget.product.folder != '产品应用') return const [];
     final keys = <String>{
-      if (widget.product.primer != null && widget.product.primer!.isNotEmpty)
-        widget.product.primer!,
-      if (widget.product.midCoat != null && widget.product.midCoat!.isNotEmpty)
-        widget.product.midCoat!,
-      if (widget.product.topCoat != null && widget.product.topCoat!.isNotEmpty)
-        widget.product.topCoat!,
+      for (final entry in [
+        MapEntry('底漆', widget.product.primer),
+        MapEntry('中漆', widget.product.midCoat),
+        MapEntry('面漆', widget.product.topCoat),
+      ])
+        applicationFormulaField(widget.product, entry.key, entry.value ?? ''),
     };
-    final linked =
-        widget.formulas.where((f) => keys.contains(_formulaName(f))).toList();
-    return _deduplicateFormulasByFileName(linked);
+    final linked = <ProductItem>{};
+    for (final key in keys) {
+      final formula =
+          resolveApplicationFormula(widget.product, widget.formulas, key);
+      if (formula != null) linked.add(formula);
+      linked.addAll(
+          applicationFormulaTokens(widget.product, widget.formulas, key)
+              .map((p) => p.formula));
+    }
+    for (final text in [
+      applicationFormulaField(
+          widget.product, '基材', widget.product.baseMaterial ?? ''),
+      _extractMarkdownBody(widget.product.rawContent),
+    ]) {
+      linked.addAll(
+          applicationFormulaTokens(widget.product, widget.formulas, text)
+              .map((p) => p.formula));
+    }
+    return linked.toList();
   }
 
   /// 配方按完整产品牌号或明确的实验牌号关联，不做前缀推断。
@@ -1044,6 +1120,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         value: index,
         child: Text(
           _formulaName(formula),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(color: cs.onSurface, fontSize: 13),
         ),
       );
@@ -1053,32 +1131,20 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         _selectedFormulaIndex.clamp(0, matchedFormulas.length - 1)];
     final title = '配方：${_formulaName(selectedFormula)}';
 
-    return Column(
-      children: [
-        // 下拉选择器
-        Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainer,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: cs.outlineVariant),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<int>(
-              value: _selectedFormulaIndex.clamp(0, matchedFormulas.length - 1),
-              isExpanded: true,
-              dropdownColor: cs.surfaceContainerHigh,
-              icon: Icon(Icons.arrow_drop_down, color: cs.onSurfaceVariant),
-              items: items,
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedFormulaIndex = val);
-              },
-            ),
-          ),
+    return _buildFormulaCard(
+      title,
+      selectedFormula,
+      selector: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: _selectedFormulaIndex.clamp(0, matchedFormulas.length - 1),
+          isExpanded: true,
+          dropdownColor: cs.surfaceContainerHigh,
+          items: items,
+          onChanged: (val) {
+            if (val != null) setState(() => _selectedFormulaIndex = val);
+          },
         ),
-        _buildFormulaCard(title, selectedFormula),
-      ],
+      ),
     );
   }
 
@@ -1089,7 +1155,8 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
         .join('\n');
   }
 
-  Widget _buildFormulaCard(String title, ProductItem formula) {
+  Widget _buildFormulaCard(String title, ProductItem formula,
+      {Widget? selector}) {
     final document = formula.formulaDocument;
     if (document != null) {
       ProductItem? exactProduct(String target) {
@@ -1101,6 +1168,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
 
       return StructuredFormulaCard(
           document: document,
+          selector: selector,
           canOpenProduct: (target) => exactProduct(target) != null,
           onOpenProduct: (target) {
             final product = exactProduct(target);
@@ -1131,39 +1199,30 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-            child: Row(
-              children: [
-                Icon(Icons.science_outlined, color: cs.secondary, size: 16),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: cs.secondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.share_outlined,
-                      color: cs.onSurfaceVariant, size: 18),
-                  padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 36, minHeight: 36),
-                  tooltip: '分享配方图片',
-                  onPressed: () => _shareTableAsImage(
-                    context,
-                    title,
-                    tableBodyRows,
-                    extraContent:
-                        fullExtraContent.isNotEmpty ? fullExtraContent : null,
-                  ),
-                ),
-              ],
-            ),
+          FormulaCardHeader(
+            title: title.startsWith('配方：') ? title.substring(3) : title,
+            selector: selector,
+            onCopy: () async {
+              if (tableBodyRows.isEmpty) return;
+              await Clipboard.setData(ClipboardData(
+                  text: FormulaTableClipboardParser.toTsv(
+                      tableBodyRows.first,
+                      tableBodyRows.skip(1).map((row) => [
+                        ...row,
+                        // Legacy Markdown displays omitted trailing cells as
+                        // blanks; copy the same complete header-width row.
+                        if (row.length < tableBodyRows.first.length)
+                          ...List<String>.filled(
+                              tableBodyRows.first.length - row.length, ''),
+                      ]).toList())));
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('已复制完整五列（TSV）')));
+              }
+            },
+            onShare: () => _shareTableAsImage(context, title, tableBodyRows,
+                extraContent:
+                    fullExtraContent.isNotEmpty ? fullExtraContent : null),
           ),
           // 表格前的额外内容（如有）
           if (preContent.isNotEmpty)
@@ -1262,7 +1321,7 @@ class _ProductDetailSheetState extends State<ProductDetailSheet> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '${widget.product.folder} · ${widget.product.origin == DataOrigin.user ? '个人' : '官方'}',
+                          widget.product.folder,
                           style: TextStyle(
                             color: folderAccent,
                             fontSize: 12,

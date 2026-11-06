@@ -1,6 +1,8 @@
 /// 产品列表主页，支持筛选、收藏与详情入口。
 library;
 
+import 'dart:convert';
+import 'package:yaml/yaml.dart';
 import 'package:flutter/material.dart';
 import '../utils/compat_color.dart';
 import '../models/product_item.dart';
@@ -109,29 +111,146 @@ class _ProductListPageState extends State<ProductListPage> {
     });
   }
 
-  Future<void> _showAddProductDialog() async {
+  Map<dynamic, dynamic> _editableProductMetadata(String frontmatter) {
+    try {
+      final parsed = loadYaml(frontmatter);
+      return {
+        if (parsed is YamlMap)
+          for (final entry in parsed.entries) entry.key: entry.value,
+      };
+    } on YamlException {
+      // Older add forms accepted literal scalars through the line-based model.
+      // Recover each top-level field independently, preserving valid nested
+      // metadata and quoting invalid legacy scalar text on the next save.
+      final start = RegExp(r'^([^\s:#][^:]*):[ \t]*(.*)$');
+      final blocks = <List<String>>[];
+      for (final line in frontmatter.split('\n')) {
+        if (start.hasMatch(line)) {
+          blocks.add([line]);
+        } else if (blocks.isNotEmpty) {
+          blocks.last.add(line);
+        }
+      }
+      final recovered = <dynamic, dynamic>{};
+      for (final block in blocks) {
+        try {
+          final parsed = loadYaml(block.join('\n'));
+          if (parsed is YamlMap) {
+            for (final entry in parsed.entries) {
+              recovered[entry.key] = entry.value;
+            }
+          }
+        } on YamlException {
+          final match = start.firstMatch(block.first)!;
+          recovered[match.group(1)!.trim()] =
+              [match.group(2)!, ...block.skip(1)].join('\n').trimRight();
+        }
+      }
+      return recovered;
+    }
+  }
+
+  String _yamlMetadataValue(dynamic value) {
+    if (value is Map) {
+      return '{${value.entries.map((e) => '? ${_yamlMetadataValue(e.key)} : ${_yamlMetadataValue(e.value)}').join(', ')}}';
+    }
+    if (value is List) {
+      return '[${value.map(_yamlMetadataValue).join(', ')}]';
+    }
+    if (value is double && !value.isFinite) {
+      return value.isNaN ? '.nan' : (value.isNegative ? '-.inf' : '.inf');
+    }
+    return jsonEncode(value);
+  }
+
+  ({String metadata, String body, String prefix})? _productFrontmatter(
+      String content) {
+    int? openingStart, metadataStart;
+    var offset = 0;
+    for (final line in content.split('\n')) {
+      final lineEnd = offset + line.length;
+      final next = lineEnd < content.length ? lineEnd + 1 : lineEnd;
+      if (line.trim() == '---') {
+        if (metadataStart == null) {
+          openingStart = offset;
+          metadataStart = next;
+        } else {
+          var prefix = content.substring(0, openingStart!);
+          if (content.startsWith('\uFEFF') && !prefix.startsWith('\uFEFF')) {
+            prefix = '\uFEFF$prefix';
+          }
+          return (
+            metadata: content.substring(metadataStart, offset),
+            body: content.substring(next),
+            prefix: prefix,
+          );
+        }
+      }
+      offset = next;
+    }
+    return null;
+  }
+
+  Future<void> _showAddProductDialog([ProductItem? item]) async {
     _closePullButton();
-    final codeController = TextEditingController();
-    final tagsController = TextEditingController();
-    final engineerController = TextEditingController();
-    final expCodeController = TextEditingController();
-    final solidController = TextEditingController();
-    final hydroxylController = TextEditingController();
-    final contactAngleController = TextEditingController();
-    final functionalityController = TextEditingController();
-    final hardnessController = TextEditingController();
-    final glossController = TextEditingController();
-    final boilController = TextEditingController();
-    final sourceController = TextEditingController();
-    final benchmarkController = TextEditingController();
-    final viscosityController = TextEditingController();
+    if (item != null && item.origin != DataOrigin.user) return;
+    final front = item == null
+        ? null
+        : _productFrontmatter(item.rawContent);
+    final original = front == null
+        ? <dynamic, dynamic>{}
+        : _editableProductMetadata(front.metadata);
+    final initial = <String, String?>{
+      '工程师': item?.engineer,
+      '实验牌号': item?.experimentalCode,
+      '固含': item?.solidContent,
+      '羟值': item?.hydroxylValue,
+      '官能度': item?.functionality,
+      '硬度': item?.hardness,
+      '光泽(60°)': item?.gloss60,
+      '水煮': item?.boilResistance,
+      '水接触角': item?.waterContactAngle,
+      '技术源': item?.technologySource,
+      '对标': item?.benchmark,
+      '粘度': item?.viscosity,
+    };
+    for (final key in initial.keys.toList()) {
+      final value = original[key];
+      if (original.containsKey(key) &&
+          (value == null || value is String || value is num || value is bool)) {
+        initial[key] = value?.toString() ?? '';
+      }
+    }
+    TextEditingController field(String key) =>
+        TextEditingController(text: initial[key] ?? '');
+    final codeController = TextEditingController(
+        text: item == null
+            ? ''
+            : item.filePath.split('/').last.replaceFirst(RegExp(r'\.md$'), ''));
+    final decodedTags = original['tags'];
+    final tagsController = TextEditingController(
+        text: decodedTags is List && decodedTags.every((tag) => tag is String)
+            ? decodedTags.cast<String>().join(' ')
+            : item?.tags.join(' ') ?? '');
+    final engineerController = field('工程师');
+    final expCodeController = field('实验牌号');
+    final solidController = field('固含');
+    final hydroxylController = field('羟值');
+    final contactAngleController = field('水接触角');
+    final functionalityController = field('官能度');
+    final hardnessController = field('硬度');
+    final glossController = field('光泽(60°)');
+    final boilController = field('水煮');
+    final sourceController = field('技术源');
+    final benchmarkController = field('对标');
+    final viscosityController = field('粘度');
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text(
-          '新增产品信息',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        title: Text(
+          item == null ? '新增产品信息' : '编辑产品信息',
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
         ),
         content: SizedBox(
           width: 640,
@@ -142,7 +261,7 @@ class _ProductListPageState extends State<ProductListPage> {
                 _buildRoundedField(
                   controller: codeController,
                   label: '文件名',
-                  hint: '以 RD 或 RS 开头',
+                  hint: '输入自定义产品名称',
                 ),
                 const SizedBox(height: 10),
                 TextField(
@@ -194,7 +313,7 @@ class _ProductListPageState extends State<ProductListPage> {
           ObsidianTagValidator.splitSpaceSeparated(tagsController.text);
       final normalizedTags =
           ObsidianTagValidator.validateAndNormalizeTags(tags);
-      final markdown = widget.dataService.buildProductMarkdownTemplate(
+      var markdown = widget.dataService.buildProductMarkdownTemplate(
         tags: normalizedTags,
         engineer: engineerController.text.trim(),
         experimentalCode: expCodeController.text.trim(),
@@ -209,14 +328,60 @@ class _ProductListPageState extends State<ProductListPage> {
         benchmark: benchmarkController.text.trim(),
         viscosity: viscosityController.text.trim(),
       );
-      await widget.dataService.addProductMarkdown(
-        code: codeController.text.trim(),
-        markdown: markdown,
-      );
+      if (item == null) {
+        await widget.dataService.addProductMarkdown(
+            code: codeController.text.trim(), markdown: markdown);
+      } else {
+        // Preserve unknown YAML metadata (including typed map keys) and body.
+        // Quote edited scalars so ':' or '#' never become YAML syntax.
+        dynamic editedValue(String key, TextEditingController controller) =>
+            original.containsKey(key) && controller.text == (initial[key] ?? '')
+                ? original[key]
+                : controller.text.trim();
+        final metadata = <dynamic, dynamic>{
+          ...original,
+          'tags': normalizedTags,
+          '工程师': editedValue('工程师', engineerController),
+          '实验牌号': editedValue('实验牌号', expCodeController),
+          '固含': editedValue('固含', solidController),
+          '羟值': editedValue('羟值', hydroxylController),
+          '官能度': editedValue('官能度', functionalityController),
+          '硬度': editedValue('硬度', hardnessController),
+          '光泽(60°)': editedValue('光泽(60°)', glossController),
+          '水煮': editedValue('水煮', boilController),
+          '水接触角': editedValue('水接触角', contactAngleController),
+          '技术源': editedValue('技术源', sourceController),
+          '对标': editedValue('对标', benchmarkController),
+          '粘度': editedValue('粘度', viscosityController),
+        };
+        final hasBom = item.rawContent.startsWith('\uFEFF');
+        final body = front?.body ??
+            (hasBom ? item.rawContent.substring(1) : item.rawContent);
+        // The line-oriented reader needs its fixed, safe field labels bare.
+        // All other keys are literals, not YAML syntax or implicit scalars.
+        const literalFieldLabels = {
+          'tags', '工程师', '实验牌号', '固含', '羟值', '官能度', '硬度',
+          '光泽(60°)', '水煮', '水接触角', '技术源', '对标', '粘度',
+          '产品状态', '底漆', '中漆', '面漆', '基材',
+        };
+        final lines = metadata.entries.map((entry) {
+          final key = entry.key;
+          final renderedKey = literalFieldLabels.contains(key)
+              ? key
+              : key is Map || key is List
+                  ? '? ${_yamlMetadataValue(key)}\n'
+                  : _yamlMetadataValue(key);
+          return '$renderedKey: ${_yamlMetadataValue(entry.value)}';
+        });
+        final prefix = front?.prefix ?? (hasBom ? '\uFEFF' : '');
+        markdown = '$prefix---\n${lines.join('\n')}\n---\n$body';
+        await widget.dataService.updateProductMarkdown(
+            item: item, code: codeController.text.trim(), markdown: markdown);
+      }
       if (!mounted) return;
       setState(() => _noteResetSignal++);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('产品信息已新增')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(item == null ? '产品信息已新增' : '产品信息已更新')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -546,6 +711,7 @@ class _ProductListPageState extends State<ProductListPage> {
                             widget.dataService.formulaAssociations,
                         tdsByProduct: widget.dataService.tdsByProduct,
                         tdsForProduct: widget.dataService.tdsForProduct,
+                        onEditProduct: _showAddProductDialog,
                         defaultColumns: _columns,
                         availableColumns: isMobile
                             ? _mobileDefaultColumns

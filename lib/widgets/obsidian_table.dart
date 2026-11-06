@@ -38,6 +38,7 @@ class ObsidianTable extends StatefulWidget {
   final int noteResetSignal;
   final bool Function(ProductItem item)? isManualItem;
   final Future<void> Function(ProductItem item)? onDeleteManualItem;
+  final Future<void> Function(ProductItem item)? onEditProduct;
 
   const ObsidianTable({
     super.key,
@@ -56,6 +57,7 @@ class ObsidianTable extends StatefulWidget {
     required this.preferencesService,
     this.isManualItem,
     this.onDeleteManualItem,
+    this.onEditProduct,
     this.noteResetSignal = 0,
     this.currentSortColumn,
     this.sortDescending = false,
@@ -132,7 +134,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
 
   void _ensureDesktopWidths(double totalWidth) {
     if (widget.isMobile || _columns.isEmpty) return;
-    final tableWidth = (totalWidth - 44).clamp(320.0, double.infinity);
+    final tableWidth = (totalWidth - 44 - 16).clamp(320.0, double.infinity);
     if (_columnWidths.length == _columns.length &&
         _columns.every(_columnWidths.containsKey)) {
       return;
@@ -243,7 +245,11 @@ class _ObsidianTableState extends State<ObsidianTable> {
   }
 
   String? _tdsOf(ProductItem item) {
-    if (item.folder != '产品列表') return null;
+    if (item.folder != '产品列表' ||
+        item.origin == DataOrigin.user ||
+        item.filePath.startsWith('user/')) {
+      return null;
+    }
     if (widget.tdsForProduct != null) {
       return widget.tdsForProduct!(item.fileName);
     }
@@ -291,6 +297,15 @@ class _ObsidianTableState extends State<ObsidianTable> {
   }
 
   bool _isManual(ProductItem item) => widget.isManualItem?.call(item) ?? false;
+
+  Widget? _editButton(ProductItem item) => item.origin == DataOrigin.user &&
+          item.folder == '产品列表' &&
+          widget.onEditProduct != null
+      ? IconButton(
+          tooltip: '编辑产品信息',
+          icon: const Icon(Icons.edit_outlined, size: 18),
+          onPressed: () => widget.onEditProduct!(item))
+      : null;
 
   Future<void> _deleteManualItem(ProductItem item) async {
     await widget.onDeleteManualItem?.call(item);
@@ -421,6 +436,7 @@ class _ObsidianTableState extends State<ObsidianTable> {
                 : null,
             statusLabel: item.productStatus,
             titleBadge: _formulaBadge(item),
+            titleSuffix: _editButton(item),
             titleStyle: TextStyle(
               color: cs.onSurface,
               fontWeight: FontWeight.w700,
@@ -609,6 +625,9 @@ class _ObsidianTableState extends State<ObsidianTable> {
                                           ),
                                         ),
                                         if (formulaBadge != null) formulaBadge,
+                                        if (isGradeColumn &&
+                                            _editButton(item) != null)
+                                          _editButton(item)!,
                                         if (isGradeColumn &&
                                             item.productStatus != null)
                                           Container(

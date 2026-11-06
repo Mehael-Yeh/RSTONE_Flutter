@@ -436,8 +436,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final cs = Theme.of(context).colorScheme;
     final totalProducts = widget.dataService.products.length;
     final coveredProducts = widget.dataService.products
-        .where((product) =>
-            widget.dataService.tdsForProduct(product.fileName) != null)
+        .where((product) => widget.dataService.tdsForItem(product) != null)
         .length;
     final coveragePercent = totalProducts == 0
         ? 0

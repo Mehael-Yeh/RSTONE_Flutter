@@ -315,9 +315,32 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
   Widget _buildResultItem(ProductItem item) {
     final cs = Theme.of(context).colorScheme;
     final tagColor = item.folder == '产品列表' ? cs.primary : cs.tertiary;
+    // Presentation only: preserve the model's single normalized scalar. Do not
+    // split aliases or infer production lifecycle status from a grade prefix.
+    final alias = item.experimentalCode?.trim() ?? '';
+    final showAlias = item.folder == '产品列表' &&
+        !item.displayName.toUpperCase().startsWith('RD') &&
+        alias.isNotEmpty &&
+        alias.toUpperCase() != item.displayName.trim().toUpperCase();
 
     return SwipeNoteItemCard(
       title: item.displayName,
+      titleSuffix: showAlias
+          ? Container(
+              key: ValueKey('experimental-alias:${item.fileName}'),
+              margin: const EdgeInsets.only(left: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: cs.secondaryContainer,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(alias,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      TextStyle(fontSize: 11, color: cs.onSecondaryContainer)),
+            )
+          : null,
       subtitleTokens: _buildSubtitleParts(item),
       indicatorColor: tagColor,
       onTap: () {
@@ -327,7 +350,7 @@ class _SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
           item,
           productCatalog: widget.dataService.products,
           formulas: widget.dataService.formulas,
-          tdsContent: widget.dataService.tdsForProduct(item.fileName),
+          tdsContent: widget.dataService.tdsForItem(item),
         );
       },
       onNoteTap: () => _openNoteEditor(item),
