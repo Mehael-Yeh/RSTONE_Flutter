@@ -20,7 +20,7 @@ sys.dont_write_bytecode=True
 API='https://api.github.com/repos/Mehael-Yeh/RSTONE_Flutter'
 HEAD='4494f70e631db36c0dde552e125e2882f9146c82'
 TREE='9cad1ae400a185cc57303a0bebad2d7f48354973'
-TAG='v2.0.6'
+TAG='v2.0.10'
 def request(url,api=False):
     headers={'Accept':'application/vnd.github+json','User-Agent':'RSTONE-independent-apk-acceptance'}
     if api:headers['Authorization']='Bearer '+os.environ['GH_TOKEN']
@@ -92,7 +92,7 @@ def main():
     for suffix in ['', '-Lite']:
         name=f'RSTONE-{a.baseline}{suffix}-arm64-v8a-release.apk';assert name in old_assets
         download(old_assets[name],previous/name);identity=verifier.apk_identity(previous/name,tools)
-        assert identity['versionName']=='2.0.8' and identity['abis']==['arm64-v8a']
+        assert identity['versionName']=='2.0.9' and identity['abis']==['arm64-v8a']
         baseline.append(identity)
     (out/'baseline-identities.json').write_text(json.dumps(baseline,indent=2)+'\n')
     first=verifier.apk_identity(current/sorted(expected)[0],tools)
