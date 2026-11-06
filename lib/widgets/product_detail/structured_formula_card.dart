@@ -8,14 +8,17 @@ import 'formula_presentation.dart';
 import 'process_presentation.dart';
 import 'formula_png_renderer.dart';
 import 'formula_pinned_table.dart';
+import 'formula_card_header.dart';
 
 class StructuredFormulaCard extends StatelessWidget {
   final FormulaDisplayView view;
   final bool Function(String)? canOpenProduct;
   final ValueChanged<String>? onOpenProduct;
+  final Widget? selector;
   StructuredFormulaCard(
       {super.key,
       required FormulaDocument document,
+      this.selector,
       this.canOpenProduct,
       this.onOpenProduct})
       : view = FormulaDisplayView(document);
@@ -69,23 +72,18 @@ class StructuredFormulaCard extends StatelessWidget {
             border: Border.all(color: cs.outlineVariant),
             borderRadius: BorderRadius.circular(8)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(child: paragraph('配方：${d.title}', bold: true)),
-            IconButton(
-                tooltip: '复制配方五列',
-                icon: const Icon(Icons.copy),
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: view.tsv));
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已复制完整五列（TSV）')));
-                  }
-                }),
-            IconButton(
-                tooltip: '分享配方图片',
-                icon: const Icon(Icons.share_outlined),
-                onPressed: () => _share(context)),
-          ]),
+          FormulaCardHeader(
+            title: d.title,
+            selector: selector,
+            onCopy: () async {
+              await Clipboard.setData(ClipboardData(text: view.tsv));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('已复制完整五列（TSV）')));
+              }
+            },
+            onShare: () => _share(context),
+          ),
           for (final p in d.preTable) paragraph(p),
           LayoutBuilder(builder: (context, constraints) {
             final layout = FormulaTableLayout(view,

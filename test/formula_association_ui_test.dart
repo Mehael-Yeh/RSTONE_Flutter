@@ -145,12 +145,19 @@ void main() {
     expect(find.byKey(const ValueKey('formula-badge:RS7966')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('formula-badge:RS7965')));
     await tester.pumpAndSettle();
-    expect(find.text('配方：混拼方案A'), findsOneWidget);
+    expect(find.text('配方：'), findsOneWidget);
+    expect(find.text('混拼方案A'), findsOneWidget);
     await tester.tap(find.byType(DropdownButton<int>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('混拼方案B').last);
     await tester.pumpAndSettle();
-    expect(find.text('配方：混拼方案B'), findsOneWidget);
+    expect(find.text('配方：'), findsOneWidget);
+    expect(
+        tester
+            .widget<DropdownButton<int>>(find.byType(DropdownButton<int>))
+            .value,
+        1);
+    expect(find.text('混拼方案B'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.tap(find.byIcon(Icons.close).last);
     await tester.pumpAndSettle();

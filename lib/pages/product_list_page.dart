@@ -1,6 +1,8 @@
 /// 产品列表主页，支持筛选、收藏与详情入口。
 library;
 
+import 'dart:convert';
+import 'package:yaml/yaml.dart';
 import 'package:flutter/material.dart';
 import '../utils/compat_color.dart';
 import '../models/product_item.dart';
@@ -109,29 +111,47 @@ class _ProductListPageState extends State<ProductListPage> {
     });
   }
 
-  Future<void> _showAddProductDialog() async {
+  Future<void> _showAddProductDialog([ProductItem? item]) async {
     _closePullButton();
-    final codeController = TextEditingController();
-    final tagsController = TextEditingController();
-    final engineerController = TextEditingController();
-    final expCodeController = TextEditingController();
-    final solidController = TextEditingController();
-    final hydroxylController = TextEditingController();
-    final contactAngleController = TextEditingController();
-    final functionalityController = TextEditingController();
-    final hardnessController = TextEditingController();
-    final glossController = TextEditingController();
-    final boilController = TextEditingController();
-    final sourceController = TextEditingController();
-    final benchmarkController = TextEditingController();
-    final viscosityController = TextEditingController();
+    if (item != null && item.origin != DataOrigin.user) return;
+    final initial = <String, String?>{
+      '工程师': item?.engineer,
+      '实验牌号': item?.experimentalCode,
+      '固含': item?.solidContent,
+      '羟值': item?.hydroxylValue,
+      '官能度': item?.functionality,
+      '硬度': item?.hardness,
+      '光泽(60°)': item?.gloss60,
+      '水煮': item?.boilResistance,
+      '水接触角': item?.waterContactAngle,
+      '技术源': item?.technologySource,
+      '对标': item?.benchmark,
+      '粘度': item?.viscosity,
+    };
+    TextEditingController field(String key) =>
+        TextEditingController(text: initial[key] ?? '');
+    final codeController = TextEditingController(text: item?.fileName ?? '');
+    final tagsController =
+        TextEditingController(text: item?.tags.join(' ') ?? '');
+    final engineerController = field('工程师');
+    final expCodeController = field('实验牌号');
+    final solidController = field('固含');
+    final hydroxylController = field('羟值');
+    final contactAngleController = field('水接触角');
+    final functionalityController = field('官能度');
+    final hardnessController = field('硬度');
+    final glossController = field('光泽(60°)');
+    final boilController = field('水煮');
+    final sourceController = field('技术源');
+    final benchmarkController = field('对标');
+    final viscosityController = field('粘度');
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text(
-          '新增产品信息',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        title: Text(
+          item == null ? '新增产品信息' : '编辑产品信息',
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
         ),
         content: SizedBox(
           width: 640,
@@ -142,7 +162,7 @@ class _ProductListPageState extends State<ProductListPage> {
                 _buildRoundedField(
                   controller: codeController,
                   label: '文件名',
-                  hint: '以 RD 或 RS 开头',
+                  hint: '输入自定义产品名称',
                 ),
                 const SizedBox(height: 10),
                 TextField(
@@ -194,7 +214,7 @@ class _ProductListPageState extends State<ProductListPage> {
           ObsidianTagValidator.splitSpaceSeparated(tagsController.text);
       final normalizedTags =
           ObsidianTagValidator.validateAndNormalizeTags(tags);
-      final markdown = widget.dataService.buildProductMarkdownTemplate(
+      var markdown = widget.dataService.buildProductMarkdownTemplate(
         tags: normalizedTags,
         engineer: engineerController.text.trim(),
         experimentalCode: expCodeController.text.trim(),
@@ -209,14 +229,44 @@ class _ProductListPageState extends State<ProductListPage> {
         benchmark: benchmarkController.text.trim(),
         viscosity: viscosityController.text.trim(),
       );
-      await widget.dataService.addProductMarkdown(
-        code: codeController.text.trim(),
-        markdown: markdown,
-      );
+      if (item == null) {
+        await widget.dataService.addProductMarkdown(
+            code: codeController.text.trim(), markdown: markdown);
+      } else {
+        // JSON maps are valid YAML. Preserve unknown metadata and the full body;
+        // quote edited scalars so ':' or '#' never become YAML syntax.
+        final front = RegExp(r'^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)')
+            .firstMatch(item.rawContent);
+        final original = front == null ? null : loadYaml(front.group(1)!);
+        final metadata = <String, dynamic>{
+          if (original is YamlMap)
+            for (final e in original.entries) e.key.toString(): e.value,
+          'tags': normalizedTags,
+          '工程师': engineerController.text.trim(),
+          '实验牌号': expCodeController.text.trim(),
+          '固含': solidController.text.trim(),
+          '羟值': hydroxylController.text.trim(),
+          '官能度': functionalityController.text.trim(),
+          '硬度': hardnessController.text.trim(),
+          '光泽(60°)': glossController.text.trim(),
+          '水煮': boilController.text.trim(),
+          '水接触角': contactAngleController.text.trim(),
+          '技术源': sourceController.text.trim(),
+          '对标': benchmarkController.text.trim(),
+          '粘度': viscosityController.text.trim(),
+        };
+        final body = front == null
+            ? item.rawContent
+            : item.rawContent.substring(front.end);
+        markdown =
+            '---\n${metadata.entries.map((e) => '${e.key}: ${jsonEncode(e.value)}').join('\n')}\n---\n$body';
+        await widget.dataService.updateProductMarkdown(
+            item: item, code: codeController.text.trim(), markdown: markdown);
+      }
       if (!mounted) return;
       setState(() => _noteResetSignal++);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('产品信息已新增')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(item == null ? '产品信息已新增' : '产品信息已更新')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -546,6 +596,7 @@ class _ProductListPageState extends State<ProductListPage> {
                             widget.dataService.formulaAssociations,
                         tdsByProduct: widget.dataService.tdsByProduct,
                         tdsForProduct: widget.dataService.tdsForProduct,
+                        onEditProduct: _showAddProductDialog,
                         defaultColumns: _columns,
                         availableColumns: isMobile
                             ? _mobileDefaultColumns

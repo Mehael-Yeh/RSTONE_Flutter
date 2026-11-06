@@ -8,6 +8,17 @@ final _completeGrade = RegExp(
   caseSensitive: false,
 );
 final _legacyFinish = RegExp(r'-(?:亮|哑|银|黑|底)$');
+// Official recipes resolve only official records. Personal recipes resolve the
+// current explicit catalog target, including an official target.
+bool _sourceMatches(ProductItem product, ProductItem formula) =>
+    (product.origin != DataOrigin.user ||
+        product.filePath.startsWith('user/产品列表/')) &&
+    (formula.origin != DataOrigin.user ||
+        formula.filePath.startsWith('user/产品配方/')) &&
+    (formula.origin == DataOrigin.user || product.origin != DataOrigin.user) &&
+    (formula.formulaProductRecords == null ||
+        formula.formulaProductRecords![product.fileName] ==
+            '${product.origin.name}:${product.filePath}');
 const _materialHeaders = {'原料编号', '原料名称', '原料', '组分'};
 
 Set<String> _wikiGradeKeys(String value) {
@@ -139,7 +150,7 @@ List<ProductItem> linkedFormulasForProduct(
   };
   final matched = <String, ProductItem>{};
   for (final formula in formulas) {
-    if (formula.folder != '产品配方') continue;
+    if (formula.folder != '产品配方' || !_sourceMatches(product, formula)) continue;
     final structured = formula.formulaDocument;
     if (structured != null) {
       if (structured.associatedProducts.contains(product.fileName)) {
@@ -217,6 +228,7 @@ class FormulaAssociationIndex {
         }
       }
       for (final product in targets) {
+        if (!_sourceMatches(product, formula)) continue;
         matches[product]!.putIfAbsent(formula.fileName, () => formula);
       }
     }

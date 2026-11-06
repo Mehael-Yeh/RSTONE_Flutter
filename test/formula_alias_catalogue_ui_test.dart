@@ -121,7 +121,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
       await tester.pumpAndSettle();
       await tester.tap(find.descendant(
-          of: find.byType(SwipeNoteItemCard), matching: find.text(id)));
+          of: find.byWidgetPredicate(
+              (w) => w is SwipeNoteItemCard && w.title == id),
+          matching: find.text(id)));
       await tester.pumpAndSettle();
       expect(find.byType(ProductDetailSheet), findsOneWidget);
       try {

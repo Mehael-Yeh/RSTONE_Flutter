@@ -20,6 +20,7 @@ import '../utils/formula_catalog_validator.dart';
 import '../utils/grade_lookup.dart';
 import '../utils/natural_sort.dart';
 import '../utils/formula_association.dart';
+import 'personal_product_transaction.dart';
 
 class ObsidianDataService extends ChangeNotifier {
   DataSyncService? sync;
@@ -251,6 +252,14 @@ class ObsidianDataService extends ChangeNotifier {
   String? tdsForProduct(String productName) {
     return _tdsByGrade[_gradeKey(productName)];
   }
+
+  // The current TDS catalog contains official documents only. A personal
+  // product path has no implicit TDS ownership, even when its grade is equal.
+  String? tdsForItem(ProductItem item) => item.folder != '产品列表' ||
+          item.origin == DataOrigin.user ||
+          item.filePath.startsWith('user/')
+      ? null
+      : tdsForProduct(item.fileName);
 
   /// Case difference and surrounding whitespace are the only tolerated
   /// variants; every suffix character stays significant.
@@ -667,11 +676,56 @@ ${_joinTagsToYamlList(tags)}
     return results;
   }
 
+  bool _editingUserProduct = false;
+
+  Future<T> _exclusiveUserMutation<T>(Future<T> Function() operation) async {
+    if (_editingUserProduct) throw StateError('personal-edit-in-progress');
+    _editingUserProduct = true;
+    try {
+      return await operation();
+    } finally {
+      _editingUserProduct = false;
+    }
+  }
+
+  Future<void> updateProductMarkdown(
+      {required ProductItem item,
+      required String code,
+      required String markdown}) async {
+    if (_editingUserProduct) throw StateError('personal-edit-in-progress');
+    if (item.origin != DataOrigin.user ||
+        item.folder != '产品列表' ||
+        !item.filePath.startsWith('user/产品列表/') ||
+        !identical(_userItems[item.filePath.substring(5)], item)) {
+      throw StateError('仅支持编辑当前个人产品');
+    }
+    _editingUserProduct = true;
+    try {
+      final name = _validatedProductName(code);
+      final path = '产品列表/$name.md';
+      validateLogicalPath(path);
+      await PersonalProductTransaction(_store)
+          .edit(item.filePath, 'user/$path', item.rawContent, markdown);
+      _userItems.remove(item.filePath.substring(5));
+      _userItems[path] = ProductItem.fromMdContent('user/$path', markdown,
+          origin: DataOrigin.user);
+      _composeSnapshot();
+      notifyListeners();
+    } finally {
+      _editingUserProduct = false;
+    }
+  }
+
   Future<void> _saveUserItem(
       String folder, String name, String markdown) async {
     final path = '$folder/$name.md';
     validateLogicalPath(path);
-    final parsed = ProductItem.fromMdContent('user/$path', markdown,
+    if (folder == '产品列表' &&
+        (await _store.keys('user/$folder/')).any(
+            (key) => protocolCaseFold(key) == protocolCaseFold('user/$path'))) {
+      throw StateError('个人产品名称已存在');
+    }
+    var parsed = ProductItem.fromMdContent('user/$path', markdown,
         origin: DataOrigin.user);
     if (folder == '产品配方') {
       if (parsed.formulaDocument == null) {
@@ -684,8 +738,43 @@ ${_joinTagsToYamlList(tags)}
           (f) => f.fileName != name && f.formulaDocument?.recipeId == id)) {
         throw const FormatException('duplicate-personal-recipe-id');
       }
+      final records = <String, String>{};
+      for (final grade in parsed.formulaDocument!.associatedProducts) {
+        final targets = _products.where((p) => p.fileName == grade).toList();
+        if (targets.length != 1) {
+          throw StateError('ambiguous-personal-recipe-target');
+        }
+        final target = targets.single;
+        records[grade] = '${target.origin.name}:${target.filePath}';
+      }
+      final bindingKey = _formulaBindingKey(path);
+      final previous = await _store.readText(bindingKey);
+      await _store.writeText(
+          bindingKey,
+          jsonEncode({
+            'version': 1,
+            'sha256':
+                await sha256Hex(Uint8List.fromList(utf8.encode(markdown))),
+            'records': records,
+          }));
+      try {
+        await _store.writeText('user/$path', markdown);
+      } catch (_) {
+        try {
+          if (previous == null) {
+            await _store.remove(bindingKey);
+          } else {
+            await _store.writeText(bindingKey, previous);
+          }
+        } catch (_) {/* Hash mismatch fails closed on reload. */}
+        rethrow;
+      }
+      parsed = ProductItem.fromMdContent('user/$path', markdown,
+          origin: DataOrigin.user,
+          formulaProductRecords: Map.unmodifiable(records));
+    } else {
+      await _store.writeText('user/$path', markdown);
     }
-    await _store.writeText('user/$path', markdown);
     _quarantinedFormulas.remove(path);
     _quarantinedOriginals.remove(path);
     _userItems[path] = parsed;
@@ -695,11 +784,27 @@ ${_joinTagsToYamlList(tags)}
 
   Future<void> addProductMarkdown(
       {required String code, required String markdown}) async {
-    final name = code.trim().toUpperCase();
-    if (!name.startsWith('RD') && !name.startsWith('RS')) {
-      throw ArgumentError('文件名需以 RD 或 RS 开头');
+    if (_editingUserProduct) throw StateError('personal-edit-in-progress');
+    _editingUserProduct = true;
+    try {
+      await PersonalProductTransaction(_store).recover();
+      await _saveUserItem('产品列表', _validatedProductName(code), markdown);
+    } finally {
+      _editingUserProduct = false;
     }
-    await _saveUserItem('产品列表', name, markdown);
+  }
+
+  String _validatedProductName(String code) {
+    final name = code.trim();
+    if (name.isEmpty ||
+        code.runes.any((r) => r < 32 || r == 127) ||
+        name.contains('/') ||
+        name.contains('\\')) {
+      throw ArgumentError('产品名称不能为空或含不安全字符');
+    }
+    // User-created display names are not official grade identifiers. Keep
+    // portable-path validation in _saveUserItem and official codecs unchanged.
+    return name;
   }
 
   Future<void> addApplicationMarkdown(
@@ -714,36 +819,48 @@ ${_joinTagsToYamlList(tags)}
           markdown: utf8.decode(FormulaProtocolCodec.encode(document)));
 
   Future<void> addFormulaMarkdown(
-      {required String name, required String markdown}) async {
-    if (name.trim().isEmpty) throw ArgumentError('产品配方名称不能为空');
-    await _saveUserItem('产品配方', name.trim(), markdown);
-  }
+          {required String name, required String markdown}) =>
+      _exclusiveUserMutation(() async {
+        await PersonalProductTransaction(_store).recover();
+        if (name.trim().isEmpty) throw ArgumentError('产品配方名称不能为空');
+        await _saveUserItem('产品配方', name.trim(), markdown);
+      });
 
   bool isManualItem(ProductItem item) => item.origin == DataOrigin.user;
-  Future<void> deleteManualItem(ProductItem item) async {
-    if (!isManualItem(item)) throw StateError('仅支持删除用户新增资料');
-    final path = item.filePath.substring('user/'.length);
-    await _store.remove('user/$path');
-    _userItems.remove(path);
-    // Only the CURRENT official mapping can reappear underneath an overlay.
-    _composeSnapshot();
-    notifyListeners();
-  }
+  Future<void> deleteManualItem(ProductItem item) =>
+      _exclusiveUserMutation(() async {
+        await PersonalProductTransaction(_store).recover();
+        if (!isManualItem(item)) throw StateError('仅支持删除用户新增资料');
+        final path = item.filePath.substring('user/'.length);
+        if (item.folder == '产品列表' && !identical(_userItems[path], item)) {
+          throw StateError('stale-personal-product');
+        }
+        await _store.remove('user/$path');
+        _userItems.remove(path);
+        // Only the CURRENT official mapping can reappear underneath an overlay.
+        _composeSnapshot();
+        notifyListeners();
+      });
 
-  Future<int> clearAllManualMarkdownData() async {
-    // This explicit user action clears even isolated originals. Reload and
-    // normal synchronization never delete or rewrite those originals.
-    final paths = {..._userItems.keys, ..._quarantinedOriginals.keys}.toList();
-    for (final path in paths) {
-      await _store.remove('user/$path');
-      _userItems.remove(path);
-      _quarantinedFormulas.remove(path);
-      _quarantinedOriginals.remove(path);
-    }
-    _composeSnapshot();
-    notifyListeners();
-    return paths.length;
-  }
+  Future<int> clearAllManualMarkdownData() => _exclusiveUserMutation(() async {
+        await PersonalProductTransaction(_store).recover();
+        // This explicit user action clears even isolated originals. Reload and
+        // normal synchronization never delete or rewrite those originals.
+        final paths =
+            {..._userItems.keys, ..._quarantinedOriginals.keys}.toList();
+        for (final path in paths) {
+          await _store.remove('user/$path');
+          _userItems.remove(path);
+          _quarantinedFormulas.remove(path);
+          _quarantinedOriginals.remove(path);
+        }
+        for (final key in await _store.keys('user/record-links/')) {
+          await _store.remove(key);
+        }
+        _composeSnapshot();
+        notifyListeners();
+        return paths.length;
+      });
 
   void _quarantine(String path, Uint8List original) {
     _quarantinedFormulas[path] = '个人配方格式无效，已隔离；原文保留，可导出后修复。';
@@ -751,13 +868,14 @@ ${_joinTagsToYamlList(tags)}
     _addLog('个人配方已隔离：$path（原文保留，未使用同名官方配方）');
   }
 
-  Future<void> reloadUserItems() async {
-    await _loadUserItems();
-    _composeSnapshot();
-    notifyListeners();
-  }
+  Future<void> reloadUserItems() => _exclusiveUserMutation(() async {
+        await _loadUserItems();
+        _composeSnapshot();
+        notifyListeners();
+      });
 
   Future<void> _loadUserItems() async {
+    await PersonalProductTransaction(_store).recover();
     _userItems.clear();
     _quarantinedFormulas.clear();
     _quarantinedOriginals.clear();
@@ -773,11 +891,31 @@ ${_joinTagsToYamlList(tags)}
             raw[1] == 0xbb &&
             raw[2] == 0xbf;
         final text = '${bom ? '\uFEFF' : ''}${utf8.decode(raw)}';
-        _userItems[path] =
-            ProductItem.fromMdContent(key, text, origin: DataOrigin.user);
+        _userItems[path] = ProductItem.fromMdContent(key, text,
+            origin: DataOrigin.user,
+            formulaProductRecords: path.startsWith('产品配方/')
+                ? await _readFormulaBinding(path, raw)
+                : null);
       } on FormatException {
         _quarantine(path, raw);
       }
+    }
+  }
+
+  String _formulaBindingKey(String path) => 'user/record-links/$path.json';
+
+  Future<Map<String, String>?> _readFormulaBinding(
+      String path, Uint8List bytes) async {
+    final text = await _store.readText(_formulaBindingKey(path));
+    if (text == null) return null; // Preserve pre-binding legacy references.
+    try {
+      final json = jsonDecode(text) as Map<String, dynamic>;
+      if (json['version'] != 1 || json['sha256'] != await sha256Hex(bytes)) {
+        return const {};
+      }
+      return Map.unmodifiable(Map<String, String>.from(json['records'] as Map));
+    } catch (_) {
+      return const {}; // Mismatched proof must never transfer ownership.
     }
   }
 

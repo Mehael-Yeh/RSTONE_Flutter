@@ -7,6 +7,7 @@ import 'package:rst_flutter/models/formula_document.dart';
 import 'package:rst_flutter/widgets/product_detail/formula_presentation.dart';
 import 'package:rst_flutter/widgets/product_detail/formula_png_renderer.dart';
 import 'package:rst_flutter/widgets/product_detail/structured_formula_card.dart';
+import 'package:rst_flutter/widgets/product_detail/formula_pinned_table.dart';
 
 FormulaDocument synthetic({int length = 70, int count = 1}) {
   final target = 'RS900000${'1' * length}';
@@ -93,7 +94,8 @@ void main() {
     });
   }
   for (final width in [360.0, 412.0, 1200.0]) {
-    testWidgets('pinned header and first column stay aligned at width $width',
+    testWidgets(
+        'expanded full-height table keeps horizontal first column at width $width',
         (tester) async {
       tester.view.physicalSize = Size(width, 900);
       tester.view.devicePixelRatio = 1;
@@ -119,27 +121,47 @@ void main() {
           tester.widget<SingleChildScrollView>(horizontal).controller;
       final xBar = find.byWidgetPredicate(
           (w) => w is Scrollbar && w.controller == xController);
-      expect(tester.getSize(xBar).height, lessThanOrEqualTo(420));
-      expect(tester.getSize(xBar).width,
-          closeTo(tester.getSize(horizontal).width, .1),
-          reason:
-              'scrollbar track must use the actual pannable viewport, not the frozen column');
+      expect(xBar, findsNothing,
+          reason: 'horizontal movement must not add a visible scrollbar');
+      expect(find.ancestor(of: horizontal, matching: find.byType(RawScrollbar)),
+          findsNothing,
+          reason: 'desktop ScrollBehavior must not inject a horizontal bar');
       await tester.dragFrom(
           Offset(width - 40, beforeFirst.dy + 20), const Offset(-10000, 0));
       await tester.pumpAndSettle();
       expect(tester.getTopLeft(first).dx, beforeFirst.dx);
       expect(tester.getTopLeft(header), beforeHeader);
-      final vertical =
-          find.byKey(const ValueKey('recipe-vertical:SYNTH-900000'));
-      expect(vertical, findsOneWidget);
+      final table = find.byType(FormulaPinnedTable);
+      final heights = tester.widget<FormulaPinnedTable>(table).heights;
+      final fullHeight = heights.fold<double>(0, (a, b) => a + b);
+      expect(tester.getSize(table).height, closeTo(fullHeight, .1));
+      expect(
+          find.descendant(
+              of: table,
+              matching: find.byWidgetPredicate((w) =>
+                  w is Scrollable &&
+                  axisDirectionToAxis(w.axisDirection) == Axis.vertical)),
+          findsNothing);
+      expect(find.descendant(of: table, matching: find.byType(Scrollbar)),
+          findsNothing);
+      var rowTop = tester.getRect(header).top;
+      for (var row = 0; row < heights.length; row++) {
+        final cell = find.byKey(ValueKey('recipe-cell:SYNTH-900000:$row:0'));
+        final rect = tester.getRect(cell);
+        expect(rect.top, closeTo(rowTop, .1));
+        expect(rect.height, closeTo(heights[row], .1));
+        rowTop = rect.bottom;
+      }
+      expect(rowTop - tester.getRect(header).top, closeTo(fullHeight, .1));
       await tester.dragFrom(
-          beforeFirst + const Offset(30, 20), const Offset(0, -10000));
+          beforeFirst + const Offset(30, 20), const Offset(0, -100000));
       await tester.pumpAndSettle();
-      expect(tester.getTopLeft(header), beforeHeader);
+      expect(tester.getTopLeft(header).dy, lessThan(beforeHeader.dy),
+          reason: 'the whole detail scrolls; there is no sticky inner header');
       final bottom =
           find.byKey(const ValueKey('recipe-cell:SYNTH-900000:40:0'));
       final end = find.byKey(const ValueKey('recipe-cell:SYNTH-900000:40:4'));
-      expect(tester.getRect(bottom).bottom, lessThanOrEqualTo(500));
+      expect(tester.getRect(bottom).bottom, lessThanOrEqualTo(900));
       expect(tester.getRect(end).bottom,
           closeTo(tester.getRect(bottom).bottom, .1));
       expect(tester.getRect(end).right, lessThanOrEqualTo(width));

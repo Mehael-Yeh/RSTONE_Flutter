@@ -21,6 +21,9 @@ class SwipeNoteItemCard extends StatelessWidget {
   final String? statusLabel;
   final Widget? titleBadge;
 
+  /// Inline accessory directly after the title, not at the trailing edge.
+  final Widget? titleSuffix;
+
   const SwipeNoteItemCard({
     super.key,
     required this.title,
@@ -35,6 +38,7 @@ class SwipeNoteItemCard extends StatelessWidget {
     this.titleDecoration,
     this.statusLabel,
     this.titleBadge,
+    this.titleSuffix,
   });
 
   @override
@@ -86,18 +90,40 @@ class SwipeNoteItemCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Expanded(
-                              child: Text(
-                                title,
-                                style: (titleStyle ??
-                                        Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              color: cs.onSurface,
-                                              fontWeight: FontWeight.w700,
-                                            ))
-                                    ?.copyWith(decoration: titleDecoration),
-                              ),
+                              child: titleSuffix == null
+                                  ? Text(
+                                      title,
+                                      style: (titleStyle ??
+                                              Theme.of(context)
+                                                  .textTheme
+                                                  .titleMedium
+                                                  ?.copyWith(
+                                                    color: cs.onSurface,
+                                                    fontWeight: FontWeight.w700,
+                                                  ))
+                                          ?.copyWith(
+                                              decoration: titleDecoration),
+                                    )
+                                  : Row(children: [
+                                      Flexible(
+                                          child: Text(title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: (titleStyle ??
+                                                      Theme.of(context)
+                                                          .textTheme
+                                                          .titleMedium
+                                                          ?.copyWith(
+                                                              color:
+                                                                  cs.onSurface,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700))
+                                                  ?.copyWith(
+                                                      decoration:
+                                                          titleDecoration))),
+                                      Flexible(child: titleSuffix!),
+                                    ]),
                             ),
                             if (titleBadge != null) titleBadge!,
                             if (statusLabel != null)
