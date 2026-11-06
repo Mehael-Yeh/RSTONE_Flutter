@@ -163,16 +163,43 @@ class _ProductListPageState extends State<ProductListPage> {
     return jsonEncode(value);
   }
 
+  ({String metadata, String body, String prefix})? _productFrontmatter(
+      String content) {
+    int? openingStart, metadataStart;
+    var offset = 0;
+    for (final line in content.split('\n')) {
+      final lineEnd = offset + line.length;
+      final next = lineEnd < content.length ? lineEnd + 1 : lineEnd;
+      if (line.trim() == '---') {
+        if (metadataStart == null) {
+          openingStart = offset;
+          metadataStart = next;
+        } else {
+          var prefix = content.substring(0, openingStart!);
+          if (content.startsWith('\uFEFF') && !prefix.startsWith('\uFEFF')) {
+            prefix = '\uFEFF$prefix';
+          }
+          return (
+            metadata: content.substring(metadataStart, offset),
+            body: content.substring(next),
+            prefix: prefix,
+          );
+        }
+      }
+      offset = next;
+    }
+    return null;
+  }
+
   Future<void> _showAddProductDialog([ProductItem? item]) async {
     _closePullButton();
     if (item != null && item.origin != DataOrigin.user) return;
     final front = item == null
         ? null
-        : RegExp(r'^\uFEFF?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)')
-            .firstMatch(item.rawContent);
+        : _productFrontmatter(item.rawContent);
     final original = front == null
         ? <dynamic, dynamic>{}
-        : _editableProductMetadata(front.group(1)!);
+        : _editableProductMetadata(front.metadata);
     final initial = <String, String?>{
       '工程师': item?.engineer,
       '实验牌号': item?.experimentalCode,
@@ -327,9 +354,9 @@ class _ProductListPageState extends State<ProductListPage> {
           '对标': editedValue('对标', benchmarkController),
           '粘度': editedValue('粘度', viscosityController),
         };
-        final body = front == null
-            ? item.rawContent
-            : item.rawContent.substring(front.end);
+        final hasBom = item.rawContent.startsWith('\uFEFF');
+        final body = front?.body ??
+            (hasBom ? item.rawContent.substring(1) : item.rawContent);
         // The line-oriented reader needs its fixed, safe field labels bare.
         // All other keys are literals, not YAML syntax or implicit scalars.
         const literalFieldLabels = {
@@ -346,8 +373,8 @@ class _ProductListPageState extends State<ProductListPage> {
                   : _yamlMetadataValue(key);
           return '$renderedKey: ${_yamlMetadataValue(entry.value)}';
         });
-        final bom = item.rawContent.startsWith('\uFEFF') ? '\uFEFF' : '';
-        markdown = '$bom---\n${lines.join('\n')}\n---\n$body';
+        final prefix = front?.prefix ?? (hasBom ? '\uFEFF' : '');
+        markdown = '$prefix---\n${lines.join('\n')}\n---\n$body';
         await widget.dataService.updateProductMarkdown(
             item: item, code: codeController.text.trim(), markdown: markdown);
       }

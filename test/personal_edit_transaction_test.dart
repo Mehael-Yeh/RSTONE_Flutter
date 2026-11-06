@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 import 'dart:async';
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:rst_flutter/services/preferences_service.dart';
 import 'package:rst_flutter/data_sync/storage/native_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rst_flutter/data_sync/storage/storage_adapter.dart';
@@ -63,6 +65,7 @@ Future<void> edit(dynamic app, ProductItem item, String name, String text) =>
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   test('pending deletion excludes concurrent personal mutations', () async {
     final f = SignedFixture();
     await f.initialize();
@@ -157,6 +160,10 @@ void main() {
           final a = await f.app(s);
           await a.addProductMarkdown(code: '旧名称', markdown: 'old bytes');
           await a.addProductMarkdown(code: '其它', markdown: 'neighbour bytes');
+          final prefs = PreferencesService();
+          await prefs.initialize();
+          await prefs.saveProductNote('旧名称', 'original note');
+          await prefs.saveProductNote('Unrelated', 'unrelated note');
           if (stage == 'new-write') s.failWriteKey = 'user/产品列表/新名称.md';
           if (stage == 'journal-write') {
             s.failWriteKey = 'user/transactions/product-edit.json';
@@ -175,7 +182,14 @@ void main() {
             expect(await base.readText('user/transactions/product-edit.json'),
                 isNotNull);
           }
+          if (stage != 'journal-remove') {
+            expect(prefs.getProductNote('旧名称'), 'original note');
+            expect(prefs.getProductNote('新名称'), isEmpty);
+          }
           final reload = await f.app(base);
+          expect(prefs.getAllProductNotes(), {
+            '旧名称': 'original note', 'Unrelated': 'unrelated note',
+          });
           expect(await base.readText('user/产品列表/旧名称.md'), 'old bytes');
           expect(await base.readText('user/产品列表/新名称.md'), isNull);
           expect(await base.readText('user/产品列表/其它.md'), 'neighbour bytes');

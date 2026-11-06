@@ -21,6 +21,7 @@ import '../utils/grade_lookup.dart';
 import '../utils/natural_sort.dart';
 import '../utils/formula_association.dart';
 import 'personal_product_transaction.dart';
+import 'preferences_service.dart';
 
 class ObsidianDataService extends ChangeNotifier {
   DataSyncService? sync;
@@ -704,8 +705,21 @@ ${_joinTagsToYamlList(tags)}
       final name = _validatedProductName(code);
       final path = '产品列表/$name.md';
       validateLogicalPath(path);
-      await PersonalProductTransaction(_store)
-          .edit(item.filePath, 'user/$path', item.rawContent, markdown);
+      // Recover before reading preferences: an interrupted prior move may have
+      // changed their keys even though this service still holds the old item.
+      final transaction = PersonalProductTransaction(_store);
+      await transaction.recover();
+      ProductNoteChange? noteChange;
+      if (name != item.displayName) {
+        final prefs = PreferencesService();
+        await prefs.initialize();
+        noteChange = prefs.prepareProductNoteRename(item.displayName, name,
+            officialSource: _official.products.any((p) =>
+                protocolCaseFold(p.displayName) ==
+                protocolCaseFold(item.displayName)));
+      }
+      await transaction.edit(item.filePath, 'user/$path', item.rawContent, markdown,
+          noteChange: noteChange);
       _userItems.remove(item.filePath.substring(5));
       _userItems[path] = ProductItem.fromMdContent('user/$path', markdown,
           origin: DataOrigin.user);

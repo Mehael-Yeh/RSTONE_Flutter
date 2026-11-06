@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rst_flutter/pages/product_list_page.dart';
+import 'package:rst_flutter/pages/search_page.dart';
+import 'package:rst_flutter/widgets/note_swipe_tile.dart';
 import 'package:rst_flutter/services/preferences_service.dart';
 import 'support/sync_fixture.dart';
 
@@ -48,6 +50,14 @@ void main() {
     await tester.pumpWidget(MaterialApp(
         home: ProductListPage(dataService: app, preferencesService: prefs)));
     await tester.pumpAndSettle();
+    final originalTile = find.ancestor(of: find.text('自定义').first,
+        matching: find.byType(NoteSwipeTile));
+    final writingOriginal = tester.widget<NoteSwipeTile>(originalTile.first).onNoteTap!();
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'synthetic personal note');
+    await tester.tap(find.text('确认'));
+    await tester.pumpAndSettle();
+    await writingOriginal;
     expect(find.byTooltip('编辑产品信息'), findsOneWidget);
     await tester.tap(find.byTooltip('编辑产品信息'));
     await tester.pumpAndSettle();
@@ -69,6 +79,8 @@ void main() {
     expect(await tester.runAsync(() => s.readText('user/产品列表/自定义.md')), raw);
     expect(await tester.runAsync(() => s.readText('user/产品列表/Cancelled.md')),
         isNull);
+    expect(prefs.getProductNote('自定义'), 'synthetic personal note');
+    expect(prefs.getProductNote('Cancelled'), isEmpty);
     await tester.tap(find.byTooltip('编辑产品信息'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'ABC');
@@ -85,6 +97,8 @@ void main() {
     }
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
+    expect(prefs.getProductNote('ABC'), 'synthetic personal note');
+    expect(prefs.getProductNote('自定义'), isEmpty);
     expect(await tester.runAsync(() => s.readText('user/产品列表/自定义.md')), isNull);
     final saved = await tester.runAsync(() => s.readText('user/产品列表/ABC.md'));
     expect(saved, contains('body stays'));
@@ -118,6 +132,34 @@ void main() {
     expect(find.text('编辑产品信息'), findsOneWidget);
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
+    // Exercise the real table callback and editor, then the real search
+    // callback/editor against the same service, not only a preferences getter.
+    final tableTile = find.ancestor(of: find.text('ABC').first,
+        matching: find.byType(NoteSwipeTile));
+    tester.widget<NoteSwipeTile>(tableTile.first).onNoteTap!();
+    await tester.pumpAndSettle();
+    expect(tester.widget<NoteEditorDialog>(find.byType(NoteEditorDialog)).initialValue,
+        'synthetic personal note');
+    await tester.enterText(find.descendant(of: find.byType(NoteEditorDialog), matching: find.byType(TextField)), 'table updated note');
+    await tester.tap(find.text('确认'));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(MaterialApp(home: SearchPage(
+      dataService: app, preferencesService: prefs,
+      onThemeModeChanged: (_) async {}, themeSeedColor: Colors.orange,
+      onThemeSeedColorChanged: (_) async {}, themeMode: ThemeMode.system,
+    )));
+    await tester.enterText(find.byType(TextField), 'ABC');
+    await tester.pumpAndSettle();
+    tester.widget<NoteSwipeTile>(find.byType(NoteSwipeTile).first).onNoteTap!();
+    await tester.pumpAndSettle();
+    expect(tester.widget<NoteEditorDialog>(find.byType(NoteEditorDialog)).initialValue,
+        'table updated note');
+    await tester.enterText(find.descendant(of: find.byType(NoteEditorDialog), matching: find.byType(TextField)), 'search updated note');
+    await tester.tap(find.text('确认'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(app.reloadUserItems);
+    expect(prefs.getProductNote('ABC'), 'search updated note');
+    expect(prefs.getProductNote('自定义'), isEmpty);
     expect(tester.takeException(), isNull);
   });
 }

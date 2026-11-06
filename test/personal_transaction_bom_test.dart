@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 
 import 'package:rst_flutter/services/personal_product_transaction.dart';
@@ -13,6 +14,7 @@ import 'support/sync_fixture.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   for (final native in [false, true]) {
     for (final changed in [
       '---\r\nbody  \r\n',
