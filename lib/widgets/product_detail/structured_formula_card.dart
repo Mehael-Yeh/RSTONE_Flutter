@@ -73,6 +73,17 @@ class StructuredFormulaCard extends StatelessWidget {
       final style = FormulaTableLayout.style.copyWith(
           color: cs.onSurface, fontWeight: FontWeight.normal);
       const bold = TextStyle(fontWeight: FontWeight.bold);
+      // 中文字体的空格步进偏宽（0.5em 级），连接空格固定用西文字体渲染，避免看起来像全角空格。
+      const latinSpace = TextStyle(fontFamily: 'Roboto');
+      List<InlineSpan> spaced(String t) {
+        final parts = t.split(' ');
+        return [
+          for (var i = 0; i < parts.length; i++) ...[
+            if (i > 0) const TextSpan(text: ' ', style: latinSpace),
+            if (parts[i].isNotEmpty) TextSpan(text: parts[i]),
+          ],
+        ];
+      }
       const cnLabel = r'^([^：:]{1,16})：';
       final cn = RegExp(cnLabel).firstMatch(text);
       if (cn != null) {
@@ -83,7 +94,7 @@ class StructuredFormulaCard extends StatelessWidget {
                 TextSpan(children: [
                   TextSpan(text: cn.group(1)),
                   const TextSpan(text: '：', style: bold),
-                  TextSpan(text: text.substring(cut + 1)),
+                  ...spaced(text.substring(cut + 1)),
                 ]),
                 style: style,
                 textScaler: TextScaler.noScaling));
@@ -95,11 +106,11 @@ class StructuredFormulaCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Text.rich(
               TextSpan(children: [
-                TextSpan(text: text.substring(0, at)),
-                const TextSpan(text: ' '),
+                ...spaced(text.substring(0, at)),
+                const TextSpan(text: ' ', style: latinSpace),
                 const TextSpan(text: ':', style: bold),
-                const TextSpan(text: ' '),
-                TextSpan(text: text.substring(at + marker.length)),
+                const TextSpan(text: ' ', style: latinSpace),
+                ...spaced(text.substring(at + marker.length)),
               ]),
               style: style,
               textScaler: TextScaler.noScaling));
