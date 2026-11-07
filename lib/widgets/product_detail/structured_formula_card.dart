@@ -67,6 +67,27 @@ class StructuredFormulaCard extends StatelessWidget {
                 color: cs.onSurface,
                 fontWeight: bold ? FontWeight.bold : FontWeight.normal),
             textScaler: TextScaler.noScaling));
+    // 工艺条款的“标签 : 值”分节符：只把冒号加粗，文字本身不加粗。
+    Widget processStep(String text) {
+      const marker = ' : ';
+      final at = text.indexOf(marker);
+      final style = FormulaTableLayout.style.copyWith(
+          color: cs.onSurface, fontWeight: FontWeight.normal);
+      if (at < 0) return paragraph(text);
+      return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Text.rich(
+              TextSpan(children: [
+                TextSpan(text: text.substring(0, at)),
+                const TextSpan(text: ' '),
+                const TextSpan(
+                    text: ':', style: TextStyle(fontWeight: FontWeight.bold)),
+                const TextSpan(text: ' '),
+                TextSpan(text: text.substring(at + marker.length)),
+              ]),
+              style: style,
+              textScaler: TextScaler.noScaling));
+    }
     return Container(
         margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         decoration: BoxDecoration(
@@ -124,7 +145,7 @@ class StructuredFormulaCard extends StatelessWidget {
             if (block is FormulaNote) paragraph(block.text),
             if (block is FormulaProcess) ...[
               paragraph(block.label, bold: true),
-              for (final s in presentFormulaProcess(block.steps)) paragraph(s),
+              for (final s in presentFormulaProcess(block.steps)) processStep(s),
             ],
           ],
         ]));
