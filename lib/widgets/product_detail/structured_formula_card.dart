@@ -67,12 +67,11 @@ class StructuredFormulaCard extends StatelessWidget {
                 color: cs.onSurface,
                 fontWeight: bold ? FontWeight.bold : FontWeight.normal),
             textScaler: TextScaler.noScaling));
-    // 工艺条款的分节符：标签用中文冒号（紧跟、不加空格），值内的英文冒号与等号前后各一空格。
-    // 只有分节冒号加粗，文字本身不加粗。
+    // 工艺条款：标签用中文冒号（紧跟、不加空格），值内的英文冒号与等号前后各一空格。
+    // 分隔符一律不加粗；空格用西文字体渲染，避免中文字体把空格撑得过宽。
     Widget processStep(String text) {
       final style = FormulaTableLayout.style.copyWith(
           color: cs.onSurface, fontWeight: FontWeight.normal);
-      const bold = TextStyle(fontWeight: FontWeight.bold);
       // 中文字体的空格步进偏宽（0.5em 级），连接空格固定用西文字体渲染，避免看起来像全角空格。
       const latinSpace = TextStyle(fontFamily: 'Roboto');
       List<InlineSpan> spaced(String t) {
@@ -93,7 +92,7 @@ class StructuredFormulaCard extends StatelessWidget {
             child: Text.rich(
                 TextSpan(children: [
                   TextSpan(text: cn.group(1)),
-                  const TextSpan(text: '：', style: bold),
+                  const TextSpan(text: '：'),
                   ...spaced(text.substring(cut + 1)),
                 ]),
                 style: style,
@@ -108,7 +107,7 @@ class StructuredFormulaCard extends StatelessWidget {
               TextSpan(children: [
                 ...spaced(text.substring(0, at)),
                 const TextSpan(text: ' ', style: latinSpace),
-                const TextSpan(text: ':', style: bold),
+                const TextSpan(text: ':'),
                 const TextSpan(text: ' ', style: latinSpace),
                 ...spaced(text.substring(at + marker.length)),
               ]),

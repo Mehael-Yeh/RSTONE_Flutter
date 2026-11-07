@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rst_flutter/models/formula_document.dart';
 import 'package:rst_flutter/widgets/product_detail/structured_formula_card.dart';
 
-/// 工艺条款里 “标签 : 值” 的分节冒号必须单独加粗，文字本身不加粗。
+/// 工艺条款里的分隔符（中文冒号/英文冒号/等号）一律不加粗：只有版式，没有字重变化。
 FormulaDocument _doc() => FormulaDocument.fromJson({
       'schema': 'rstone-recipe/2',
       'recipeId': 'SYNTH-COLON-1',
@@ -29,38 +29,23 @@ FormulaDocument _doc() => FormulaDocument.fromJson({
       ],
     });
 
+bool _hasBold(InlineSpan span) {
+  if (span is! TextSpan) return false;
+  if (span.style?.fontWeight == FontWeight.bold) return true;
+  return span.children?.any(_hasBold) ?? false;
+}
+
 void main() {
-  testWidgets('process step bolds only the connector colon', (tester) async {
+  testWidgets('process step never bolds a separator', (tester) async {
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
             body: SingleChildScrollView(
                 child: StructuredFormulaCard(document: _doc())))));
-    bool hasBoldColon(InlineSpan span) {
-      if (span is! TextSpan) return false;
-      if (span.text == ':' && span.style?.fontWeight == FontWeight.bold) {
-        return true;
-      }
-      return span.children?.any(hasBoldColon) ?? false;
-    }
-
-    bool hasPlainColon(InlineSpan span) {
-      if (span is! TextSpan) return false;
-      if (span.text == ':' && span.style?.fontWeight != FontWeight.bold) {
-        return true;
-      }
-      return span.children?.any(hasPlainColon) ?? false;
-    }
-
-    final processText = tester
+    final step = tester
         .widgetList<RichText>(find.byType(RichText))
-        .where((w) => w.text.toPlainText().contains('固化剂'))
-        .toList();
-    expect(processText, isNotEmpty);
-    expect(hasBoldColon(processText.first.text), isTrue);
-    expect(hasPlainColon(processText.first.text), isFalse);
-    expect(processText.first.text.toPlainText(), contains('固化剂 : N3300'));
-    final label = processText.first.text;
-    expect(label.toPlainText().startsWith('固化剂'), isTrue);
+        .firstWhere((w) => w.text.toPlainText() == '固化剂 : N3300');
+    expect(step.text.toPlainText(), '固化剂 : N3300');
+    expect(_hasBold(step.text), isFalse, reason: 'no bold inside a step line');
   });
 
   testWidgets('ratio line keeps a chinese label colon and spaced english colons',
@@ -69,24 +54,11 @@ void main() {
         home: Scaffold(
             body: SingleChildScrollView(
                 child: StructuredFormulaCard(document: _doc())))));
-    bool hasBoldText(InlineSpan span, String ch) {
-      if (span is! TextSpan) return false;
-      if (span.text == ch && span.style?.fontWeight == FontWeight.bold) {
-        return true;
-      }
-      return span.children?.any((c) => hasBoldText(c, ch)) ?? false;
-    }
-
     const line = '施工比例：配方 : 13-75P（新拓普固化剂） : H2O = 100 : 25 : 5-15';
     final ratio = tester
         .widgetList<RichText>(find.byType(RichText))
-        .where((w) => w.text.toPlainText() == line)
-        .toList();
-    expect(ratio, isNotEmpty, reason: 'ratio line keeps its exact text');
-    expect(hasBoldText(ratio.first.text, '：'), isTrue,
-        reason: 'the label colon is bold');
-    expect(ratio.first.text.toPlainText().contains(' : '), isTrue,
-        reason: 'inner english colons keep a space on both sides');
-    expect(hasBoldText(ratio.first.text, ':'), isFalse);
+        .firstWhere((w) => w.text.toPlainText() == line);
+    expect(ratio.text.toPlainText(), line);
+    expect(_hasBold(ratio.text), isFalse, reason: 'separators stay regular');
   });
 }
