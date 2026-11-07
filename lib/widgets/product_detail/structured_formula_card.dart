@@ -67,12 +67,29 @@ class StructuredFormulaCard extends StatelessWidget {
                 color: cs.onSurface,
                 fontWeight: bold ? FontWeight.bold : FontWeight.normal),
             textScaler: TextScaler.noScaling));
-    // 工艺条款的“标签 : 值”分节符：只把冒号加粗，文字本身不加粗。
+    // 工艺条款的分节符：标签用中文冒号（紧跟、不加空格），值内的英文冒号与等号前后各一空格。
+    // 只有分节冒号加粗，文字本身不加粗。
     Widget processStep(String text) {
-      const marker = ' : ';
-      final at = text.indexOf(marker);
       final style = FormulaTableLayout.style.copyWith(
           color: cs.onSurface, fontWeight: FontWeight.normal);
+      const bold = TextStyle(fontWeight: FontWeight.bold);
+      const cnLabel = r'^([^：:]{1,16})：';
+      final cn = RegExp(cnLabel).firstMatch(text);
+      if (cn != null) {
+        final cut = cn.group(1)!.length;
+        return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: cn.group(1)),
+                  const TextSpan(text: '：', style: bold),
+                  TextSpan(text: text.substring(cut + 1)),
+                ]),
+                style: style,
+                textScaler: TextScaler.noScaling));
+      }
+      const marker = ' : ';
+      final at = text.indexOf(marker);
       if (at < 0) return paragraph(text);
       return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -80,8 +97,7 @@ class StructuredFormulaCard extends StatelessWidget {
               TextSpan(children: [
                 TextSpan(text: text.substring(0, at)),
                 const TextSpan(text: ' '),
-                const TextSpan(
-                    text: ':', style: TextStyle(fontWeight: FontWeight.bold)),
+                const TextSpan(text: ':', style: bold),
                 const TextSpan(text: ' '),
                 TextSpan(text: text.substring(at + marker.length)),
               ]),

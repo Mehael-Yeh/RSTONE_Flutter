@@ -20,7 +20,11 @@ FormulaDocument _doc() => FormulaDocument.fromJson({
         {
           'kind': 'process',
           'label': '配制与施工',
-          'steps': ['固化剂 : N3300', '直接说明文字'],
+          'steps': [
+            '固化剂 : N3300',
+            '施工比例：配方 : 13-75P（新拓普固化剂） : H2O = 100 : 25 : 5-15',
+            '直接说明文字',
+          ],
         },
       ],
     });
@@ -57,5 +61,32 @@ void main() {
     expect(processText.first.text.toPlainText(), contains('固化剂 : N3300'));
     final label = processText.first.text;
     expect(label.toPlainText().startsWith('固化剂'), isTrue);
+  });
+
+  testWidgets('ratio line keeps a chinese label colon and spaced english colons',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: StructuredFormulaCard(document: _doc())))));
+    bool hasBoldText(InlineSpan span, String ch) {
+      if (span is! TextSpan) return false;
+      if (span.text == ch && span.style?.fontWeight == FontWeight.bold) {
+        return true;
+      }
+      return span.children?.any((c) => hasBoldText(c, ch)) ?? false;
+    }
+
+    const line = '施工比例：配方 : 13-75P（新拓普固化剂） : H2O = 100 : 25 : 5-15';
+    final ratio = tester
+        .widgetList<RichText>(find.byType(RichText))
+        .where((w) => w.text.toPlainText() == line)
+        .toList();
+    expect(ratio, isNotEmpty, reason: 'ratio line keeps its exact text');
+    expect(hasBoldText(ratio.first.text, '：'), isTrue,
+        reason: 'the label colon is bold');
+    expect(ratio.first.text.toPlainText().contains(' : '), isTrue,
+        reason: 'inner english colons keep a space on both sides');
+    expect(hasBoldText(ratio.first.text, ':'), isFalse);
   });
 }
